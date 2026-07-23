@@ -14,6 +14,7 @@ import '../../core/theme.dart';
 import '../../models/persp_calib.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/common_ui.dart';
+import '../../widgets/common/motif_preview.dart';
 import '../../widgets/studio/calib_handles.dart';
 import '../../widgets/studio/metres_panel.dart';
 import '../../widgets/studio/product_modal.dart';
@@ -308,6 +309,16 @@ class _PhotoZone extends StatelessWidget {
               left: 10,
               bottom: 10,
               child: _DemoScenePicker(),
+            ),
+          // Aperçu zoomé du VRAI relief sculpté (Bug B) — la bande dans la
+          // photo de pièce est physiquement trop fine pour révéler le
+          // détail du motif (feuillages/perles/oves), même en texture-
+          // mapping réel ; cette vignette montre le vrai produit net.
+          if (state.showProductOverlay)
+            Positioned(
+              right: 10,
+              top: 10,
+              child: MotifPreviewBar(selectedProducts: state.selectedProducts),
             ),
           Positioned(
             left: 10,

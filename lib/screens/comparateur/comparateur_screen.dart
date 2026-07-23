@@ -17,6 +17,7 @@ import '../../core/theme.dart';
 import '../../models/persp_calib.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/common_ui.dart';
+import '../../widgets/common/motif_preview.dart';
 
 class ComparateurScreen extends StatelessWidget {
   const ComparateurScreen({super.key});
@@ -228,6 +229,14 @@ class _CompZone extends StatelessWidget {
             right: 10,
             bottom: 10,
             child: _CompLabel('APRÈS'),
+          ),
+          // Aperçu zoomé du VRAI relief sculpté (Bug B) — voir Studio pour
+          // le détail : la bande dans la photo est trop fine pour montrer
+          // le motif, même en texture-mapping réel.
+          Positioned(
+            right: 10,
+            top: 10,
+            child: MotifPreviewBar(selectedProducts: state.selectedProducts),
           ),
         ],
       ),
