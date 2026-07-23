@@ -107,7 +107,12 @@ class RoomPainter extends CustomPainter {
       // chaque frame (no-op si déjà chargé/en cours/en échec) et
       // déclenche un `notifyListeners()` → repaint dès que l'image
       // réseau arrive (voir [ProductTextureCache]).
-      if (fam == 'Corniches' || fam == 'Plinthes') {
+      //
+      // ⚠️ CORRECTION Bug "aucune ornementation" (retour utilisateur) —
+      // les Ornements (pièces uniques : modillons, fleurs de trumeau...)
+      // sont désormais également texturés avec la vraie photo produit,
+      // au lieu du contour vectoriel abstrait générique précédent.
+      if (fam == 'Corniches' || fam == 'Plinthes' || fam == 'Ornements') {
         ProductTextureCache.instance.ensureLoading(prod.ref, prod.img);
       }
       final texture = ProductTextureCache.instance.getIfLoaded(prod.ref);
@@ -202,6 +207,7 @@ class RoomPainter extends CustomPainter {
             imgLeft: imgLeft,
             imgW: imgW,
             canvasW: w,
+            texture: texture,
           );
           break;
       }

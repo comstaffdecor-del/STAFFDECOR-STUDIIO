@@ -205,8 +205,29 @@ void paintEncadrement(
   canvas.drawCircle(Offset(rX, rY), 3.5, Paint()..color = color.withValues(alpha: 0.85));
 }
 
-/// ── Ornements : motif feuille d'acanthe simplifié, position libre sur
-/// le mur (xPct horizontal, snapLine pour la hauteur verticale). ──
+/// ── Ornements : pièce sculptée unique (modillon, fleur de trumeau...)
+/// posée sur le mur, position libre (xPct horizontal, snapLine pour la
+/// hauteur verticale).
+///
+/// ⚠️ CORRECTION Bug "aucune ornementation" (retour utilisateur : "aucune
+/// ornementation [visible]") — l'ancien rendu traçait UNIQUEMENT un
+/// contour fin (`strokeWidth: 2`, `PaintingStyle.stroke`, sans aucun
+/// remplissage) d'une forme abstraite minuscule (`canvasW * 0.040`, soit
+/// ~4% de la largeur, quelques dizaines de px) dans une couleur quasi
+/// blanche (`famColors['Ornements'] = 0xFFF0EDE8`) à 80% d'opacité —
+/// vérifié : sur la plupart des photos (murs clairs, fenêtres, ciel), ce
+/// motif devient indiscernable à l'oeil (confirmé par diff pixel-à-pixel :
+/// seule une différence de quelques niveaux de gris sur ~45×40px, aucune
+/// forme perceptible en observation directe du rendu).
+///
+/// Comme pour Corniches/Plinthes (voir [ProductTextureCache]), on mappe
+/// désormais la VRAIE photo produit staffdecor.fr dans une plaque
+/// arrondie avec ombre de contact — une pièce d'ornement plaquée au mur,
+/// pas une silhouette procédurale générique. Si la photo n'est pas
+/// encore chargée (ou échec réseau), le fallback procédural est
+/// nettement plus visible : plaque REMPLIE (pas juste un contour), 2.6x
+/// plus grande, contour sombre net + reflet clair pour un effet de
+/// relief perceptible sur n'importe quel fond.
 void paintOrnement(
   Canvas canvas,
   VanishingPoint vp, {
@@ -216,34 +237,114 @@ void paintOrnement(
   required double imgLeft,
   required double imgW,
   required double canvasW,
+  Image? texture,
 }) {
   final oX = imgLeft + xPct * imgW;
   final tOY = snapLine == 'ceiling' ? 0.15 : (snapLine == 'floor' ? 0.70 : 0.48);
   final oY = vp.fTL.dy + (vp.fBL.dy - vp.fTL.dy) * tOY;
-  final oS = canvasW * 0.040;
 
-  final paint = Paint()
-    ..color = color.withValues(alpha: 0.80)
-    ..strokeWidth = 2
-    ..style = PaintingStyle.stroke;
+  // Taille de plaque perçue ~2.6x l'ancienne (0.040 → 0.105), cohérente
+  // avec une pièce décorative posée (comparable à une petite rosace).
+  final oS = canvasW * 0.105;
+  final rectW = oS * 2;
+  final rectH = oS * 2 * 1.15;
+  final rect = Rect.fromCenter(center: Offset(oX, oY), width: rectW, height: rectH);
+  final rrect = RRect.fromRectAndRadius(rect, Radius.circular(oS * 0.35));
 
-  final path1 = Path()
-    ..moveTo(oX, oY - oS)
-    ..cubicTo(oX + oS * 0.8, oY - oS * 0.4, oX + oS, oY + oS * 0.4, oX, oY + oS * 0.2)
-    ..cubicTo(oX - oS, oY + oS * 0.4, oX - oS * 0.8, oY - oS * 0.4, oX, oY - oS);
-  canvas.drawPath(path1, paint);
+  // Ombre de contact douce — détache visuellement la pièce du mur (sans
+  // quoi même une plaque bien rendue reste "plate"/peu perceptible).
+  canvas.drawRRect(
+    rrect.shift(const Offset(0, 3)),
+    Paint()
+      ..color = const Color(0x552A2016)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+  );
 
-  final path2 = Path()
-    ..moveTo(oX - oS * 0.5, oY - oS * 0.5)
-    ..cubicTo(
-      oX - oS * 0.2,
-      oY + oS * 0.3,
-      oX + oS * 0.2,
-      oY + oS * 0.3,
-      oX + oS * 0.5,
-      oY - oS * 0.5,
+  if (texture != null) {
+    canvas.save();
+    canvas.clipRRect(rrect);
+    canvas.drawRRect(rrect, Paint()..color = const Color(0xFFFCFAF6));
+
+    // Recadrage "cover" manuel (équivalent BoxFit.cover) : on garde le
+    // centre de la photo produit et on rogne l'excédent selon le ratio
+    // de la plaque, pour éviter tout étirement déformant.
+    final texW = texture.width.toDouble();
+    final texH = texture.height.toDouble();
+    final targetAspect = rectW / rectH;
+    final texAspect = texW / texH;
+    Rect src;
+    if (texAspect > targetAspect) {
+      final cropW = texH * targetAspect;
+      src = Rect.fromLTWH((texW - cropW) / 2, 0, cropW, texH);
+    } else {
+      final cropH = texW / targetAspect;
+      src = Rect.fromLTWH(0, (texH - cropH) / 2, texW, cropH);
+    }
+    canvas.drawImageRect(texture, src, rect, Paint()..filterQuality = FilterQuality.medium);
+    canvas.restore();
+
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = const Color(0xCCFFFFFF)
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke,
     );
-  canvas.drawPath(path2, paint);
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = const Color(0x99413426)
+        ..strokeWidth = 1.0
+        ..style = PaintingStyle.stroke,
+    );
+    return;
+  }
+
+  // ── Fallback procédural (photo pas encore chargée / échec réseau). ──
+  canvas.drawRRect(rrect, Paint()..color = color.withValues(alpha: 0.97));
+  canvas.drawRRect(
+    rrect,
+    Paint()
+      ..color = const Color(0x99413426)
+      ..strokeWidth = 1.4
+      ..style = PaintingStyle.stroke,
+  );
+
+  final leafS = oS * 0.62;
+  final path1 = Path()
+    ..moveTo(oX, oY - leafS)
+    ..cubicTo(oX + leafS * 0.8, oY - leafS * 0.4, oX + leafS, oY + leafS * 0.4, oX, oY + leafS * 0.2)
+    ..cubicTo(oX - leafS, oY + leafS * 0.4, oX - leafS * 0.8, oY - leafS * 0.4, oX, oY - leafS);
+  final path2 = Path()
+    ..moveTo(oX - leafS * 0.5, oY - leafS * 0.5)
+    ..cubicTo(
+      oX - leafS * 0.2,
+      oY + leafS * 0.3,
+      oX + leafS * 0.2,
+      oY + leafS * 0.3,
+      oX + leafS * 0.5,
+      oY - leafS * 0.5,
+    );
+
+  // Trait sombre net (structure) + fin reflet clair décalé (relief perçu).
+  final darkStroke = Paint()
+    ..color = const Color(0xD9413426)
+    ..strokeWidth = 2.6
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round;
+  final lightStroke = Paint()
+    ..color = const Color(0xF2FFFFFF)
+    ..strokeWidth = 1.1
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round;
+
+  canvas.drawPath(path1, darkStroke);
+  canvas.drawPath(path2, darkStroke);
+  canvas.save();
+  canvas.translate(-0.8, -0.8);
+  canvas.drawPath(path1, lightStroke);
+  canvas.drawPath(path2, lightStroke);
+  canvas.restore();
 }
 
 
