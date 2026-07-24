@@ -50,7 +50,15 @@ class ComparateurScreen extends StatelessWidget {
               ),
               IconBtn(icon: FontAwesomeIcons.download, size: 30, onTap: () {}),
               const SizedBox(width: 6),
-              IconBtn(icon: FontAwesomeIcons.paperPlane, size: 30, onTap: () {}),
+              // ⚠️ CORRECTION Bug #12 : cette icône "envoyer" n'avait
+              // jamais eu de comportement (onTap: () {} vide). Elle ouvre
+              // désormais le modal de coordonnées, cohérent avec le bouton
+              // "Générer le devis" ci-dessous.
+              IconBtn(
+                icon: FontAwesomeIcons.paperPlane,
+                size: 30,
+                onTap: state.openContactModal,
+              ),
             ],
           ),
         ),
@@ -65,78 +73,156 @@ class ComparateurScreen extends StatelessWidget {
           child: Container(
             color: AppColors.bg,
             padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Devis estimatif',
-                      style: TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(width: 8),
-                    EstimBadge(calibrated: state.isCalibrated),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: chiffrage.lignes.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Aucun produit sélectionné',
-                            style: TextStyle(color: AppColors.text3, fontSize: 12),
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: chiffrage.lignes.length,
-                          separatorBuilder: (_, __) => const Divider(height: 12, color: AppColors.border),
-                          itemBuilder: (context, i) {
-                            final l = chiffrage.lignes[i];
-                            return Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(l.ref,
-                                          style: const TextStyle(
-                                              color: AppColors.text, fontSize: 12.5, fontWeight: FontWeight.w600)),
-                                      Text('${fmtN(l.qteCom)} ${l.unite}',
-                                          style: const TextStyle(color: AppColors.text3, fontSize: 10.5)),
-                                    ],
-                                  ),
-                                ),
-                                Text(fmtPrix(l.totalHt),
-                                    style: const TextStyle(color: AppColors.gold, fontSize: 12.5, fontWeight: FontWeight.w600)),
-                              ],
-                            );
-                          },
-                        ),
-                ),
-                const Divider(color: AppColors.border),
-                Row(
-                  children: [
-                    const Text('Total estimé (TTC)',
-                        style: TextStyle(color: AppColors.text2, fontSize: 13)),
-                    const Spacer(),
-                    Text(fmtPrix(chiffrage.totalTtc),
-                        style: const TextStyle(color: AppColors.gold, fontSize: 17, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: BtnGold(
-                    label: 'Générer le devis',
-                    icon: FontAwesomeIcons.fileInvoiceDollar,
-                    onTap: () => state.goTo('devis'),
-                  ),
-                ),
-              ],
-            ),
+            // ⚠️ CORRECTION Bug #14/#22 (retour utilisateur : "il faut
+            // RETIRER le prix/devis visible du panneau bas du Comparateur
+            // jusqu'à la saisie des coordonnées") — tant que
+            // [contactSubmitted] est faux, on masque entièrement les
+            // montants (lignes + total) et on affiche un appel à l'action
+            // à la place. Une fois les coordonnées soumises, le panneau
+            // redevient identique à avant (aucune régression pour
+            // l'utilisateur qui a déjà laissé ses coordonnées).
+            child: state.contactSubmitted
+                ? _PricedPanel(chiffrage: chiffrage, state: state)
+                : _LockedPanel(hasProducts: state.selectedProducts.isNotEmpty),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Panneau chiffrage complet (affiché seulement après coordonnées soumises).
+class _PricedPanel extends StatelessWidget {
+  final Chiffrage chiffrage;
+  final AppState state;
+  const _PricedPanel({required this.chiffrage, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Devis estimatif',
+              style: TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(width: 8),
+            EstimBadge(calibrated: state.isCalibrated),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: chiffrage.lignes.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Aucun produit sélectionné',
+                    style: TextStyle(color: AppColors.text3, fontSize: 12),
+                  ),
+                )
+              : ListView.separated(
+                  itemCount: chiffrage.lignes.length,
+                  separatorBuilder: (_, __) => const Divider(height: 12, color: AppColors.border),
+                  itemBuilder: (context, i) {
+                    final l = chiffrage.lignes[i];
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(l.ref,
+                                  style: const TextStyle(
+                                      color: AppColors.text, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                              Text('${fmtN(l.qteCom)} ${l.unite}',
+                                  style: const TextStyle(color: AppColors.text3, fontSize: 10.5)),
+                            ],
+                          ),
+                        ),
+                        Text(fmtPrix(l.totalHt),
+                            style: const TextStyle(color: AppColors.gold, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                      ],
+                    );
+                  },
+                ),
+        ),
+        const Divider(color: AppColors.border),
+        Row(
+          children: [
+            const Text('Total estimé (TTC)',
+                style: TextStyle(color: AppColors.text2, fontSize: 13)),
+            const Spacer(),
+            Text(fmtPrix(chiffrage.totalTtc),
+                style: const TextStyle(color: AppColors.gold, fontSize: 17, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: BtnGold(
+            label: 'Générer le devis',
+            icon: FontAwesomeIcons.fileInvoiceDollar,
+            onTap: () => state.goTo('devis'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Panneau verrouillé — remplace les montants tant que les coordonnées
+/// client n'ont pas été soumises (Bug #14/#22).
+class _LockedPanel extends StatelessWidget {
+  final bool hasProducts;
+  const _LockedPanel({required this.hasProducts});
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.read<AppState>();
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppColors.gold.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const Icon(FontAwesomeIcons.lock, size: 20, color: AppColors.gold),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Estimation masquée',
+            style: TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              hasProducts
+                  ? 'Renseignez vos coordonnées pour afficher le chiffrage '
+                      'détaillé et être recontacté par un conseiller.'
+                  : 'Ajoutez au moins un produit dans le Studio, puis '
+                      'renseignez vos coordonnées pour afficher le chiffrage.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.text3, fontSize: 11.5, height: 1.4),
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: 220,
+            child: BtnGold(
+              label: 'Voir mon estimation',
+              icon: FontAwesomeIcons.unlock,
+              onTap: state.openContactModal,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

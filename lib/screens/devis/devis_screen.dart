@@ -25,6 +25,14 @@ class DevisScreen extends StatelessWidget {
       isCalibrated: state.isCalibrated,
     );
 
+    // ⚠️ CORRECTION Bug #14/#22 : l'écran Devis complet (table détaillée +
+    // totaux) reste réservé aux utilisateurs ayant soumis leurs
+    // coordonnées — même logique de verrouillage que le panneau bas du
+    // Comparateur (voir _LockedPanel/comparateur_screen.dart).
+    if (!state.contactSubmitted) {
+      return _DevisLocked(state: state);
+    }
+
     return Column(
       children: [
         Container(
@@ -206,6 +214,81 @@ class DevisScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold)),
         ],
       ),
+    );
+  }
+}
+
+/// Écran Devis verrouillé — affiché tant que [AppState.contactSubmitted]
+/// est faux (Bug #14/#22).
+class _DevisLocked extends StatelessWidget {
+  final AppState state;
+  const _DevisLocked({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          height: 58,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: const BoxDecoration(
+            color: AppColors.bg,
+            border: Border(bottom: BorderSide(color: AppColors.border)),
+          ),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text('Mon Devis',
+                    style: TextStyle(color: AppColors.gold, fontSize: 15, fontWeight: FontWeight.w600)),
+              ),
+              IconBtn(icon: FontAwesomeIcons.arrowLeft, size: 32, onTap: () => state.goTo('comparateur')),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: AppColors.gold.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(FontAwesomeIcons.lock, size: 24, color: AppColors.gold),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Devis masqué',
+                    style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Renseignez vos coordonnées pour consulter le détail du '
+                    'chiffrage et recevoir cette estimation par email.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.text3, fontSize: 12.5, height: 1.4),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: 240,
+                    child: BtnGold(
+                      label: 'Voir mon devis',
+                      icon: FontAwesomeIcons.unlock,
+                      onTap: state.openContactModal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

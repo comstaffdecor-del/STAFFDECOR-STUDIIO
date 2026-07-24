@@ -10,6 +10,12 @@ import '../../core/theme.dart';
 import '../../data/catalogue_data.dart';
 import '../../state/app_state.dart';
 
+// ⚠️ CORRECTION Bug #13 (retour utilisateur : "produits Lambris non
+// indexés/accessibles") — 'Lambris' et 'Profils LED' existent bien dans
+// [catalogueGed] (voir catalogue_data.dart, `familles`) et sont déjà
+// rendus par [RoomPainter], mais n'apparaissaient jamais dans ce bandeau
+// d'onglets Studio : impossible d'y accéder autrement que par appel direct
+// à `setCatTabStudio`. Ajoutés ici avec des icônes dédiées.
 const _famTabIcons = {
   'Corniches': FontAwesomeIcons.archway,
   'Moulures': FontAwesomeIcons.minus,
@@ -18,6 +24,8 @@ const _famTabIcons = {
   'Colonnes': FontAwesomeIcons.tableColumns,
   'Ornements': FontAwesomeIcons.leaf,
   'Parements': FontAwesomeIcons.borderAll,
+  'Lambris': FontAwesomeIcons.bars,
+  'Profils LED': FontAwesomeIcons.lightbulb,
 };
 
 const _famTabLabels = {

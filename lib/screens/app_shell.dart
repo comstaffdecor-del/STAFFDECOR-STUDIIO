@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../state/app_state.dart';
 import '../widgets/common/bottom_nav.dart';
+import '../widgets/common/contact_modal.dart';
 import 'catalogue/catalogue_screen.dart';
 import 'comparateur/comparateur_screen.dart';
 import 'devis/devis_screen.dart';
@@ -54,10 +55,18 @@ class _AppShellState extends State<AppShell> {
         screen = const HomeScreen();
     }
 
-    final content = Column(
+    final content = Stack(
       children: [
-        Expanded(child: screen),
-        const AppBottomNav(),
+        Column(
+          children: [
+            Expanded(child: screen),
+            const AppBottomNav(),
+          ],
+        ),
+        // ⚠️ Bug #14/#15/#16/#22 : modal contact global, superposable à
+        // n'importe quel écran (déclenché depuis Comparateur/Devis quand
+        // l'utilisateur tente de consulter le chiffrage sans coordonnées).
+        if (state.showContactModal) const Positioned.fill(child: ContactModal()),
       ],
     );
 

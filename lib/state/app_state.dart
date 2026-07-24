@@ -27,6 +27,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/catalogue_data.dart';
 import '../core/chiffrage.dart';
 import '../core/perspective/edge_detect.dart';
+import '../models/contact_info.dart';
 import '../models/project_item.dart';
 import '../models/persp_calib.dart';
 
@@ -440,6 +441,48 @@ class AppState extends ChangeNotifier {
   double productModalQte = 5;
   bool showMetresPanel = false;
 
+  /* ── Contact commercial (Bug #14/#15/#16/#22) ── */
+
+  /// ⚠️ CORRECTION Bug #14/#22 (retour utilisateur : "il faut RETIRER le
+  /// prix/devis visible (panneau bas du Comparateur + écran Devis)
+  /// jusqu'à la saisie des coordonnées, l'objectif est la génération de
+  /// leads, pas l'affichage libre d'un prix") — tant que
+  /// [contactSubmitted] est faux, le Comparateur et le Devis masquent
+  /// leurs montants et affichent un appel à contact à la place. Passe à
+  /// `true` dès qu'un [ContactInfo] valide (avec consentement RGPD) a
+  /// été soumis via [submitContact] — persistant (voir [save]/[restore])
+  /// pour ne pas re-demander les coordonnées à chaque session.
+  bool contactSubmitted = false;
+
+  /// Dernières coordonnées soumises (pré-remplissage du modal si
+  /// l'utilisateur rouvre le formulaire, et corps du mailto généré).
+  ContactInfo? lastContactInfo;
+
+  /// Affiche/masque le modal de saisie des coordonnées.
+  bool showContactModal = false;
+
+  void openContactModal() {
+    showContactModal = true;
+    notifyListeners();
+  }
+
+  void closeContactModal() {
+    showContactModal = false;
+    notifyListeners();
+  }
+
+  /// Enregistre les coordonnées et débloque l'affichage du chiffrage.
+  /// Validation stricte (prénom/nom/email non vides + RGPD cochée) faite
+  /// côté UI ([ContactModal]) avant appel — ici on se contente de
+  /// persister et de lever le verrou de prix.
+  void submitContact(ContactInfo info) {
+    lastContactInfo = info;
+    contactSubmitted = true;
+    showContactModal = false;
+    notifyListeners();
+    save();
+  }
+
   void openMetresPanel() {
     showMetresPanel = true;
     notifyListeners();
@@ -665,6 +708,8 @@ class AppState extends ChangeNotifier {
         'metresFenetres': metresFenetres,
         'devisWarnShown': devisWarnShown,
         'catFam': catFam,
+        'contactSubmitted': contactSubmitted,
+        'lastContactInfo': lastContactInfo?.toJson(),
         // ⚠️ CORRECTION Bug "bande cassée après rechargement" (retour
         // utilisateur répété : "mais pourquoi ca ne fonctionne pas") —
         // `perspCalib` et `isCalibrated` ne doivent JAMAIS être persistés
@@ -736,6 +781,14 @@ class AppState extends ChangeNotifier {
       }
       if (saved['catFam'] != null) {
         catFam = saved['catFam'] as String;
+      }
+      if (saved['contactSubmitted'] != null) {
+        contactSubmitted = saved['contactSubmitted'] as bool;
+      }
+      if (saved['lastContactInfo'] != null) {
+        lastContactInfo = ContactInfo.fromJson(
+          saved['lastContactInfo'] as Map<String, dynamic>,
+        );
       }
       // ⚠️ NE PAS restaurer `perspCalib`/`isCalibrated` — voir commentaire
       // dans [save]. Ils sont toujours recalculés à neuf par

@@ -47,6 +47,19 @@ dependencies:
   # HTTP client for contact form submission (mirrors /api/contact)
   http: 1.5.0
 
+  # ⚠️ CORRECTION Bug #14 (retour utilisateur : "générer un devis doit
+  # imposer la saisie des coordonnées, puis ENVOYER automatiquement le
+  # projet à contact@staffdecor.fr") — aucun backend Hono/Cloudflare
+  # Workers n'est déployé/atteignable depuis ce sandbox (l'ancien
+  # `/api/contact` utilisait l'API Gmail server-side, indisponible ici).
+  # Solution pragmatique fidèle à l'objectif ("génération de leads") :
+  # on ouvre le client mail de l'utilisateur pré-rempli (destinataire
+  # contact@staffdecor.fr, sujet + corps = coordonnées + récapitulatif
+  # chiffrage) via un lien `mailto:` — l'envoi reste un geste explicite
+  # de l'utilisateur (un clic "Envoyer" dans son client mail), mais le
+  # contenu est entièrement préparé, sans ressaisie.
+  url_launcher: 6.3.1
+
   # Formatting fr-FR (prix, quantités) — mirrors Intl.NumberFormat('fr-FR')
   intl: ^0.19.0
 

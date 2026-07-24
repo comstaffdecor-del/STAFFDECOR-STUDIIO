@@ -15,6 +15,9 @@ import '../../state/app_state.dart';
 import '../../widgets/common/common_ui.dart';
 import '../../widgets/studio/product_modal.dart';
 
+// ⚠️ CORRECTION Bug #13 : 'Lambris' et 'Profils LED' ajoutés — mêmes
+// familles présentes dans [catalogueGed] mais absentes de ce filtre pills,
+// rendant ~30 produits invisibles/inaccessibles depuis le Catalogue.
 const _pills = <String, String>{
   'all': 'Tous',
   'Corniches': 'Corniches',
@@ -24,6 +27,8 @@ const _pills = <String, String>{
   'Encadrements': 'Rosaces',
   'Colonnes': 'Colonnes',
   'Ornements': 'Ornements',
+  'Lambris': 'Lambris',
+  'Profils LED': 'Profils LED',
   'with_img': 'Photo',
 };
 
