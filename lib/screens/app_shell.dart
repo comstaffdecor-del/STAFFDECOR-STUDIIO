@@ -28,6 +28,10 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     context.read<AppState>().restore();
+    // ⚠️ Chargement de la liste des projets NOMMÉS enregistrés (bouton
+    // disquette du Studio) — distinct de l'auto-save silencieux [restore]
+    // ci-dessus, voir [AppState.loadSavedProjects].
+    context.read<AppState>().loadSavedProjects();
   }
 
   @override
@@ -71,11 +75,11 @@ class _AppShellState extends State<AppShell> {
     );
 
     return Scaffold(
-      // Fond noir plein écran derrière le cadre "téléphone" — équivalent
-      // du body { background:#000 } + box-shadow: 0 0 100px rgba(0,0,0,.9)
-      // de l'ancien #app-shell (base.css), qui assombrissait tout l'écran
-      // autour de la fenêtre applicative sur desktop/large viewport.
-      backgroundColor: Colors.black,
+      // ⚠️ CORRECTION demande utilisateur ("Remplace le noir de l'app par
+      // du bleu profond (bleu nuit)") — le fond plein écran derrière le
+      // cadre "téléphone" (desktop/large viewport) utilise désormais
+      // [AppColors.shellBg] (bleu nuit très sombre) au lieu de noir pur.
+      backgroundColor: AppColors.shellBg,
       body: LayoutBuilder(
         builder: (context, constraints) {
           const maxW = 430.0;

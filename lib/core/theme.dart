@@ -1,27 +1,39 @@
-/// Thème Flutter — port fidèle de la palette CSS originale (`base.css`).
+/// Thème Flutter — palette "bleu nuit" (retour utilisateur : "Remplace le
+/// noir de l'app par du bleu profond (bleu nuit)").
 ///
-/// Couleurs identiques à `:root { --bg, --gold, --text, ... }` pour
-/// préserver le design existant demandé par l'utilisateur.
+/// ⚠️ CORRECTION demande utilisateur : la palette d'origine (brun/noir
+/// quasi neutre, `0xFF1C1714` etc., héritée de `base.css`) est remplacée
+/// par une gamme de bleu nuit profond (marine/encre), en conservant à
+/// l'identique les accents dorés (`gold`/`goldLight`/`goldDark`) qui
+/// portent l'identité visuelle Staff Décor, ainsi que les couleurs
+/// sémantiques (`green`/`red`/`amber`) et les teintes de texte (le
+/// contraste texte crème / fond bleu nuit reste excellent).
 library;
 
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const bg = Color(0xFF1C1714);
-  static const bg2 = Color(0xFF231F1A);
-  static const card = Color(0xFF2A2420);
-  static const card2 = Color(0xFF322B25);
+  static const bg = Color(0xFF0B1220);
+  static const bg2 = Color(0xFF10192E);
+  static const card = Color(0xFF16213A);
+  static const card2 = Color(0xFF1C2B47);
   static const gold = Color(0xFFC9A96E);
   static const goldLight = Color(0xFFE2C48A);
   static const goldDark = Color(0xFFA07840);
   static const text = Color(0xFFF5EFE3);
-  static const text2 = Color(0xFFB8A898);
-  static const text3 = Color(0xFF7A6A5A);
-  static const border = Color(0xFF3D342A);
+  static const text2 = Color(0xFFB0B9CC);
+  static const text3 = Color(0xFF6E7A94);
+  static const border = Color(0xFF2A3B5C);
   static const platre = Color(0xFFF5F0E8);
   static const green = Color(0xFF4ADE80);
   static const red = Color(0xFFF87171);
   static const amber = Color(0xFFFBBF24);
+
+  /// Fond plein écran derrière le cadre "téléphone" (desktop/large écran)
+  /// — équivalent bleu nuit du `body { background:#000 }` d'origine
+  /// (légèrement plus sombre que [bg] pour garder une sensation de
+  /// profondeur derrière le cadre applicatif).
+  static const shellBg = Color(0xFF050A14);
 }
 
 ThemeData buildAppTheme() {

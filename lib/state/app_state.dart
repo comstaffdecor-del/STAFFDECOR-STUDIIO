@@ -30,8 +30,10 @@ import '../core/perspective/edge_detect.dart';
 import '../models/contact_info.dart';
 import '../models/project_item.dart';
 import '../models/persp_calib.dart';
+import '../models/saved_project.dart';
 
 const _prefsKey = 'sds_state';
+const _projectsPrefsKey = 'sds_saved_projects';
 
 /// Calcule le rectangle d'affichage "contain" d'une image source dans un
 /// conteneur donné (letterboxing centré) — port fidèle de la logique
@@ -441,6 +443,20 @@ class AppState extends ChangeNotifier {
   double productModalQte = 5;
   bool showMetresPanel = false;
 
+  /// Affiche/masque le modal "Enregistrer le projet" (Studio) — voir
+  /// [saveCurrentAsProject].
+  bool showSaveProjectModal = false;
+
+  void openSaveProjectModal() {
+    showSaveProjectModal = true;
+    notifyListeners();
+  }
+
+  void closeSaveProjectModal() {
+    showSaveProjectModal = false;
+    notifyListeners();
+  }
+
   /* ── Contact commercial (Bug #14/#15/#16/#22) ── */
 
   /// ⚠️ CORRECTION Bug #14/#22 (retour utilisateur : "il faut RETIRER le
@@ -688,6 +704,121 @@ class AppState extends ChangeNotifier {
   void closeProductModal() {
     productModalRef = null;
     notifyListeners();
+  }
+
+  /* ── Projets nommés (Enregistrer / Charger / Supprimer) ── */
+  //
+  // ⚠️ CORRECTION retour utilisateur : "Les boutons d'enregistrement et de
+  // téléchargement des projets ne sont pas instinctifs et surtout ne
+  // fonctionnent pas." — Avant cette correction, il n'existait AUCUN
+  // bouton "Enregistrer le projet" dans toute l'application (l'auto-save
+  // de [save]/[restore] ci-dessous est un mécanisme SILENCIEUX qui ne
+  // conserve qu'UN SEUL état "en cours", jamais nommé, jamais listé nulle
+  // part) ; et l'écran Home affichait deux cartes "projet" 100% factices
+  // (texte codé en dur, aucun `onTap`). Cette section introduit un
+  // véritable système de projets NOMMÉS : liste persistée, enregistrement
+  // explicite (bouton disquette dans le Studio), chargement et suppression
+  // depuis l'écran Home.
+
+  /// Liste des projets explicitement enregistrés par l'utilisateur
+  /// (persistée séparément de l'état "session courante").
+  List<SavedProject> savedProjects = [];
+
+  /// Charge la liste des projets enregistrés — appelé une fois au
+  /// démarrage de l'app (voir [AppShell.initState], en complément de
+  /// [restore]).
+  Future<void> loadSavedProjects() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_projectsPrefsKey);
+      if (raw == null) return;
+      final list = jsonDecode(raw) as List;
+      savedProjects = list
+          .map((e) => SavedProject.fromJson(e as Map<String, dynamic>))
+          .toList();
+      notifyListeners();
+    } catch (_) {
+      // stockage indisponible/corrompu — comportement silencieux, comme le reste de la persistance de l'app.
+    }
+  }
+
+  Future<void> _persistSavedProjects() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = savedProjects.map((p) => p.toJson()).toList();
+      await prefs.setString(_projectsPrefsKey, jsonEncode(data));
+    } catch (_) {
+      // stockage indisponible — silencieux.
+    }
+  }
+
+  /// Enregistre l'état courant du projet (produits sélectionnés,
+  /// positions, métrés, scène démo) sous le nom [name]. Retourne le
+  /// [SavedProject] créé. Action EXPLICITE déclenchée par l'utilisateur
+  /// (bouton disquette du Studio) — répond directement au retour
+  /// utilisateur sur le bouton "enregistrement" non fonctionnel.
+  Future<SavedProject> saveCurrentAsProject(String name) async {
+    final project = SavedProject(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      name: name.trim().isEmpty ? 'Projet sans titre' : name.trim(),
+      createdAt: DateTime.now(),
+      selectedProducts: List.of(selectedProducts),
+      prodPositions: Map.of(prodPositions),
+      metresMurA: metresMurA,
+      metresMurB: metresMurB,
+      metresHauteur: metresHauteur,
+      metresPortes: metresPortes,
+      metresFenetres: metresFenetres,
+      isDemoRoom: isDemoRoom,
+      demoScene: demoScene,
+    );
+    savedProjects = [project, ...savedProjects];
+    notifyListeners();
+    await _persistSavedProjects();
+    return project;
+  }
+
+  /// Recharge un projet enregistré : restaure produits/positions/métrés,
+  /// et si c'était une scène démo, recharge la vraie photo correspondante
+  /// (voir [loadDemoScene]). Pour un projet basé sur une photo IMPORTÉE
+  /// (non démo), la photo elle-même n'a pas pu être conservée (voir
+  /// limite documentée dans [SavedProject]) — seuls produits/métrés sont
+  /// restaurés, l'utilisateur devra réimporter sa photo si besoin.
+  void loadProject(String id) {
+    SavedProject? project;
+    for (final p in savedProjects) {
+      if (p.id == id) {
+        project = p;
+        break;
+      }
+    }
+    if (project == null) return;
+    selectedProducts = List.of(project.selectedProducts);
+    prodPositions = Map.of(project.prodPositions);
+    metresMurA = project.metresMurA;
+    metresMurB = project.metresMurB;
+    metresHauteur = project.metresHauteur;
+    metresPortes = project.metresPortes;
+    metresFenetres = project.metresFenetres;
+    computeAndStoreMetres();
+    currentScreen = 'studio';
+    notifyListeners();
+    save();
+    if (project.isDemoRoom) {
+      demoScene = project.demoScene;
+      isDemoRoom = true;
+      // La taille de la zone photo n'est connue qu'une fois le Studio
+      // monté — [loadDemoScene] gère déjà ce cas (mémorise juste le choix
+      // si la taille n'est pas encore disponible, voir studio_screen.dart).
+      loadDemoScene(project.demoScene);
+    }
+  }
+
+  /// Supprime un projet enregistré (bouton corbeille, écran Home).
+  Future<void> deleteProject(String id) async {
+    savedProjects = savedProjects.where((p) => p.id != id).toList();
+    notifyListeners();
+    await _persistSavedProjects();
   }
 
   /* ── Persistance (équivalent sessionStorage) ── */

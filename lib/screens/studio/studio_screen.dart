@@ -19,6 +19,7 @@ import '../../widgets/studio/calib_handles.dart';
 import '../../widgets/studio/metres_panel.dart';
 import '../../widgets/studio/product_modal.dart';
 import '../../widgets/studio/product_strip.dart';
+import '../../widgets/studio/save_project_modal.dart';
 
 const _demoScenes = {
   'haussmann': ('🏛️', 'Haussmannien'),
@@ -127,6 +128,8 @@ class _StudioScreenState extends State<StudioScreen> {
         if (state.productModalRef != null) const Positioned.fill(child: ProductModal()),
         if (state.showMetresPanel)
           Positioned.fill(child: MetresPanel(onClose: state.closeMetresPanel)),
+        if (state.showSaveProjectModal)
+          Positioned.fill(child: SaveProjectModal(onClose: state.closeSaveProjectModal)),
       ],
     );
   }
@@ -183,6 +186,16 @@ class _StudioTopbar extends StatelessWidget {
             onTap: state.toggleProductOverlay,
           ),
           _ToolBtn(icon: FontAwesomeIcons.rulerCombined, tip: 'Métrés', onTap: onMetres),
+          // ⚠️ CORRECTION retour utilisateur ("les boutons d'enregistrement...
+          // des projets... ne fonctionnent pas") — aucun bouton "Enregistrer"
+          // n'existait auparavant dans toute l'application. Ouvre le modal de
+          // nommage du projet (voir [SaveProjectModal]), qui l'ajoute à la
+          // liste "Mes projets" affichée sur l'écran d'accueil.
+          _ToolBtn(
+            icon: FontAwesomeIcons.floppyDisk,
+            tip: 'Enregistrer le projet',
+            onTap: state.openSaveProjectModal,
+          ),
           _ToolBtn(
             icon: FontAwesomeIcons.fileInvoiceDollar,
             tip: 'Devis',

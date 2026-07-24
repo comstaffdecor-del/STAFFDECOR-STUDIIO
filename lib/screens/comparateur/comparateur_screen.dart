@@ -6,9 +6,13 @@
 /// remplacé par le même VP réel).
 library;
 
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/chiffrage.dart';
 import '../../core/perspective/product_texture_cache.dart';
@@ -19,8 +23,65 @@ import '../../state/app_state.dart';
 import '../../widgets/common/common_ui.dart';
 import '../../widgets/common/motif_preview.dart';
 
-class ComparateurScreen extends StatelessWidget {
+class ComparateurScreen extends StatefulWidget {
   const ComparateurScreen({super.key});
+
+  @override
+  State<ComparateurScreen> createState() => _ComparateurScreenState();
+}
+
+class _ComparateurScreenState extends State<ComparateurScreen> {
+  // ⚠️ CORRECTION retour utilisateur ("le bouton de téléchargement... ne
+  // fonctionne pas") — cette icône `download` n'avait JAMAIS eu de
+  // comportement (`onTap: () {}` vide, présent depuis la création de
+  // l'écran). On lui donne désormais une action concrète et instinctive :
+  // capturer l'image Avant/Après affichée (via [RepaintBoundary]) et
+  // proposer son téléchargement/partage (galerie photo sur mobile,
+  // téléchargement de fichier sur Web) via `share_plus`, qui gère
+  // nativement le fallback "téléchargement" sur Web quand aucune feuille
+  // de partage système n'est disponible.
+  final GlobalKey _compZoneKey = GlobalKey();
+  bool _exporting = false;
+
+  Future<void> _downloadComparisonImage() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      final boundary = _compZoneKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) {
+        throw Exception('zone de rendu introuvable');
+      }
+      final image = await boundary.toImage(pixelRatio: 2.5);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) {
+        throw Exception('encodage PNG échoué');
+      }
+      final bytes = byteData.buffer.asUint8List();
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              bytes,
+              name: 'staff-decor-avant-apres.png',
+              mimeType: 'image/png',
+            ),
+          ],
+          subject: 'Staff Décor — Visualisation Avant/Après',
+          text: 'Ma visualisation Staff Décor Studio',
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        showAppToast(
+          context,
+          'Téléchargement impossible — réessayez dans quelques secondes.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,24 +109,46 @@ class ComparateurScreen extends StatelessWidget {
                   style: TextStyle(color: AppColors.gold, fontSize: 15, fontWeight: FontWeight.w600),
                 ),
               ),
-              IconBtn(icon: FontAwesomeIcons.download, size: 30, onTap: () {}),
+              Tooltip(
+                message: 'Télécharger l\'image Avant/Après',
+                child: _exporting
+                    ? const SizedBox(
+                        width: 30,
+                        height: 30,
+                        child: Padding(
+                          padding: EdgeInsets.all(6),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gold),
+                        ),
+                      )
+                    : IconBtn(
+                        icon: FontAwesomeIcons.download,
+                        size: 30,
+                        onTap: _downloadComparisonImage,
+                      ),
+              ),
               const SizedBox(width: 6),
               // ⚠️ CORRECTION Bug #12 : cette icône "envoyer" n'avait
               // jamais eu de comportement (onTap: () {} vide). Elle ouvre
               // désormais le modal de coordonnées, cohérent avec le bouton
               // "Générer le devis" ci-dessous.
-              IconBtn(
-                icon: FontAwesomeIcons.paperPlane,
-                size: 30,
-                onTap: state.openContactModal,
+              Tooltip(
+                message: 'Envoyer mon projet à Staff Décor',
+                child: IconBtn(
+                  icon: FontAwesomeIcons.paperPlane,
+                  size: 30,
+                  onTap: state.openContactModal,
+                ),
               ),
             ],
           ),
         ),
         Expanded(
           flex: 55,
-          child: LayoutBuilder(
-            builder: (context, c) => _CompZone(size: Size(c.maxWidth, c.maxHeight)),
+          child: RepaintBoundary(
+            key: _compZoneKey,
+            child: LayoutBuilder(
+              builder: (context, c) => _CompZone(size: Size(c.maxWidth, c.maxHeight)),
+            ),
           ),
         ),
         Expanded(
