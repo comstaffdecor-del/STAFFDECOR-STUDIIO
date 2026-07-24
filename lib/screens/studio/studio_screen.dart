@@ -43,11 +43,29 @@ class _StudioScreenState extends State<StudioScreen> {
     final bytes = await file.readAsBytes();
     if (!mounted) return;
     final state = context.read<AppState>();
-    // Zone photo ~ largeur écran, hauteur ~ 46% de l'écran (voir #photo-zone)
-    final size = MediaQuery.of(context).size;
+    // ⚠️ CORRECTION Bug #1 (photo importée "hors champs" sur desktop) —
+    // on utilisait ici `MediaQuery.of(context).size` (taille de la
+    // FENÊTRE NAVIGATEUR entière, ex: 1920×1080 sur desktop), alors que
+    // la zone photo réellement rendue à l'écran est contrainte par le
+    // cadre "téléphone" desktop (voir AppShell, max 430×932) ET par le
+    // ratio 62% de hauteur défini juste en dessous dans ce même fichier
+    // (`photoZoneSize = Size(constraints.maxWidth, constraints.maxHeight
+    // * 0.62)`). Calculer l'`imgDraw` (letterboxing "contain") à partir
+    // d'une taille de conteneur FAUSSE produisait un rectangle
+    // d'affichage totalement désaligné du canvas réellement dessiné —
+    // sur mobile plein écran les deux tailles coïncidaient à peu près
+    // (d'où le bug invisible sur mobile), mais sur desktop l'écart était
+    // flagrant. On utilise désormais la VRAIE taille de la zone photo,
+    // mémorisée en continu par `registerPhotoZoneSize` depuis le
+    // `LayoutBuilder` du Studio (voir plus bas dans ce fichier).
+    final size = state.lastPhotoZoneSize ??
+        Size(
+          MediaQuery.of(context).size.width,
+          MediaQuery.of(context).size.height * 0.62,
+        );
     await state.setRoomImageBytes(
       bytes,
-      containerSize: Size(size.width, size.height * 0.46),
+      containerSize: size,
       demo: false,
     );
   }
@@ -223,21 +241,32 @@ class _PhotoZone extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(
-            // Écoute [ProductTextureCache] : dès qu'une vraie photo produit
-            // (motifs/relief) termine son chargement réseau, on repaint
-            // pour la faire apparaître (sans ça, le canvas resterait figé
-            // sur le fallback procédural jusqu'au prochain changement
-            // d'état de [AppState], sans lien avec le chargement image).
-            child: ListenableBuilder(
-              listenable: ProductTextureCache.instance,
-              builder: (context, _) => CustomPaint(
-                painter: RoomPainter(
-                  roomImage: state.roomImage,
-                  imgDraw: state.imgDraw,
-                  calib: state.perspCalib ?? PerspCalib.defaultCalib,
-                  selectedProducts: state.selectedProducts,
-                  prodPositions: state.prodPositions,
-                  withProducts: state.showProductOverlay,
+            // ⚠️ AJOUT pinch-to-zoom mobile (retour utilisateur : "On ne
+            // peut pas zoomer avec les doigts sur téléphone pour agrandir
+            // le visuel") — [InteractiveViewer] permet le pinch-to-zoom
+            // et le pan tactile natif sur le rendu de la pièce. Désactivé
+            // (panEnabled/scaleEnabled = false) pendant l'édition des
+            // repères de calibration pour ne pas capter les gestes de
+            // drag destinés aux poignées dorées (voir
+            // `CalibHandlesOverlay` plus bas, qui doit rester le seul
+            // récepteur de gestes dans ce cas).
+            child: InteractiveViewer(
+              panEnabled: !state.showCalibHandles,
+              scaleEnabled: !state.showCalibHandles,
+              minScale: 1.0,
+              maxScale: 4.0,
+              child: ListenableBuilder(
+                listenable: ProductTextureCache.instance,
+                builder: (context, _) => CustomPaint(
+                  painter: RoomPainter(
+                    roomImage: state.roomImage,
+                    imgDraw: state.imgDraw,
+                    calib: state.perspCalib ?? PerspCalib.defaultCalib,
+                    selectedProducts: state.selectedProducts,
+                    prodPositions: state.prodPositions,
+                    withProducts: state.showProductOverlay,
+                  ),
+                  size: size,
                 ),
               ),
             ),

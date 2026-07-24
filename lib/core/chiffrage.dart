@@ -98,8 +98,22 @@ class LigneDevis {
 }
 
 /// Calcule une ligne complète du devis pour un item du projet.
+///
+/// ⚠️ CORRECTION Bug critique (retour utilisateur "les métrés ne
+/// fonctionnent pas" / prix incohérents) — cette fonction appelait
+/// jusqu'ici `getPrixInfo(item.famille)`, c'est-à-dire le NOM DE LA
+/// FAMILLE ('Corniches', 'Moulures'...) et non la référence du produit
+/// réellement sélectionné. Comme `getPrixInfo` essaie d'abord une
+/// référence produit puis retombe sur `prixRefParFamille`, passer une
+/// famille en argument fait TOUJOURS échouer la recherche par référence
+/// et retomber sur le prix ET la longueur de barre GÉNÉRIQUES par
+/// famille (ex: 18,50 €/ml et barre 2,5m pour TOUTES les Corniches),
+/// quel que soit le produit réel choisi (D520, D560, D574...) et son
+/// vrai prix/sa vraie longueur de barre issus du tarif PDF. On utilise
+/// désormais la RÉFÉRENCE (`item.ref`) — chaque produit a son propre
+/// prix et sa propre longueur de barre dans `catalogueGed`.
 LigneDevis? calcLigne(ProjectItem item, double margePct) {
-  final px = getPrixInfo(item.famille);
+  final px = getPrixInfo(item.ref);
   if (px == null) return null;
 
   final r = calcQteCom(item.qte, px.unite, margePct, px.barre);
@@ -238,8 +252,11 @@ class PrixPreview {
   const PrixPreview({required this.ht, required this.detail});
 }
 
-PrixPreview calcPrixPreview(double qte, String famille, double margePct) {
-  final px = getPrixInfo(famille);
+/// [refOuFamille] doit être la RÉFÉRENCE du produit (ex: 'D520') pour un
+/// calcul juste (voir correction dans [calcLigne] ci-dessus). Un nom de
+/// famille reste accepté en repli (fallback) via [getPrixInfo].
+PrixPreview calcPrixPreview(double qte, String refOuFamille, double margePct) {
+  final px = getPrixInfo(refOuFamille);
   if (px == null) return const PrixPreview(ht: 0, detail: '');
 
   final r = calcQteCom(qte, px.unite, margePct, px.barre);

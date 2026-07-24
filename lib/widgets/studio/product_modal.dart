@@ -51,7 +51,10 @@ class _ProductModalState extends State<ProductModal> {
 
     final qte = double.tryParse(_qteCtrl.text.replaceAll(',', '.')) ??
         state.productModalQte;
-    final preview = calcPrixPreview(qte, prod.famille, state.margeCoupePct);
+    // ⚠️ CORRECTION : passer la RÉFÉRENCE produit (pas la famille) pour
+    // que l'aperçu de prix utilise le vrai prix/la vraie barre de CE
+    // produit (voir commentaire détaillé dans chiffrage.dart/calcLigne).
+    final preview = calcPrixPreview(qte, prod.ref, state.margeCoupePct);
     final existing = state.getProdInProject(ref);
 
     return ModalSheet(

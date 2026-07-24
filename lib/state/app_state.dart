@@ -112,6 +112,21 @@ class AppState extends ChangeNotifier {
   /// la taille du conteneur, ex: changement de scène démo).
   Size? _lastPhotoZoneSize;
 
+  /// Dernière taille RÉELLE et FIABLE de la zone photo, mesurée par le
+  /// [LayoutBuilder] du Studio (contrainte par le cadre "téléphone" sur
+  /// desktop — voir [AppShell], max 430×932). À utiliser IMPÉRATIVEMENT
+  /// au lieu de `MediaQuery.of(context).size` pour tout calcul de
+  /// letterboxing d'image importée : sur desktop/large écran,
+  /// `MediaQuery.size` renvoie la taille de la FENÊTRE NAVIGATEUR
+  /// entière (ex: 1920×1080), alors que la photo s'affiche en réalité
+  /// dans un cadre contraint bien plus petit (430px large max) — utiliser
+  /// `MediaQuery.size` pour calculer l'`imgDraw` (letterboxing "contain")
+  /// produisait un rectangle d'affichage totalement faux par rapport au
+  /// canvas réellement rendu, d'où la photo "hors champs" signalée par
+  /// l'utilisateur (bug reproductible uniquement en desktop/large fenêtre,
+  /// jamais sur mobile plein écran où les deux tailles coïncident).
+  Size? get lastPhotoZoneSize => _lastPhotoZoneSize;
+
   /// Vrai pendant le chargement asynchrone d'une scène démo (affiche un
   /// petit indicateur de chargement dans la zone photo).
   bool demoSceneLoading = false;
@@ -448,8 +463,12 @@ class AppState extends ChangeNotifier {
   int get nbProds => selectedProducts.length;
 
   /// Total HT estimé (sans marge de coupe, prix catalogue brut)
+  ///
+  /// ⚠️ CORRECTION même bug que [calcLigne] (voir chiffrage.dart) :
+  /// `getPrixInfo(item.famille)` retombait toujours sur le prix
+  /// générique par famille au lieu du vrai prix du produit (`item.ref`).
   double get totalHtBrut => selectedProducts.fold<double>(0, (acc, item) {
-    final px = getPrixInfo(item.famille);
+    final px = getPrixInfo(item.ref);
     return acc + (px != null ? px.prix * item.qte : 0);
   });
 
