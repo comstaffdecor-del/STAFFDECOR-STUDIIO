@@ -112,7 +112,12 @@ class RoomPainter extends CustomPainter {
       // les Ornements (pièces uniques : modillons, fleurs de trumeau...)
       // sont désormais également texturés avec la vraie photo produit,
       // au lieu du contour vectoriel abstrait générique précédent.
-      if (fam == 'Corniches' || fam == 'Plinthes' || fam == 'Ornements') {
+      // ⚠️ CORRECTION Bug #7 : 'Moulures' ajouté à la liste des familles
+      // texturées — voir moulure_painter.dart pour le détail du mapping.
+      if (fam == 'Corniches' ||
+          fam == 'Plinthes' ||
+          fam == 'Ornements' ||
+          fam == 'Moulures') {
         ProductTextureCache.instance.ensureLoading(prod.ref, prod.img);
       }
       final texture = ProductTextureCache.instance.getIfLoaded(prod.ref);
@@ -156,6 +161,7 @@ class RoomPainter extends CustomPainter {
             wLat: pH * 0.060 < 8 ? 8 : pH * 0.060,
             canvasW: w,
             canvasH: h,
+            texture: texture,
           );
           break;
 

@@ -32,7 +32,11 @@ import '../../models/project_item.dart';
 /// Familles pour lesquelles le relief sculpté (photo produit) a un sens —
 /// mêmes familles que celles texturées par [ProductTextureCache] dans
 /// `RoomPainter`.
-const _kMotifFamilies = {'Corniches', 'Plinthes'};
+///
+/// ⚠️ CORRECTION Bug #7 : 'Moulures' ajouté — la vignette "Relief réel"
+/// doit désormais suivre le modèle de moulure réellement sélectionné
+/// (voir moulure_painter.dart pour le texture-mapping correspondant).
+const _kMotifFamilies = {'Corniches', 'Plinthes', 'Moulures'};
 
 /// Bandeau horizontal de vignettes "vrai relief" — une par famille
 /// Corniches/Plinthes actuellement dans [selectedProducts] (au plus une de

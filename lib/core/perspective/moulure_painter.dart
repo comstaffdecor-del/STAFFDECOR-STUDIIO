@@ -7,11 +7,78 @@
 /// `renderProductOnPhoto` (studio.js), mais consommant désormais le
 /// [VanishingPoint] RÉEL partagé au lieu d'un point de fuite recalculé
 /// localement (Bug #5).
+///
+/// ⚠️ CORRECTION Bug #7 (retour utilisateur : "quel que soit le modèle,
+/// le choix de la moulure ne s'incrémente ni sur la photo, ni sur la
+/// vignette") — cette famille ne consommait JAMAIS la vraie photo produit
+/// ([ProductTextureCache]), contrairement à Corniches/Plinthes/Ornements :
+/// on dessinait toujours la même bande plate procédurale. [drawMoulureBand]
+/// accepte désormais un [texture] optionnel, mappé sur le quadrilatère du
+/// segment exactement comme [drawProfileFace] (profile_strip.dart) — même
+/// pattern `Canvas.drawVertices` + `ImageShader` + `TileMode.repeated`.
 library;
 
+import 'dart:typed_data';
 import 'dart:ui';
 import 'persp_geometry.dart';
 import 'vanishing_point.dart';
+
+/// Matrice identité 4x4 — voir profile_strip.dart pour le détail.
+final Float64List _kIdentityMatrix4 = Float64List.fromList([
+  1, 0, 0, 0,
+  0, 1, 0, 0,
+  0, 0, 1, 0,
+  0, 0, 0, 1,
+]);
+
+/// Cf. `_kMotifRepeatPx` dans profile_strip.dart — même calibration
+/// empirique de répétition horizontale du motif.
+const double _kMotifRepeatPx = 90.0;
+
+/// Mappe la vraie photo produit [texture] sur le quadrilatère de la bande
+/// (p0→p1→p2→p3, sens direct) — port du pattern de
+/// `profile_strip._drawTexturedFace`, adapté à une bande fine (pas de
+/// retournement plinthe ici, la moulure n'a pas de sens haut/bas fixe).
+void _drawTexturedBand(
+  Canvas canvas,
+  Offset p0,
+  Offset p1,
+  Offset p2,
+  Offset p3,
+  Image texture,
+) {
+  final segLen = dist(p0, p1);
+  final repeats = (segLen / _kMotifRepeatPx).clamp(1.0, 40.0);
+  final texW = texture.width.toDouble();
+  final texH = texture.height.toDouble();
+  final uRight = texW * repeats;
+
+  final positions = <Offset>[p0, p1, p2, p0, p2, p3];
+  final texCoords = <Offset>[
+    const Offset(0, 0),
+    Offset(uRight, 0),
+    Offset(uRight, texH),
+    const Offset(0, 0),
+    Offset(uRight, texH),
+    Offset(0, texH),
+  ];
+
+  final vertices = Vertices(
+    VertexMode.triangles,
+    positions,
+    textureCoordinates: texCoords,
+  );
+
+  final shader = ImageShader(
+    texture,
+    TileMode.repeated,
+    TileMode.clamp,
+    _kIdentityMatrix4,
+    filterQuality: FilterQuality.medium,
+  );
+
+  canvas.drawVertices(vertices, BlendMode.srcOver, Paint()..shader = shader);
+}
 
 /// Convertit une snap line en fraction t (0 = plafond, 1 = sol) le long
 /// du mur — port exact des valeurs de l'ancien `case 'Moulures'`.
@@ -39,6 +106,7 @@ void drawMoulureBand(
   double w1 = 4,
   double w2 = 4,
   double glowBlur = 0,
+  Image? texture,
 }) {
   final dx = b.dx - a.dx, dy = b.dy - a.dy;
   final len = dist(a, b);
@@ -56,6 +124,29 @@ void drawMoulureBand(
     ..lineTo(p2.dx, p2.dy)
     ..lineTo(p3.dx, p3.dy)
     ..close();
+
+  // ⚠️ CORRECTION Bug #7 : si une vraie photo produit est disponible
+  // (chargée par [ProductTextureCache] pour ce ref), on la mappe sur le
+  // quadrilatère de la bande au lieu du dégradé plat générique — chaque
+  // modèle de moulure affiche désormais SON relief réel, plus fin/épais
+  // selon la largeur perspective du segment.
+  if (texture != null) {
+    canvas.save();
+    canvas.clipPath(path);
+    _drawTexturedBand(canvas, p0, p1, p2, p3, texture);
+    canvas.restore();
+    // Liseré d'ombre portante conservé même en mode texture, pour la
+    // cohérence visuelle avec le rendu procédural.
+    canvas.drawLine(
+      p3,
+      p2,
+      Paint()
+        ..color = const Color(0x38443A2E)
+        ..strokeWidth = 1.2
+        ..style = PaintingStyle.stroke,
+    );
+    return;
+  }
 
   final gdist = dist(p0, p3);
   final paint = Paint();
@@ -102,6 +193,7 @@ void paintHorizontalBandSet(
   required double canvasW,
   required double canvasH,
   double glowBlur = 0,
+  Image? texture,
 }) {
   final mL = lerpPt(vp.fTL, vp.fBL, t);
   final mR = lerpPt(vp.fTR, vp.fBR, t);
@@ -110,7 +202,7 @@ void paintHorizontalBandSet(
   final frontL = Offset(0, canvasH * t);
   final frontR = Offset(canvasW, canvasH * t);
 
-  drawMoulureBand(canvas, mL, mR, color, w1: wFond, w2: wFond, glowBlur: glowBlur);
-  drawMoulureBand(canvas, frontL, mL, color, w1: wLat, w2: wFond, glowBlur: glowBlur);
-  drawMoulureBand(canvas, mR, frontR, color, w1: wFond, w2: wLat, glowBlur: glowBlur);
+  drawMoulureBand(canvas, mL, mR, color, w1: wFond, w2: wFond, glowBlur: glowBlur, texture: texture);
+  drawMoulureBand(canvas, frontL, mL, color, w1: wLat, w2: wFond, glowBlur: glowBlur, texture: texture);
+  drawMoulureBand(canvas, mR, frontR, color, w1: wFond, w2: wLat, glowBlur: glowBlur, texture: texture);
 }
