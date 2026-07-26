@@ -67,6 +67,19 @@ dependencies:
   font_awesome_flutter: ^10.7.0
   share_plus: ^12.0.2
 
+  # Algèbre linéaire pour le rendu 3D (geometry/) — Mat4/Vector3, matrices
+  # de projection perspective. Déjà présent en dépendance TRANSITIVE via le
+  # SDK Flutter (voir pubspec.lock) en version 2.2.0 ; déclaré ici en DIRECT
+  # avec la même version exacte pour ne provoquer aucun saut de version.
+  vector_math: 2.2.0
+
+  # Lecture EXIF (FocalLength, FocalLengthIn35mmFilm) des photos importées
+  # par l'utilisateur — priorité 1 pour la focale caméra (gratuite, fiable),
+  # le calcul géométrique par points de fuite orthogonaux (Caprile-Torre,
+  # voir geometry/camera.dart) devient un repli si l'EXIF est absent.
+  # Compatible Web (WASM-ready) + Android + iOS.
+  exif_reader: 4.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
