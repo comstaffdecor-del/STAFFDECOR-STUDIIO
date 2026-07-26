@@ -5,6 +5,26 @@
 fichier avant modification. Toute évolution du schéma passe par une bascule
 de `version_schema` et une mise à jour de ce document.
 
+## 🔒 RÈGLE PERMANENTE — INTÉGRITÉ DES DONNÉES SOUS `assets/`
+
+**On ne supprime, ne déplace, ni n'écrase JAMAIS un fichier sous `assets/`.**
+
+- `assets/dwg/`, `assets/dxf/`, `assets/profiles/` (et tout sous-dossier)
+  ne contiennent que des données produit réelles fournies par l'utilisateur
+  ou générées par le pipeline validé. Ce sont des dossiers en **écriture
+  additive uniquement** : on y ajoute, on n'y retire jamais rien sans
+  demande explicite et confirmée de l'utilisateur.
+- Aucun script, aucune commande de "nettoyage", aucun test ne doit
+  jamais faire de `rm`, `mv`, ou d'écrasement (`>`, overwrite) visant un
+  chemin sous `assets/`.
+- Les artefacts de test (fixtures synthétiques, sorties de test,
+  fichiers générés pendant le développement du pipeline) vont **exclusivement**
+  dans `/tmp/` ou `tests/fixtures/` — jamais dans `assets/`.
+- Toute exception à cette règle nécessite une confirmation explicite,
+  écrite, de l'utilisateur, dans le tour de conversation où l'action est
+  demandée — jamais une décision autonome, même pour un fichier qui
+  "semble" être un doublon ou un artefact de test.
+
 ## Contexte
 
 Staff Décor fabrique des moulures en plâtre (corniches, plinthes, cimaises,
@@ -72,12 +92,16 @@ produit un fichier JSON normalisé par SKU, au format ci-dessous.
 ## Règles strictes de production (rappel, cf. mission d'origine)
 
 1. **Unités** : lire `$INSUNITS`. Si présent et non nul → `origine_unite:
-   "header"`. Si absent ou = 0 → le batch **ne s'arrête pas** : le fichier
-   est marqué `statut: "ERREUR_UNITES"`, `origine_unite: "override"`, une
-   unité par défaut (`mm`) est proposée dans `source.unite_retenue` **mais
-   `profil_mm` reste vide** et le fichier est signalé dans le log/rapport
-   pour confirmation manuelle ultérieure. Le run continue sur le fichier
-   suivant.
+   "header"`. Si absent ou = 0 → priorité 2 : lecture de `units_override.csv`
+   (voir plus bas) — si le SKU y figure, `origine_unite: "override"` et
+   l'unité de ce fichier est utilisée sans ambiguïté. Sinon → le batch **ne
+   s'arrête pas** : le fichier est marqué `statut: "ERREUR_UNITES"`, une
+   **proposition d'unité par plausibilité de bbox** est calculée (voir
+   `_propose_unit_by_bbox` dans `dxf2profile.py`) et consignée dans le log
+   (colonne `proposition_unite` + `proposition_motif`), **mais `profil_mm`
+   reste vide** — la proposition est indicative pour aider à remplir
+   `units_override.csv`, jamais appliquée automatiquement. Le run continue
+   sur le fichier suivant.
 2. **Sélection du contour** : ne garder que la polyligne **fermée** de
    plus grande aire, sur le calque de contour. Ignorer `HATCH`,
    `DIMENSION`, `TEXT`, cartouche, axes. Si zéro ou plusieurs candidates
@@ -96,22 +120,56 @@ produit un fichier JSON normalisé par SKU, au format ci-dessous.
    JSON ou sous-dossier `control/`).
 7. **Log par fichier** : nombre de sommets, bbox (mm), hauteur mur,
    projection plafond — un log global (`inventaire.csv` / rapport batch)
-   et un log détaillé par fichier.
+   et un log détaillé par fichier. Pour `ERREUR_UNITES`, le log contient
+   obligatoirement la proposition d'unité calculée par plausibilité de
+   bbox (jamais une case vide).
+8. **Correspondance fichier → SKU** : jamais déduite par une regex sur le
+   nom de fichier. `mapping.csv` (colonnes `fichier,sku,type`) est la
+   seule source de vérité pour associer un fichier DWG/DXF à un SKU
+   catalogue. Un fichier absent de `mapping.csv` est traité avec
+   `sku = nom_de_fichier_sans_extension` par défaut, mais signalé
+   `mapping_absent: true` dans l'inventaire/le log — jamais une déduction
+   silencieuse par regex.
+9. **Unités forcées** : `units_override.csv` (colonnes `sku_ou_fichier,
+   insunits,motif`) est lu en priorité 2, juste après `$INSUNITS` du
+   header DXF et avant toute proposition automatique. Permet de débloquer
+   un fichier sans `$INSUNITS` sans jamais deviner silencieusement.
 
 ## Arborescence
 
 ```
 /home/user/flutter_app/
   SPEC.md                          <- ce fichier
-  assets/dxf/*.dxf                 <- fichiers DXF source (issus d'ODA File Converter)
-  assets/profiles/<sku>.json       <- sortie JSON par SKU
+  assets/dwg/*.dwg                 <- fichiers DWG source (non convertis) -- JAMAIS supprimés
+  assets/dxf/*.dxf                 <- fichiers DXF source (issus d'ODA File Converter) -- JAMAIS supprimés
+  assets/profiles/<sku>.json       <- sortie JSON par SKU -- JAMAIS supprimé sans confirmation
   assets/profiles/control/<sku>.png<- PNG de contrôle coté
   tools/dxf_pipeline/
-    scan_assets.py                 <- inventaire des DXF disponibles
+    scan_assets.py                 <- inventaire DWG+DXF (sku, dwg_present, dxf_present, statut)
     dxf2profile.py                 <- extraction DXF -> JSON + PNG
+    mapping.csv                    <- correspondance fichier -> sku (source de vérité, non déduite)
+    units_override.csv             <- unités forcées par sku/fichier, priorité 2 après $INSUNITS
     inventaire.csv                 <- sortie de scan_assets.py
-    logs/                          <- logs détaillés par run
+    logs/                          <- logs détaillés par run (jamais supprimés sans confirmation)
+    tests/fixtures/*.dxf           <- fixtures synthétiques de non-régression (pytest) -- permanentes
+    test_dxf2profile.py            <- suite pytest de non-régression sur les fixtures
 ```
+
+### `mapping.csv` — schéma
+
+| Colonne | Description |
+|---|---|
+| `fichier` | Nom de fichier DWG ou DXF (ex: `D570-sansmotif.dxf`) |
+| `sku` | Référence catalogue officielle (ex: `D570`) |
+| `type` | `dwg` ou `dxf` |
+
+### `units_override.csv` — schéma
+
+| Colonne | Description |
+|---|---|
+| `sku_ou_fichier` | SKU ou nom de fichier concerné |
+| `insunits` | Code `$INSUNITS` à appliquer (ex: `4` pour mm) |
+| `motif` | Justification humaine (ex: "confirmé par plan papier original") |
 
 ## Champs commerciaux — rappel
 

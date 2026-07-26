@@ -10,11 +10,17 @@ est faite hors de ce script, via ODA File Converter) et produit, par SKU :
 
 RÈGLES (cf. SPEC.md — à relire avant toute modification de ce script) :
 
-1. UNITÉS : lecture de $INSUNITS dans le header DXF.
+1. UNITÉS : lecture de $INSUNITS dans le header DXF (priorité 1).
    - Présent et != 0 -> unité convertie en mm, statut OK, origine_unite=header.
-   - Absent ou == 0 -> le fichier est marqué ERREUR_UNITES (unité proposée
-     par défaut = mm dans le JSON, mais profil_mm reste VIDE). LE BATCH NE
-     S'ARRÊTE PAS : il continue sur le fichier suivant.
+   - Absent ou == 0 -> priorité 2 : lecture de units_override.csv (par sku
+     ou par nom de fichier). Si trouvé -> origine_unite=override, unité
+     appliquée sans ambiguïté, statut OK.
+   - Toujours absent -> le fichier est marqué ERREUR_UNITES. Une
+     PROPOSITION d'unité est calculée par plausibilité de bbox (voir
+     propose_unit_by_bbox()) et consignée dans le log (colonnes
+     proposition_unite / proposition_motif) — jamais appliquée
+     automatiquement, profil_mm reste VIDE. LE BATCH NE S'ARRÊTE PAS : il
+     continue sur le fichier suivant.
 
 2. SÉLECTION DU CONTOUR : ne garder que la polyligne FERMÉE de plus grande
    aire, sur le "calque de contour". Les calques de cotation/texte/
@@ -41,6 +47,10 @@ RÈGLES (cf. SPEC.md — à relire avant toute modification de ce script) :
 
 7. Log détaillé par fichier (nb sommets, bbox mm, hauteur mur, projection
    plafond) + un CSV récapitulatif du run.
+
+8. CORRESPONDANCE FICHIER -> SKU : lue depuis mapping.csv, jamais déduite
+   par regex. Si le fichier n'y figure pas, sku = nom de fichier sans
+   extension (comportement de secours explicite, signalé dans le log).
 
 Usage:
     # Lot pilote (SKU choisis explicitement) :
@@ -91,10 +101,105 @@ INSUNITS_TO_MM = {
     13: 1e-3, 14: 100.0, 15: 10000.0, 16: 100000.0,
 }
 
+INSUNITS_LABELS = {
+    0: "non_specifie", 1: "pouces", 2: "pieds", 4: "mm", 5: "cm", 6: "m",
+    9: "mils", 10: "yards", 13: "microns", 14: "decimetres",
+}
+
 
 def is_noisy_layer(layer_name: str) -> bool:
     name = (layer_name or "").lower()
     return any(hint in name for hint in NOISY_LAYER_HINTS)
+
+
+def load_mapping(mapping_path: Path):
+    """Charge mapping.csv (fichier,sku,type) -> dict fichier -> sku.
+    Ne déduit jamais une correspondance par regex."""
+    fichier_to_sku = {}
+    if mapping_path.exists():
+        with mapping_path.open(newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                fichier = (row.get("fichier") or "").strip()
+                sku = (row.get("sku") or "").strip()
+                if fichier and sku:
+                    fichier_to_sku[fichier] = sku
+    return fichier_to_sku
+
+
+def load_units_override(override_path: Path):
+    """Charge units_override.csv (sku_ou_fichier,insunits,motif) -> dict
+    clé (sku ou nom de fichier) -> (insunits:int, motif:str).
+    Priorité 2, lue seulement quand $INSUNITS est absent/nul dans le DXF."""
+    overrides = {}
+    if override_path.exists():
+        with override_path.open(newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                key = (row.get("sku_ou_fichier") or "").strip()
+                insunits_str = (row.get("insunits") or "").strip()
+                motif = (row.get("motif") or "").strip()
+                if key and insunits_str:
+                    try:
+                        overrides[key] = (int(insunits_str), motif)
+                    except ValueError:
+                        continue
+    return overrides
+
+
+def propose_unit_by_bbox(points_native):
+    """Propose une unité par PLAUSIBILITÉ de la bounding box, quand
+    $INSUNITS est absent/nul et qu'aucun units_override.csv ne couvre le
+    fichier. Ceci est UNE PROPOSITION INDICATIVE consignée dans le log,
+    JAMAIS appliquée automatiquement au profil (profil_mm reste vide dans
+    ce cas — voir règle ERREUR_UNITES).
+
+    Heuristique : un profil de moulure Staff Décor mesure typiquement entre
+    10 et 400 mm de large/haut (corniches, plinthes, cimaises, rosaces).
+    On teste chaque unité DXF standard et on retient celle qui ramène la
+    plus grande dimension de la bbox native dans cette plage plausible.
+
+    Retourne (insunits_propose:int, label:str, motif:str) ou
+    (None, None, motif_explicatif) si aucune unité ne produit une bbox
+    plausible."""
+    if not points_native:
+        return None, None, "profil vide, aucune proposition possible"
+
+    xs = [p[0] for p in points_native]
+    ys = [p[1] for p in points_native]
+    max_dim_native = max(max(xs) - min(xs), max(ys) - min(ys))
+
+    if max_dim_native <= 0:
+        return None, None, "bbox nulle, aucune proposition possible"
+
+    PLAUSIBLE_MIN_MM = 10.0
+    PLAUSIBLE_MAX_MM = 400.0
+
+    candidates = []
+    for insunits, scale in INSUNITS_TO_MM.items():
+        dim_mm = max_dim_native * scale
+        if PLAUSIBLE_MIN_MM <= dim_mm <= PLAUSIBLE_MAX_MM:
+            # Score : plus proche du centre de la plage plausible = meilleur
+            center = (PLAUSIBLE_MIN_MM + PLAUSIBLE_MAX_MM) / 2.0
+            score = abs(dim_mm - center)
+            candidates.append((score, insunits, scale, dim_mm))
+
+    if not candidates:
+        return None, None, (
+            f"aucune unité DXF standard ne ramène la plus grande dimension "
+            f"native ({max_dim_native:.3f}) dans la plage plausible "
+            f"[{PLAUSIBLE_MIN_MM}-{PLAUSIBLE_MAX_MM}] mm d'un profil de moulure"
+        )
+
+    candidates.sort(key=lambda c: c[0])
+    _, best_insunits, best_scale, best_dim_mm = candidates[0]
+    label = INSUNITS_LABELS.get(best_insunits, f"code_{best_insunits}")
+    motif = (
+        f"plus grande dimension bbox native={max_dim_native:.3f} -> "
+        f"{best_dim_mm:.1f}mm si insunits={best_insunits} ({label}), "
+        f"plage plausible moulure [{PLAUSIBLE_MIN_MM}-{PLAUSIBLE_MAX_MM}]mm"
+    )
+    return best_insunits, label, motif
 
 
 def polygon_area(points):
@@ -253,7 +358,8 @@ def guess_famille(sku: str, layers) -> str | None:
     return None
 
 
-def build_error_record(sku, fichier, statut, insunits_raw, message, layers_found=None):
+def build_error_record(sku, fichier, statut, insunits_raw, message, layers_found=None,
+                        origine_unite="header"):
     return {
         "sku": sku,
         "marque": "",
@@ -262,7 +368,7 @@ def build_error_record(sku, fichier, statut, insunits_raw, message, layers_found
             "fichier": fichier,
             "insunits": insunits_raw if insunits_raw else None,
             "unite_retenue": "mm",
-            "origine_unite": "override" if statut == "ERREUR_UNITES" else "header",
+            "origine_unite": origine_unite,
         },
         "profil_mm": [],
         "face_pose_mur": {"indices": [], "auto": False},
@@ -281,17 +387,28 @@ def build_error_record(sku, fichier, statut, insunits_raw, message, layers_found
     }
 
 
-def process_one_dxf(path: Path):
+def process_one_dxf(path: Path, fichier_to_sku=None, units_override=None):
     """Traite un fichier DXF. Retourne (record_dict, log_dict).
 
     Ne lève jamais d'exception hors de cette fonction pour un fichier
     individuel : toute erreur est capturée et transformée en statut
     d'erreur, afin que le batch puisse toujours continuer sur les fichiers
-    suivants."""
-    sku = path.stem
+    suivants.
+
+    fichier_to_sku : dict issu de mapping.csv (jamais de déduction par regex).
+    units_override : dict issu de units_override.csv, clé = sku ou nom de
+                      fichier -> (insunits:int, motif:str).
+    """
+    fichier_to_sku = fichier_to_sku or {}
+    units_override = units_override or {}
+
+    mapping_absent = path.name not in fichier_to_sku
+    sku = fichier_to_sku.get(path.name, path.stem)
+
     log = {
         "sku": sku,
         "fichier": path.name,
+        "mapping_absent": mapping_absent,
         "statut": "",
         "nb_sommets": 0,
         "bbox_w_mm": "",
@@ -299,6 +416,8 @@ def process_one_dxf(path: Path):
         "hauteur_mur_mm": "",
         "projection_plafond_mm": "",
         "insunits": "",
+        "proposition_unite": "",
+        "proposition_motif": "",
         "message": "",
     }
 
@@ -312,24 +431,56 @@ def process_one_dxf(path: Path):
 
     insunits_raw = doc.header.get("$INSUNITS", 0)
     log["insunits"] = insunits_raw
+    origine_unite = "header"
 
     if not insunits_raw or insunits_raw == 0:
-        msg = (
-            f"$INSUNITS absent ou nul dans {path.name}. Unité NON déduite "
-            f"automatiquement (règle stricte). Proposition par défaut: mm "
-            f"(à confirmer manuellement — voir source.origine_unite='override')."
-        )
-        log["statut"] = "ERREUR_UNITES"
-        log["message"] = msg
-        rec = build_error_record(sku, path.name, "ERREUR_UNITES", insunits_raw, msg)
-        return rec, log
+        # Priorité 2 : units_override.csv, par sku puis par nom de fichier
+        override = units_override.get(sku) or units_override.get(path.name)
+        if override:
+            insunits_raw, override_motif = override
+            origine_unite = "override"
+            log["insunits"] = insunits_raw
+            log["message"] = f"Unité forcée via units_override.csv: insunits={insunits_raw} ({override_motif})"
+        else:
+            # Toujours pas d'unité connue -> proposition par plausibilité de
+            # bbox, purement informative, jamais appliquée.
+            msp_tmp = doc.modelspace()
+            all_pts_native = []
+            for e in msp_tmp.query("LWPOLYLINE POLYLINE"):
+                try:
+                    if isinstance(e, LWPolyline):
+                        all_pts_native.extend([(p[0], p[1]) for p in e.get_points()])
+                    elif isinstance(e, Polyline):
+                        all_pts_native.extend(
+                            [(v.dxf.location.x, v.dxf.location.y) for v in e.vertices]
+                        )
+                except Exception:
+                    continue
+            prop_insunits, prop_label, prop_motif = propose_unit_by_bbox(all_pts_native)
+            log["proposition_unite"] = prop_label or ""
+            log["proposition_motif"] = prop_motif
+
+            msg = (
+                f"$INSUNITS absent ou nul dans {path.name}, et aucune entrée "
+                f"dans units_override.csv pour '{sku}' ou '{path.name}'. Unité "
+                f"NON déduite automatiquement (règle stricte). "
+                + (f"Proposition indicative par plausibilité de bbox: "
+                   f"insunits={prop_insunits} ({prop_label}) — {prop_motif}. "
+                   f"Ajouter cette ligne à units_override.csv pour confirmer."
+                   if prop_insunits is not None else
+                   f"Aucune proposition plausible calculable ({prop_motif}).")
+            )
+            log["statut"] = "ERREUR_UNITES"
+            log["message"] = msg
+            rec = build_error_record(sku, path.name, "ERREUR_UNITES", None, msg, origine_unite="override")
+            return rec, log
 
     scale_to_mm = INSUNITS_TO_MM.get(insunits_raw)
     if scale_to_mm is None:
         msg = f"$INSUNITS={insunits_raw} dans {path.name} n'a pas de table de conversion mm connue."
         log["statut"] = "ERREUR_UNITES"
         log["message"] = msg
-        rec = build_error_record(sku, path.name, "ERREUR_UNITES", insunits_raw, msg)
+        rec = build_error_record(sku, path.name, "ERREUR_UNITES", insunits_raw, msg, origine_unite=origine_unite)
         return rec, log
 
     msp = doc.modelspace()
@@ -361,7 +512,7 @@ def process_one_dxf(path: Path):
         )
         log["statut"] = "ERREUR_SELECTION"
         log["message"] = msg
-        rec = build_error_record(sku, path.name, "ERREUR_SELECTION", insunits_raw, msg, layers_all)
+        rec = build_error_record(sku, path.name, "ERREUR_SELECTION", insunits_raw, msg, layers_all, origine_unite=origine_unite)
         return rec, log
 
     max_area = max(c[2] for c in candidates)
@@ -377,7 +528,7 @@ def process_one_dxf(path: Path):
         )
         log["statut"] = "ERREUR_SELECTION"
         log["message"] = msg
-        rec = build_error_record(sku, path.name, "ERREUR_SELECTION", insunits_raw, msg, layers_all)
+        rec = build_error_record(sku, path.name, "ERREUR_SELECTION", insunits_raw, msg, layers_all, origine_unite=origine_unite)
         return rec, log
 
     chosen_layer, chosen_pts_native, chosen_area_native = top_candidates[0]
@@ -419,7 +570,7 @@ def process_one_dxf(path: Path):
             "fichier": path.name,
             "insunits": insunits_raw,
             "unite_retenue": "mm",
-            "origine_unite": "header",
+            "origine_unite": origine_unite,
         },
         "profil_mm": [[x, y] for x, y in pts_mm_shifted],
         "face_pose_mur": {"indices": wall_idx, "auto": wall_auto},
@@ -521,8 +672,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dxf-dir", default="/home/user/flutter_app/assets/dxf")
     parser.add_argument("--out-dir", default="/home/user/flutter_app/assets/profiles")
+    parser.add_argument("--mapping", default=str(Path(__file__).parent / "mapping.csv"))
+    parser.add_argument("--units-override", default=str(Path(__file__).parent / "units_override.csv"))
     parser.add_argument("--sku", nargs="*", default=None,
-                         help="Liste explicite de SKU (noms de fichier sans .dxf) à traiter. "
+                         help="Liste explicite de SKU à traiter (résolus via mapping.csv en priorité, "
+                              "sinon par nom de fichier <sku>.dxf). "
                               "Si omis, utiliser --all pour traiter tout le dossier.")
     parser.add_argument("--all", action="store_true", help="Traiter tous les .dxf du dossier --dxf-dir")
     args = parser.parse_args()
@@ -539,10 +693,16 @@ def main():
         print(f"ERREUR: dossier introuvable: {dxf_dir}", file=sys.stderr)
         sys.exit(1)
 
+    fichier_to_sku = load_mapping(Path(args.mapping))
+    sku_to_fichier = {v: k for k, v in fichier_to_sku.items()}
+    units_override = load_units_override(Path(args.units_override))
+
     if args.sku:
         targets = []
         for sku in args.sku:
-            p = dxf_dir / f"{sku}.dxf"
+            # Priorité: mapping.csv (sku -> fichier réel), sinon <sku>.dxf par défaut
+            fname = sku_to_fichier.get(sku, f"{sku}.dxf")
+            p = dxf_dir / fname
             if not p.exists():
                 print(f"AVERTISSEMENT: {p} introuvable, ignoré.", file=sys.stderr)
                 continue
@@ -565,7 +725,7 @@ def main():
     n_err = 0
 
     for path in targets:
-        record, log = process_one_dxf(path)
+        record, log = process_one_dxf(path, fichier_to_sku=fichier_to_sku, units_override=units_override)
         logs.append(log)
 
         json_path = write_json(record, out_dir)
