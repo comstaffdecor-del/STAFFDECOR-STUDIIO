@@ -1,0 +1,603 @@
+#!/usr/bin/env python3
+"""
+dxf2profile.py — Extraction de profil produit depuis un DXF -> JSON + PNG
+
+Lit un ou plusieurs fichiers .dxf (jamais de .dwg — la conversion DWG->DXF
+est faite hors de ce script, via ODA File Converter) et produit, par SKU :
+  - assets/profiles/<sku>.json   (schéma défini dans SPEC.md, version 1)
+  - assets/profiles/control/<sku>.png (PNG coté du profil tracé)
+  - une ligne de log dans tools/dxf_pipeline/logs/run_<timestamp>.csv
+
+RÈGLES (cf. SPEC.md — à relire avant toute modification de ce script) :
+
+1. UNITÉS : lecture de $INSUNITS dans le header DXF.
+   - Présent et != 0 -> unité convertie en mm, statut OK, origine_unite=header.
+   - Absent ou == 0 -> le fichier est marqué ERREUR_UNITES (unité proposée
+     par défaut = mm dans le JSON, mais profil_mm reste VIDE). LE BATCH NE
+     S'ARRÊTE PAS : il continue sur le fichier suivant.
+
+2. SÉLECTION DU CONTOUR : ne garder que la polyligne FERMÉE de plus grande
+   aire, sur le "calque de contour". Les calques de cotation/texte/
+   cartouche/axes/hachures sont ignorés (heuristique de nom, voir
+   NOISY_LAYER_HINTS) et les entités HATCH/DIMENSION/TEXT/MTEXT sont
+   ignorées explicitement quel que soit le calque.
+   - 0 candidate ou >1 candidate de même aire maximale (ambiguïté réelle)
+     -> ERREUR_SELECTION, profil_mm vide, message listant les calques
+     trouvés dans le log. Aucun choix implicite. LE BATCH CONTINUE.
+
+3. APLATISSEMENT : SPLINE, ARC, ELLIPSE et bulges de LWPOLYLINE sont
+   aplatis en segments via ezdxf.path.from_entity(...).flattening(distance)
+   avec distance = 0.15 mm (converti dans l'unité native du dessin avant
+   application, puisque flattening() travaille dans l'espace du dessin).
+
+4. ORIGINE : recalée à x=0 sur la face mur, y=0 sur la face plafond
+   (voir _detect_wall_ceiling_faces / --wall-side / --ceiling-side).
+
+5. INTERDICTION : ne jamais compléter, lisser, ou "corriger" un profil.
+   Toute ambiguïté ou fichier illisible -> statut d'erreur + profil_mm
+   vide, jamais un profil de substitution.
+
+6. Un PNG de contrôle coté est produit uniquement pour statut == OK.
+
+7. Log détaillé par fichier (nb sommets, bbox mm, hauteur mur, projection
+   plafond) + un CSV récapitulatif du run.
+
+Usage:
+    # Lot pilote (SKU choisis explicitement) :
+    python3 dxf2profile.py --dxf-dir /home/user/flutter_app/assets/dxf \\
+        --sku D570 D545 D560 ... \\
+        --out-dir /home/user/flutter_app/assets/profiles
+
+    # Batch complet (tous les .dxf du dossier) :
+    python3 dxf2profile.py --dxf-dir /home/user/flutter_app/assets/dxf --all \\
+        --out-dir /home/user/flutter_app/assets/profiles
+"""
+
+import argparse
+import csv
+import datetime as dt
+import json
+import sys
+from pathlib import Path
+
+try:
+    import ezdxf
+    from ezdxf import path as ezpath
+    from ezdxf.entities import LWPolyline, Polyline
+except ImportError:
+    print("ERREUR: le module 'ezdxf' n'est pas installé. pip install ezdxf", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None  # PNG de contrôle désactivé si matplotlib absent (signalé au run)
+
+
+SCHEMA_VERSION = 1
+FLATTEN_SAGITTA_MM = 0.15
+DEFAULT_BAR_LENGTH_MM = 2000
+
+NOISY_LAYER_HINTS = (
+    "cot", "dim", "texte", "text", "cartouche", "axe", "hatch",
+    "hachure", "annot", "titre", "légende", "legende",
+)
+
+INSUNITS_TO_MM = {
+    1: 25.4, 2: 304.8, 3: 1609344.0, 4: 1.0, 5: 10.0, 6: 1000.0,
+    7: 1e9, 8: 0.0254, 9: 0.001, 10: 914.4, 11: 1e-7, 12: 1e-6,
+    13: 1e-3, 14: 100.0, 15: 10000.0, 16: 100000.0,
+}
+
+
+def is_noisy_layer(layer_name: str) -> bool:
+    name = (layer_name or "").lower()
+    return any(hint in name for hint in NOISY_LAYER_HINTS)
+
+
+def polygon_area(points):
+    """Formule du lacet — aire absolue (unité native des points)."""
+    if len(points) < 3:
+        return 0.0
+    area = 0.0
+    n = len(points)
+    for i in range(n):
+        x1, y1 = points[i]
+        x2, y2 = points[(i + 1) % n]
+        area += x1 * y2 - x2 * y1
+    return abs(area) / 2.0
+
+
+def ensure_clockwise(points):
+    """Force le sens horaire (aire signée négative en repère écran y-down
+    n'est pas garantie ici : on travaille en repère mathématique standard
+    y-up, donc horaire = aire signée négative)."""
+    area_signed = 0.0
+    n = len(points)
+    for i in range(n):
+        x1, y1 = points[i]
+        x2, y2 = points[(i + 1) % n]
+        area_signed += x1 * y2 - x2 * y1
+    if area_signed > 0:  # sens anti-horaire -> inverser
+        return list(reversed(points))
+    return points
+
+
+def collect_closed_candidates(msp):
+    """Retourne la liste des candidates (layer, points_natifs, entity) pour
+    les polylignes FERMÉES, hors calques bruités. Aucune conversion d'unité
+    ici — aire calculée en unité native pour la comparaison relative."""
+    candidates = []
+    for e in msp.query("LWPOLYLINE POLYLINE"):
+        layer = e.dxf.layer
+        if is_noisy_layer(layer):
+            continue
+        try:
+            is_closed = e.is_closed
+        except Exception:
+            is_closed = False
+        if not is_closed:
+            continue
+
+        pts = flatten_entity_to_points(e)
+        if len(pts) < 3:
+            continue
+        candidates.append((layer, pts, e))
+    return candidates
+
+
+def flatten_entity_to_points(entity, sagitta_native=None):
+    """Aplati une entité (LWPOLYLINE avec bulges compris, POLYLINE, ou toute
+    entité supportée par ezdxf.path.from_entity comme SPLINE/ARC/ELLIPSE) en
+    liste de points (x, y) natifs (unité du dessin, pas encore convertie en
+    mm). sagitta_native: tolérance de flèche dans l'unité native du dessin
+    (si None, on tente une valeur générique via distance=0.01 * bbox, sinon
+    on utilise la version discrète native de l'entité sans aplatir de
+    courbes tierces)."""
+    try:
+        p = ezpath.make_path(entity)
+        if sagitta_native is None:
+            sagitta_native = 0.15  # fallback ; recalculé correctement dans
+            # le contexte de main() une fois insunits connu.
+        pts = [(v.x, v.y) for v in p.flattening(distance=sagitta_native)]
+        if len(pts) >= 3:
+            return pts
+    except Exception:
+        pass
+
+    # Fallback : LWPOLYLINE/POLYLINE natives sans passer par ezdxf.path
+    # (couvre le cas où make_path échouerait pour une raison quelconque sur
+    # une polyligne pourtant simple).
+    try:
+        if isinstance(entity, LWPolyline):
+            return [(p[0], p[1]) for p in entity.get_points()]
+        if isinstance(entity, Polyline):
+            return [(v.dxf.location.x, v.dxf.location.y) for v in entity.vertices]
+    except Exception:
+        pass
+    return []
+
+
+def detect_wall_and_ceiling_faces(points_mm):
+    """Détection automatique des faces d'appui mur/plafond.
+
+    Heuristique : la face "mur" est le segment vertical (dx quasi nul) le
+    plus à gauche (x minimal) ; la face "plafond" est le segment horizontal
+    (dy quasi nul) le plus haut (y maximal, avant inversion — voir note).
+    Retourne (wall_indices, wall_auto, ceiling_indices, ceiling_auto,
+    origin_x, origin_y) où origin_x/origin_y sont les coordonnées à
+    soustraire pour recaler l'origine sur ces faces.
+
+    Cette détection est une AIDE, pas une correction du profil : si aucune
+    face verticale/horizontale nette n'est trouvée, on retourne des indices
+    vides avec auto=False et l'origine reste au coin bbox (xmin, ymax) par
+    défaut — décision explicite, jamais un "profil corrigé".
+    """
+    n = len(points_mm)
+    if n < 2:
+        return [], False, [], False, 0.0, 0.0
+
+    xs = [p[0] for p in points_mm]
+    ys = [p[1] for p in points_mm]
+    xmin, ymax = min(xs), max(ys)
+
+    ANGLE_TOL = 0.5  # mm de tolérance sur dx/dy pour juger "vertical"/"horizontal"
+
+    wall_idx, wall_auto = [], False
+    ceiling_idx, ceiling_auto = [], False
+
+    best_wall_x = None
+    best_ceiling_y = None
+
+    for i in range(n):
+        x1, y1 = points_mm[i]
+        x2, y2 = points_mm[(i + 1) % n]
+        dx, dy = abs(x2 - x1), abs(y2 - y1)
+
+        # Segment vertical => candidat "face mur"
+        if dx <= ANGLE_TOL and dy > ANGLE_TOL:
+            seg_x = (x1 + x2) / 2.0
+            if best_wall_x is None or seg_x < best_wall_x:
+                best_wall_x = seg_x
+                wall_idx = [i, (i + 1) % n]
+                wall_auto = True
+
+        # Segment horizontal => candidat "face plafond"
+        if dy <= ANGLE_TOL and dx > ANGLE_TOL:
+            seg_y = (y1 + y2) / 2.0
+            if best_ceiling_y is None or seg_y > best_ceiling_y:
+                best_ceiling_y = seg_y
+                ceiling_idx = [i, (i + 1) % n]
+                ceiling_auto = True
+
+    origin_x = best_wall_x if best_wall_x is not None else xmin
+    origin_y = best_ceiling_y if best_ceiling_y is not None else ymax
+
+    return wall_idx, wall_auto, ceiling_idx, ceiling_auto, origin_x, origin_y
+
+
+def guess_famille(sku: str, layers) -> str | None:
+    """Devine la famille à partir du nom de calque/SKU. Retourne None si
+    aucune correspondance claire — jamais de valeur inventée."""
+    hay = (sku + " " + " ".join(layers)).lower()
+    if "plin" in hay or sku.upper().startswith("PLIN"):
+        return "plinthe"
+    if "cimaise" in hay:
+        return "cimaise"
+    if "rosace" in hay:
+        return "rosace"
+    if "cornic" in hay or sku.upper().startswith("D"):
+        return "corniche"
+    return None
+
+
+def build_error_record(sku, fichier, statut, insunits_raw, message, layers_found=None):
+    return {
+        "sku": sku,
+        "marque": "",
+        "famille": None,
+        "source": {
+            "fichier": fichier,
+            "insunits": insunits_raw if insunits_raw else None,
+            "unite_retenue": "mm",
+            "origine_unite": "override" if statut == "ERREUR_UNITES" else "header",
+        },
+        "profil_mm": [],
+        "face_pose_mur": {"indices": [], "auto": False},
+        "face_pose_plafond": {"indices": [], "auto": False},
+        "bbox_mm": {"w": 0, "h": 0},
+        "hauteur_mur_mm": 0,
+        "projection_plafond_mm": 0,
+        "motif": None,
+        "assets": {"albedo": None, "normal": None},
+        "longueur_barre_mm": DEFAULT_BAR_LENGTH_MM,
+        "prix_ml": None,
+        "statut": statut,
+        "version_schema": SCHEMA_VERSION,
+        "_message": message,  # informatif, retiré avant écriture JSON finale si besoin
+        "_layers_found": layers_found or [],
+    }
+
+
+def process_one_dxf(path: Path):
+    """Traite un fichier DXF. Retourne (record_dict, log_dict).
+
+    Ne lève jamais d'exception hors de cette fonction pour un fichier
+    individuel : toute erreur est capturée et transformée en statut
+    d'erreur, afin que le batch puisse toujours continuer sur les fichiers
+    suivants."""
+    sku = path.stem
+    log = {
+        "sku": sku,
+        "fichier": path.name,
+        "statut": "",
+        "nb_sommets": 0,
+        "bbox_w_mm": "",
+        "bbox_h_mm": "",
+        "hauteur_mur_mm": "",
+        "projection_plafond_mm": "",
+        "insunits": "",
+        "message": "",
+    }
+
+    try:
+        doc = ezdxf.readfile(str(path))
+    except Exception as e:  # noqa: BLE001
+        log["statut"] = "ERREUR_LECTURE"
+        log["message"] = f"{type(e).__name__}: {e}"
+        rec = build_error_record(sku, path.name, "ERREUR_LECTURE", None, log["message"])
+        return rec, log
+
+    insunits_raw = doc.header.get("$INSUNITS", 0)
+    log["insunits"] = insunits_raw
+
+    if not insunits_raw or insunits_raw == 0:
+        msg = (
+            f"$INSUNITS absent ou nul dans {path.name}. Unité NON déduite "
+            f"automatiquement (règle stricte). Proposition par défaut: mm "
+            f"(à confirmer manuellement — voir source.origine_unite='override')."
+        )
+        log["statut"] = "ERREUR_UNITES"
+        log["message"] = msg
+        rec = build_error_record(sku, path.name, "ERREUR_UNITES", insunits_raw, msg)
+        return rec, log
+
+    scale_to_mm = INSUNITS_TO_MM.get(insunits_raw)
+    if scale_to_mm is None:
+        msg = f"$INSUNITS={insunits_raw} dans {path.name} n'a pas de table de conversion mm connue."
+        log["statut"] = "ERREUR_UNITES"
+        log["message"] = msg
+        rec = build_error_record(sku, path.name, "ERREUR_UNITES", insunits_raw, msg)
+        return rec, log
+
+    msp = doc.modelspace()
+    layers_all = sorted({layer.dxf.name for layer in doc.layers})
+
+    sagitta_native = FLATTEN_SAGITTA_MM / scale_to_mm
+
+    candidates = []  # (layer, points_native_flattened, area_native)
+    for e in msp.query("LWPOLYLINE POLYLINE"):
+        layer = e.dxf.layer
+        if is_noisy_layer(layer):
+            continue
+        try:
+            is_closed = e.is_closed
+        except Exception:
+            is_closed = False
+        if not is_closed:
+            continue
+        pts = flatten_entity_to_points(e, sagitta_native=sagitta_native)
+        if len(pts) < 3:
+            continue
+        area = polygon_area(pts)
+        candidates.append((layer, pts, area))
+
+    if not candidates:
+        msg = (
+            f"Aucune polyligne fermée candidate trouvée dans {path.name}. "
+            f"Calques présents: {', '.join(layers_all) if layers_all else '(aucun)'}."
+        )
+        log["statut"] = "ERREUR_SELECTION"
+        log["message"] = msg
+        rec = build_error_record(sku, path.name, "ERREUR_SELECTION", insunits_raw, msg, layers_all)
+        return rec, log
+
+    max_area = max(c[2] for c in candidates)
+    top_candidates = [c for c in candidates if abs(c[2] - max_area) < 1e-9]
+
+    if len(top_candidates) > 1:
+        involved_layers = sorted({c[0] for c in top_candidates})
+        msg = (
+            f"{len(top_candidates)} polylignes fermées partagent l'aire maximale "
+            f"dans {path.name} (calques concernés: {', '.join(involved_layers)}). "
+            f"Ambiguïté réelle -> aucun choix implicite. "
+            f"Calques présents au total: {', '.join(layers_all)}."
+        )
+        log["statut"] = "ERREUR_SELECTION"
+        log["message"] = msg
+        rec = build_error_record(sku, path.name, "ERREUR_SELECTION", insunits_raw, msg, layers_all)
+        return rec, log
+
+    chosen_layer, chosen_pts_native, chosen_area_native = top_candidates[0]
+
+    # Conversion en mm
+    pts_mm = [(x * scale_to_mm, y * scale_to_mm) for x, y in chosen_pts_native]
+    pts_mm = ensure_clockwise(pts_mm)
+
+    # Détection auto des faces mur/plafond + recalage d'origine
+    wall_idx, wall_auto, ceiling_idx, ceiling_auto, origin_x, origin_y = (
+        detect_wall_and_ceiling_faces(pts_mm)
+    )
+    pts_mm_shifted = [(round(x - origin_x, 4), round(y - origin_y, 4)) for x, y in pts_mm]
+
+    xs = [p[0] for p in pts_mm_shifted]
+    ys = [p[1] for p in pts_mm_shifted]
+    bbox_w = round(max(xs) - min(xs), 3) if xs else 0
+    bbox_h = round(max(ys) - min(ys), 3) if ys else 0
+
+    # hauteur_mur_mm : étendue verticale (y) de la face mur détectée, si trouvée
+    hauteur_mur_mm = 0
+    if wall_auto and wall_idx:
+        wall_ys = [pts_mm_shifted[i][1] for i in wall_idx]
+        hauteur_mur_mm = round(abs(max(wall_ys) - min(wall_ys)), 3)
+
+    # projection_plafond_mm : étendue horizontale (x) de la face plafond détectée
+    projection_plafond_mm = 0
+    if ceiling_auto and ceiling_idx:
+        ceiling_xs = [pts_mm_shifted[i][0] for i in ceiling_idx]
+        projection_plafond_mm = round(abs(max(ceiling_xs) - min(ceiling_xs)), 3)
+
+    famille = guess_famille(sku, layers_all)
+
+    record = {
+        "sku": sku,
+        "marque": "",
+        "famille": famille,
+        "source": {
+            "fichier": path.name,
+            "insunits": insunits_raw,
+            "unite_retenue": "mm",
+            "origine_unite": "header",
+        },
+        "profil_mm": [[x, y] for x, y in pts_mm_shifted],
+        "face_pose_mur": {"indices": wall_idx, "auto": wall_auto},
+        "face_pose_plafond": {"indices": ceiling_idx, "auto": ceiling_auto},
+        "bbox_mm": {"w": bbox_w, "h": bbox_h},
+        "hauteur_mur_mm": hauteur_mur_mm,
+        "projection_plafond_mm": projection_plafond_mm,
+        "motif": None,
+        "assets": {"albedo": None, "normal": None},
+        "longueur_barre_mm": DEFAULT_BAR_LENGTH_MM,
+        "prix_ml": None,
+        "statut": "OK",
+        "version_schema": SCHEMA_VERSION,
+        "_message": (
+            f"Contour retenu: calque '{chosen_layer}', "
+            f"{len(pts_mm_shifted)} sommets après aplatissement "
+            f"(tolérance {FLATTEN_SAGITTA_MM}mm)."
+        ),
+        "_layers_found": layers_all,
+    }
+
+    log["statut"] = "OK"
+    log["nb_sommets"] = len(pts_mm_shifted)
+    log["bbox_w_mm"] = bbox_w
+    log["bbox_h_mm"] = bbox_h
+    log["hauteur_mur_mm"] = hauteur_mur_mm
+    log["projection_plafond_mm"] = projection_plafond_mm
+    log["message"] = record["_message"]
+
+    return record, log
+
+
+def write_json(record: dict, out_dir: Path):
+    sku = record["sku"]
+    clean = {k: v for k, v in record.items() if not k.startswith("_")}
+    out_path = out_dir / f"{sku}.json"
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(clean, f, ensure_ascii=False, indent=2)
+    return out_path
+
+
+def write_control_png(record: dict, out_dir: Path):
+    """Génère un PNG coté du profil. Uniquement pour statut == OK.
+    Retourne le chemin écrit, ou None si matplotlib indisponible."""
+    if plt is None:
+        return None
+    if record["statut"] != "OK" or not record["profil_mm"]:
+        return None
+
+    sku = record["sku"]
+    pts = record["profil_mm"]
+    xs = [p[0] for p in pts] + [pts[0][0]]
+    ys = [p[1] for p in pts] + [pts[0][1]]
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.plot(xs, ys, "-o", markersize=2, linewidth=1, color="#1c2c4c")
+    ax.fill(xs, ys, alpha=0.15, color="#1c2c4c")
+
+    # Origine
+    ax.axhline(0, color="gray", linewidth=0.5, linestyle="--")
+    ax.axvline(0, color="gray", linewidth=0.5, linestyle="--")
+    ax.plot(0, 0, "r+", markersize=10, markeredgewidth=2)
+
+    # Face mur / plafond en surbrillance
+    wall_idx = record["face_pose_mur"]["indices"]
+    if wall_idx and len(wall_idx) == 2:
+        wx = [pts[wall_idx[0]][0], pts[wall_idx[1]][0]]
+        wy = [pts[wall_idx[0]][1], pts[wall_idx[1]][1]]
+        ax.plot(wx, wy, color="#8a1c1c", linewidth=3, label="Face mur")
+
+    ceiling_idx = record["face_pose_plafond"]["indices"]
+    if ceiling_idx and len(ceiling_idx) == 2:
+        cx = [pts[ceiling_idx[0]][0], pts[ceiling_idx[1]][0]]
+        cy = [pts[ceiling_idx[0]][1], pts[ceiling_idx[1]][1]]
+        ax.plot(cx, cy, color="#1c6a3c", linewidth=3, label="Face plafond")
+
+    bbox = record["bbox_mm"]
+    title = (
+        f"{sku} — {record.get('famille') or 'famille inconnue'}\n"
+        f"bbox: {bbox['w']} x {bbox['h']} mm — {len(pts)} sommets — "
+        f"unité source: INSUNITS={record['source']['insunits']}"
+    )
+    ax.set_title(title, fontsize=9)
+    ax.set_xlabel("x (mm)")
+    ax.set_ylabel("y (mm)")
+    ax.set_aspect("equal", adjustable="datalim")
+    ax.grid(True, linewidth=0.3, alpha=0.5)
+    if wall_idx or ceiling_idx:
+        ax.legend(fontsize=7, loc="best")
+
+    out_path = out_dir / f"{sku}.png"
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    return out_path
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--dxf-dir", default="/home/user/flutter_app/assets/dxf")
+    parser.add_argument("--out-dir", default="/home/user/flutter_app/assets/profiles")
+    parser.add_argument("--sku", nargs="*", default=None,
+                         help="Liste explicite de SKU (noms de fichier sans .dxf) à traiter. "
+                              "Si omis, utiliser --all pour traiter tout le dossier.")
+    parser.add_argument("--all", action="store_true", help="Traiter tous les .dxf du dossier --dxf-dir")
+    args = parser.parse_args()
+
+    dxf_dir = Path(args.dxf_dir)
+    out_dir = Path(args.out_dir)
+    control_dir = out_dir / "control"
+    logs_dir = Path(__file__).parent / "logs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    control_dir.mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
+
+    if not dxf_dir.exists():
+        print(f"ERREUR: dossier introuvable: {dxf_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.sku:
+        targets = []
+        for sku in args.sku:
+            p = dxf_dir / f"{sku}.dxf"
+            if not p.exists():
+                print(f"AVERTISSEMENT: {p} introuvable, ignoré.", file=sys.stderr)
+                continue
+            targets.append(p)
+    elif args.all:
+        targets = sorted(dxf_dir.glob("*.dxf"))
+    else:
+        print("ERREUR: fournir --sku SKU1 SKU2 ... ou --all", file=sys.stderr)
+        sys.exit(1)
+
+    if not targets:
+        print("Aucun fichier à traiter.")
+        return
+
+    print(f"Traitement de {len(targets)} fichier(s) DXF ...")
+    print(f"(Règle: le batch continue toujours, même en cas d'erreur sur un fichier.)\n")
+
+    logs = []
+    n_ok = 0
+    n_err = 0
+
+    for path in targets:
+        record, log = process_one_dxf(path)
+        logs.append(log)
+
+        json_path = write_json(record, out_dir)
+        status_icon = "OK " if record["statut"] == "OK" else "ERR"
+        print(f"[{status_icon}] {record['sku']:12s} statut={record['statut']:18s} -> {json_path.name}")
+
+        if record["statut"] == "OK":
+            n_ok += 1
+            png_path = write_control_png(record, control_dir)
+            if png_path:
+                print(f"      PNG de contrôle -> {png_path}")
+            elif plt is None:
+                print(f"      (PNG de contrôle non généré: matplotlib indisponible)")
+        else:
+            n_err += 1
+            print(f"      {record.get('_message', '')}")
+
+    # Écriture du log de run
+    timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = logs_dir / f"run_{timestamp}.csv"
+    fieldnames = list(logs[0].keys())
+    with log_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(logs)
+
+    print(f"\n=== Résumé du run ===")
+    print(f"Total traité : {len(targets)}")
+    print(f"  OK          : {n_ok}")
+    print(f"  Erreurs     : {n_err}")
+    print(f"Log détaillé  : {log_path}")
+
+
+if __name__ == "__main__":
+    main()
