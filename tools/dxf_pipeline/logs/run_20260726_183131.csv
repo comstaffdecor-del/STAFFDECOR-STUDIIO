@@ -1,6 +1,0 @@
-sku,fichier,statut,nb_sommets,bbox_w_mm,bbox_h_mm,hauteur_mur_mm,projection_plafond_mm,insunits,message
-TESTOK,TESTOK.dxf,OK,7,60.0,80.0,80.0,60.0,4,"Contour retenu: calque 'CONTOUR', 7 sommets après aplatissement (tolérance 0.15mm)."
-TESTNOUNIT,TESTNOUNIT.dxf,ERREUR_UNITES,0,,,,,0,$INSUNITS absent ou nul dans TESTNOUNIT.dxf. Unité NON déduite automatiquement (règle stricte). Proposition par défaut: mm (à confirmer manuellement — voir source.origine_unite='override').
-TESTAMBIGU,TESTAMBIGU.dxf,ERREUR_SELECTION,0,,,,,4,"2 polylignes fermées partagent l'aire maximale dans TESTAMBIGU.dxf (calques concernés: CONTOUR, CONTOUR2). Ambiguïté réelle -> aucun choix implicite. Calques présents au total: 0, CONTOUR, CONTOUR2, Defpoints."
-TESTARC,TESTARC.dxf,OK,20,40.0,40.0,40.0,2.925,4,"Contour retenu: calque 'CONTOUR', 20 sommets après aplatissement (tolérance 0.15mm)."
-TESTVIDE,TESTVIDE.dxf,ERREUR_SELECTION,0,,,,,4,"Aucune polyligne fermée candidate trouvée dans TESTVIDE.dxf. Calques présents: 0, COTATION, Defpoints."
