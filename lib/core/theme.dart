@@ -1,29 +1,32 @@
 /// Thème Flutter — palette "bleu nuit" (retour utilisateur : "Remplace le
 /// noir de l'app par du bleu profond (bleu nuit)").
 ///
-/// ⚠️ CORRECTION demande utilisateur : la palette d'origine (brun/noir
-/// quasi neutre, `0xFF1C1714` etc., héritée de `base.css`) est remplacée
-/// par une gamme de bleu nuit profond (marine/encre), en conservant à
-/// l'identique les accents dorés (`gold`/`goldLight`/`goldDark`) qui
-/// portent l'identité visuelle Staff Décor, ainsi que les couleurs
-/// sémantiques (`green`/`red`/`amber`) et les teintes de texte (le
-/// contraste texte crème / fond bleu nuit reste excellent).
+/// ⚠️ CORRECTION demande utilisateur (2e passe) : la première passe de
+/// bleu nuit (`0xFF0B1220` etc.) a été jugée pas assez sombre ("on
+/// attendait un bleu encore plus foncé"). La palette est donc à nouveau
+/// resserrée vers le bas — fond quasi noir avec une dominante bleu marine/
+/// encre bien plus profonde — tout en conservant à l'identique les
+/// accents dorés (`gold`/`goldLight`/`goldDark`) qui portent l'identité
+/// visuelle Staff Décor, ainsi que les couleurs sémantiques
+/// (`green`/`red`/`amber`) et les teintes de texte (le contraste texte
+/// crème / fond bleu nuit reste excellent, voire meilleur car le fond
+/// est plus sombre).
 library;
 
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const bg = Color(0xFF0B1220);
-  static const bg2 = Color(0xFF10192E);
-  static const card = Color(0xFF16213A);
-  static const card2 = Color(0xFF1C2B47);
+  static const bg = Color(0xFF050810);
+  static const bg2 = Color(0xFF080D1B);
+  static const card = Color(0xFF0C1428);
+  static const card2 = Color(0xFF101C34);
   static const gold = Color(0xFFC9A96E);
   static const goldLight = Color(0xFFE2C48A);
   static const goldDark = Color(0xFFA07840);
   static const text = Color(0xFFF5EFE3);
   static const text2 = Color(0xFFB0B9CC);
   static const text3 = Color(0xFF6E7A94);
-  static const border = Color(0xFF2A3B5C);
+  static const border = Color(0xFF1C2C4C);
   static const platre = Color(0xFFF5F0E8);
   static const green = Color(0xFF4ADE80);
   static const red = Color(0xFFF87171);
@@ -31,9 +34,10 @@ class AppColors {
 
   /// Fond plein écran derrière le cadre "téléphone" (desktop/large écran)
   /// — équivalent bleu nuit du `body { background:#000 }` d'origine
-  /// (légèrement plus sombre que [bg] pour garder une sensation de
-  /// profondeur derrière le cadre applicatif).
-  static const shellBg = Color(0xFF050A14);
+  /// (quasi noir avec une pointe de bleu marine, encore plus sombre que
+  /// [bg] pour garder une sensation de profondeur derrière le cadre
+  /// applicatif).
+  static const shellBg = Color(0xFF020408);
 }
 
 ThemeData buildAppTheme() {
