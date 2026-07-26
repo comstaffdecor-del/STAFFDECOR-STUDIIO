@@ -176,3 +176,87 @@ produit un fichier JSON normalisé par SKU, au format ci-dessous.
 `marque`, `prix_ml`, `longueur_barre_mm` (si non standard) : toujours
 `null` (ou valeur par défaut documentée ci-dessus) si non connus avec
 certitude. **Jamais inventés.**
+
+## Décision d'architecture — rendu 3D côté Flutter (post-pipeline DXF)
+
+**Statut : décidé, non codé.** Cette section documente le choix retenu
+et les options rejetées, pour éviter toute redécouverte future des
+mêmes impasses.
+
+### Constat de départ
+
+Le rendu actuel (`lib/core/perspective/moulure_painter.dart`,
+`cornice_plinth_painter.dart`) plaque une **texture photo** sur un quad
+2D déformé en perspective (`Vertices` + `ImageShader` sur `CustomPainter`
+Skia). Le profil réel de la moulure n'intervient pas dans le dessin :
+c'est une approximation visuelle, pas une géométrie exacte. C'est le
+défaut à corriger.
+
+### Option retenue : "A bis" — maillage réel, même technique de dessin
+
+On garde `CustomPainter` + `drawVertices` + Skia (aucun changement de
+techno de rendu). Ce qui change, c'est **ce qui est dessiné** : un
+maillage 3D réel, issu de `profil_mm` (le pipeline DXF), extrudé le
+long de la polyligne de pose, projeté par une vraie caméra — puis
+seulement à ce stade rasterisé en triangles 2D via `drawVertices`.
+
+Architecture cible (Dart pur pour `geometry/`, testable sans UI) :
+
+- **`geometry/`** (aucune dépendance UI) :
+  - `Mat4` / `Vec3` maison ou `vector_math` (déjà transitivement
+    présent via Flutter — à confirmer avant usage, ne pas l'ajouter en
+    dépendance directe sans vérifier qu'il n'entraîne pas de montée de
+    version).
+  - `camera.dart` : matrice caméra construite depuis `PerspCalib`
+    (focale + pose), projection perspective sommets 3D → écran 2D.
+  - `planes.dart` : plans mur et plafond exprimés en mètres ; leur
+    intersection analytique donne l'arête mur/plafond. **Jamais
+    détectée visuellement** — toujours calculée depuis la géométrie
+    connue des plans.
+  - `sweep.dart` : extrusion de `profil_mm` (JSON du pipeline DXF) le
+    long de la polyline de pose ; faces de pose contraintes aux plans
+    mur/plafond ; onglets calculés sur plan bissecteur aux angles.
+    Sortie : positions 3D + indices de triangulation + normales.
+- **`rendering/`** : projection des sommets via `camera.dart`, tri des
+  triangles par l'algorithme du peintre (painter's algorithm, tri par
+  profondeur), `drawVertices` avec couleur par sommet (ombrage plat =
+  produit scalaire normale/direction de lumière). `ImageShader`
+  conservé, mais **uniquement** pour les moulures ornées (motif
+  répétitif), avec UV calculées au pas réel en mm (pas d'étirement
+  approximatif d'une texture sur un quad).
+
+Ordre de grandeur attendu : ~5000 triangles par corniche — sans
+difficulté pour Skia sur les plateformes cibles (Web + Android).
+
+**À supprimer une fois A bis opérationnel** : le chemin "texture photo
+sur quad déformé" dans `moulure_painter.dart` et
+`cornice_plinth_painter.dart` (code legacy, à retirer, pas à garder en
+fallback silencieux).
+
+**Occlusion (plantes, meubles devant la moulure) : explicitement hors
+périmètre pour l'instant.** Traitement futur envisagé : masque alpha
+dessiné par l'utilisateur, ou depth map. **Ne pas anticiper cela dans
+le code de A bis** — complexité à ne pas préémptivement absorber.
+
+### Options rejetées et pourquoi
+
+- **Option B (packages 3D Flutter natifs — `flutter_scene`,
+  `flutter_cube`, etc.)** : **rejetée**. Écosystème encore trop jeune
+  / peu mature pour une app de production (maintenance incertaine,
+  couverture de plateforme incomplète, API instables). Réévaluable
+  dans le futur si l'écosystème mûrit, mais pas maintenant.
+- **Option C (WebView embarquée + three.js/opencv.js, fidèle au brief
+  moteur d'origine qui était pensé web)** : **rejetée**. Reviendrait à
+  faire tourner **deux moteurs de rendu** dans la même app (Skia natif
+  Flutter + moteur JS dans une WebView), avec un pont JS↔Dart fragile
+  (`JavascriptChannel`), un poids de build significativement alourdi
+  (bundler un moteur JS complet), pour un gain nul par rapport à A bis
+  qui atteint le même résultat (maillage réel, vraie caméra) en restant
+  100% Dart/Skia natif. Non retenue.
+
+### Interface avec le pipeline DXF
+
+Aucun changement du pipeline DXF (`dxf2profile.py`, `scan_assets.py`,
+schéma JSON ci-dessus) : `profil_mm` reste la seule donnée géométrique
+consommée par `sweep.dart`. Le pipeline continue de produire du JSON
+neutre, indépendant de la technique de rendu choisie côté Flutter.
