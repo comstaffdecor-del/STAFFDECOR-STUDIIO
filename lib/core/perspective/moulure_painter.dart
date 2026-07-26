@@ -179,10 +179,25 @@ void drawMoulureBand(
 /// Dessine une bande Moulure/Profil LED continue (latéral G → fond →
 /// latéral D) à la hauteur [t] (fraction 0..1 depuis le plafond).
 ///
-/// [canvasW]/[canvasH] = dimensions totales du canvas (pour situer les
-/// coins avant de la scène, équivalent de `cTL/cTR/cBL/cBR` de l'original).
-/// [w1]/[w2] = épaisseurs fond/latéral, [glowBlur] > 0 pour un effet
-/// lumineux (Profils LED).
+/// ⚠️ CORRECTION Bug "calepinage ne fonctionne pas / bande plate au milieu
+/// de la photo" (retour utilisateur, capture Haussmannien/D570+1102) —
+/// AVANT, les extrémités latérales de la bande ([frontL]/[frontR])
+/// étaient calculées comme `Offset(0, canvasH * t)` / `Offset(canvasW,
+/// canvasH * t)` : une droite PARFAITEMENT HORIZONTALE à une hauteur fixe
+/// en pixels canvas, totalement indépendante de la calibration de
+/// perspective (les points [wallTL]/[wallTR]/[wallBL]/[wallBR] mesurés
+/// sur la VRAIE photo). Résultat : dès que la calibration de la pièce
+/// n'est pas parfaitement de niveau (cas de la quasi-totalité des photos
+/// réelles), la bande partait à plat depuis le bord de l'image et
+/// tranchait en diagonale à travers le miroir, les portes et le canapé —
+/// exactement le défaut signalé, "ne suit pas la perspective".
+///
+/// Désormais [frontL]/[frontR] sont interpolés le long des VRAIS segments
+/// de mur latéral ([wallTL]→[wallBL] et [wallTR]→[wallBR], en coordonnées
+/// canvas déjà calibrées), à la même fraction [t] que le point sur le mur
+/// du fond ([mL]/[mR]) — exactement le même principe que
+/// [paintCorniceSet]/[paintPlintheSet] (cornice_plinth_painter.dart), qui
+/// eux suivaient déjà correctement la perspective réelle.
 void paintHorizontalBandSet(
   Canvas canvas,
   VanishingPoint vp, {
@@ -190,17 +205,20 @@ void paintHorizontalBandSet(
   required Color color,
   required double wFond,
   required double wLat,
-  required double canvasW,
-  required double canvasH,
+  required Offset wallTL,
+  required Offset wallTR,
+  required Offset wallBL,
+  required Offset wallBR,
   double glowBlur = 0,
   Image? texture,
 }) {
   final mL = lerpPt(vp.fTL, vp.fBL, t);
   final mR = lerpPt(vp.fTR, vp.fBR, t);
-  // Coins avant de la scène — bord gauche/droit du canvas, interpolés
-  // verticalement entre haut (0) et bas (canvasH) à la fraction t.
-  final frontL = Offset(0, canvasH * t);
-  final frontR = Offset(canvasW, canvasH * t);
+  // Points sur les VRAIS murs latéraux calibrés, à la même hauteur
+  // relative [t] que sur le mur du fond — suit la perspective réelle de
+  // la pièce au lieu d'une ligne horizontale plate arbitraire.
+  final frontL = lerpPt(wallTL, wallBL, t);
+  final frontR = lerpPt(wallTR, wallBR, t);
 
   drawMoulureBand(canvas, mL, mR, color, w1: wFond, w2: wFond, glowBlur: glowBlur, texture: texture);
   drawMoulureBand(canvas, frontL, mL, color, w1: wLat, w2: wFond, glowBlur: glowBlur, texture: texture);

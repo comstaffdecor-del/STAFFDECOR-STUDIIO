@@ -159,8 +159,10 @@ class RoomPainter extends CustomPainter {
             color: color,
             wFond: pH * 0.045 < 6 ? 6 : pH * 0.045,
             wLat: pH * 0.060 < 8 ? 8 : pH * 0.060,
-            canvasW: w,
-            canvasH: h,
+            wallTL: cp.wallTL,
+            wallTR: cp.wallTR,
+            wallBL: cp.wallBL,
+            wallBR: cp.wallBR,
             texture: texture,
           );
           break;
@@ -173,8 +175,10 @@ class RoomPainter extends CustomPainter {
             color: color,
             wFond: 3.0,
             wLat: 3.0,
-            canvasW: w,
-            canvasH: h,
+            wallTL: cp.wallTL,
+            wallTR: cp.wallTR,
+            wallBL: cp.wallBL,
+            wallBR: cp.wallBR,
             glowBlur: 6,
           );
           break;
