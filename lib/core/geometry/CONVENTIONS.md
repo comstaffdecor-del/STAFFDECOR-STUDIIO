@@ -58,6 +58,21 @@ Convention déjà en vigueur dans `dxf2profile.py`/`solid2profile.py` et
   `Vector2(x_mm, y_mm)`, ou `Offset` si le point d'entrée est déjà côté
   Flutter — la fonction [profileToWorld] accepte les deux (voir signature).
 
+### 2.1 bis. Le profil peut être CONCAVE — ne jamais le simplifier/convexifier
+
+Pour un motif ornemental (`motif.type="variable"`, denticules, gorges),
+`profil_mm` provient d'une **union** de coupes (`shapely.unary_union`,
+voir `SPEC.md` §"Extension — pipeline 3D"), **pas** d'une enveloppe
+convexe — décision explicitement corrigée en cours de développement
+(l'enveloppe convexe effaçait les gorges concaves et détruisait le galbe
+réel de la moulure). Conséquence pour `sweep.dart` : le polygone reçu dans
+`profil_mm` DOIT être extrudé **exactement tel quel**, sommet par sommet,
+dans l'ordre fourni — aucune étape de simplification, de lissage, ni de
+`convex_hull`/enveloppe ne doit être appliquée côté Dart. Toute
+"correction" du contour dans `sweep.dart` répéterait l'erreur déjà
+corrigée côté Python, avec le même effet destructeur sur les motifs
+concaves.
+
 ### 2.3 Vérification empirique (faite avant d'écrire ce document)
 
 Rejouée sur `TESTSOLIDE_L.stl` (barre en L de référence, cf.
@@ -139,9 +154,11 @@ vectoriel, comme cela a été fait puis corrigé dans `solid2profile.py`
 
 ## 4. Résumé des bugs de repère déjà rencontrés (pour ne pas les répéter)
 
-Quatre bugs distincts, tous dans `solid2profile.py`, tous de la même
-famille ("un repère/une origine 2D/3D reconstruite indépendamment à
-plusieurs endroits, incohérente entre eux") :
+Cinq bugs distincts, tous dans `dxf2profile.py`/`solid2profile.py`, tous
+de la même famille ("une hypothèse géométrique locale — repère, origine,
+classification d'arête — appliquée de façon incomplète ou reconstruite
+indépendamment à plusieurs endroits, incohérente avec la réalité du
+maillage/contour") :
 
 1. **Coupes non comparables entre elles** : `Path3D.to_2D()` appelé sans
    matrice explicite fait un `plane_fit` propre à chaque tranche →
@@ -183,8 +200,28 @@ plusieurs endroits, incohérente entre eux") :
    (`test_height_map_couvre_toute_la_longueur_de_la_barre`) a depuis été
    ajouté pour vérifier explicitement un taux de couverture > 95 % sur
    toute la longueur, et l'absence de plage contiguë de lignes nulles.
+5. **Détection mur/plafond incomplète, deux temps** : `detect_wall_and_
+   ceiling_faces` ne collectait à l'origine que le PREMIER segment
+   vertical/horizontal trouvé (2 sommets), au lieu de tous les sommets
+   consécutifs colinéaires sous tolérance — vérifié sur
+   `TESTSOLIDE_DENTICULES` : face plafond réelle sur 8 sommets (x de 0.04
+   à 68.0mm), mais seul le segment [5,6] (x jusqu'à 31.52mm) était retenu
+   → `projection_plafond_mm=31.48` au lieu de `68.0`. Corrigé par une
+   collecte de "runs" d'arêtes consécutives de même classification.
+   Second temps (après passage à l'union de coupes, bug lié) : unir
+   plusieurs polygones introduit parfois une micro-arête de jonction
+   (jitter de tessellation entre coupes, ex. dx=0, dy=0.0225mm) trop
+   petite pour être classée franchement verticale OU horizontale par un
+   test strict — elle cassait le run à tort (`projection_plafond_mm`
+   retombé à 60.0 après le passage à l'union, avant d'être re-corrigé).
+   Corrigé en rendant la classification d'arête permissive aux
+   micro-arêtes (compatible avec un run en cours dès que la seule
+   composante testée est sous tolérance, sans exiger que l'autre la
+   dépasse) : une arête négligeable ne doit jamais interrompre un run,
+   quel qu'il soit. Test de non-régression dédié :
+   `test_projection_plafond_couvre_tous_les_sommets_colineaires`.
 
-**Leçon générale (bugs 1, 3 et 4)** : ne jamais laisser un module
+**Leçon générale (bugs 1, 3, 4 et 5)** : ne jamais laisser un module
 recalculer sa propre origine/base locale à un autre endroit du code que
 celui qui l'a définie la première fois — passer la valeur en paramètre
 (ou l'importer d'une fonction unique), jamais la reconstruire par une

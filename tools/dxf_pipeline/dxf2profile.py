@@ -288,12 +288,53 @@ def flatten_entity_to_points(entity, sagitta_native=None):
 def detect_wall_and_ceiling_faces(points_mm):
     """Détection automatique des faces d'appui mur/plafond.
 
-    Heuristique : la face "mur" est le segment vertical (dx quasi nul) le
-    plus à gauche (x minimal) ; la face "plafond" est le segment horizontal
-    (dy quasi nul) le plus haut (y maximal, avant inversion — voir note).
+    Heuristique : la face "mur" est le groupe de sommets consécutifs
+    quasi-colinéaires verticaux (dx quasi nul d'un sommet au suivant) le
+    plus à gauche (x minimal) ; la face "plafond" est le groupe de sommets
+    consécutifs quasi-colinéaires horizontaux le plus haut (y maximal).
     Retourne (wall_indices, wall_auto, ceiling_indices, ceiling_auto,
     origin_x, origin_y) où origin_x/origin_y sont les coordonnées à
     soustraire pour recaler l'origine sur ces faces.
+
+    ⚠️ PIÈGE DÉTECTÉ ET CORRIGÉ (revue utilisateur sur
+    TESTSOLIDE_DENTICULES) : une version antérieure ne regardait que LE
+    PREMIER segment (sommet i -> sommet i+1) vertical/horizontal trouvé,
+    sans poursuivre la collecte sur les sommets suivants tant qu'ils
+    restent colinéaires. Sur un maillage tessellé (STL), une face plane
+    unique est presque toujours découpée en plusieurs sommets quasi
+    confondus (bruit de tessellation ≤ 0.05mm typique) : s'arrêter au
+    premier segment ne capture qu'un fragment de la face réelle. Vérifié
+    sur TESTSOLIDE_DENTICULES : la face plafond réelle s'étend sur les
+    sommets 5 à 12 (x de 0.04 à 68.0mm, tous à y≈0), mais l'ancienne
+    version ne retenait que le segment [5,6] (x de 0.04 à 31.52mm) —
+    projection_plafond_mm=31.48 au lieu de 68.0. Corrigé : on parcourt le
+    contour et on ACCUMULE tous les sommets consécutifs colinéaires
+    (au sens de la tolérance ci-dessous) dans un même "run", puis on
+    retient le run entier (tous ses indices, pas seulement ses deux
+    extrémités) comme face candidate.
+
+    Tolérance : 0.05mm (pas 0.5mm comme l'ancien seuil, qui datait d'un
+    usage DXF sans tessellation) — suffisante pour absorber le bruit de
+    tessellation STL observé (bruit typique < 0.03mm sur les fixtures
+    synthétiques), sans risquer de fusionner deux faces réellement
+    distinctes à quelques dixièmes de mm l'une de l'autre.
+
+    ⚠️ PIÈGE #2 DÉTECTÉ ET CORRIGÉ (après passage à l'union des sections,
+    voir solid2profile.py) : unir plusieurs polygones de coupe (aux
+    positions min/max/médiane) introduit parfois un micro-décrochement à
+    la jonction de deux contours quasi identiques mais pas rigoureusement
+    superposés (jitter de tessellation entre coupes, ex. dx=0, dy=0.0225mm
+    observé sur TESTSOLIDE_DENTICULES). Une arête aussi minuscule est
+    à la fois "pas assez horizontale" (dx trop petit) ET "pas assez
+    verticale" (dy trop petit) selon la classification stricte
+    dx<=TOL-et-dy>TOL / dy<=TOL-et-dx>TOL : elle cassait le run à tort,
+    ramenant projection_plafond_mm de 68.0 à 60.0. Corrigé : une arête est
+    compatible avec l'EXTENSION d'un run vertical dès que dx<=TOL (sans
+    exiger dy>TOL), et compatible avec l'extension d'un run horizontal dès
+    que dy<=TOL (sans exiger dx>TOL). Une arête minuscule (dx<=TOL ET
+    dy<=TOL) devient ainsi compatible avec les DEUX types de run
+    simultanément, ce qui est le comportement voulu : elle ne doit jamais
+    interrompre un run en cours, quel qu'il soit.
 
     Cette détection est une AIDE, pas une correction du profil : si aucune
     face verticale/horizontale nette n'est trouvée, on retourne des indices
@@ -308,34 +349,72 @@ def detect_wall_and_ceiling_faces(points_mm):
     ys = [p[1] for p in points_mm]
     xmin, ymax = min(xs), max(ys)
 
-    ANGLE_TOL = 0.5  # mm de tolérance sur dx/dy pour juger "vertical"/"horizontal"
+    TOL = 0.05  # mm de tolérance sur dx/dy pour juger "vertical"/"horizontal"
+    # (bruit de tessellation STL/DXF ; voir docstring ci-dessus)
 
-    wall_idx, wall_auto = [], False
-    ceiling_idx, ceiling_auto = [], False
-
-    best_wall_x = None
-    best_ceiling_y = None
-
+    # --- Classification de chaque arête (sommet i -> sommet i+1) ---
+    # Une arête est compatible "vertical" dès que dx<=TOL (peu importe dy) :
+    # une micro-arête négligeable (dx<=TOL ET dy<=TOL) est ainsi compatible
+    # avec un run vertical EN COURS sans l'interrompre (voir piège #2 dans
+    # la docstring ci-dessus). Idem pour "horizontal" via dy<=TOL.
+    edge_is_vertical = []
+    edge_is_horizontal = []
     for i in range(n):
         x1, y1 = points_mm[i]
         x2, y2 = points_mm[(i + 1) % n]
         dx, dy = abs(x2 - x1), abs(y2 - y1)
+        edge_is_vertical.append(dx <= TOL)
+        edge_is_horizontal.append(dy <= TOL)
 
-        # Segment vertical => candidat "face mur"
-        if dx <= ANGLE_TOL and dy > ANGLE_TOL:
-            seg_x = (x1 + x2) / 2.0
-            if best_wall_x is None or seg_x < best_wall_x:
-                best_wall_x = seg_x
-                wall_idx = [i, (i + 1) % n]
-                wall_auto = True
+    def collect_runs(edge_flags):
+        """Regroupe les arêtes consécutives (avec retour à zéro, contour
+        fermé) partageant le même flag=True en "runs". Chaque run est la
+        liste ORDONNÉE de tous les indices de SOMMETS qu'il couvre
+        (extrémités des arêtes incluses, sans doublon), pas seulement les
+        deux extrémités du premier segment. Retourne une liste de runs
+        (chacun : liste d'indices de sommets)."""
+        runs = []
+        seen_edges = [False] * n
+        for start in range(n):
+            if seen_edges[start] or not edge_flags[start]:
+                continue
+            # Étend le run vers l'avant tant que les arêtes suivantes ont
+            # le même flag (gère le cas où le run traverse l'indice 0,
+            # contour fermé).
+            edges_in_run = [start]
+            seen_edges[start] = True
+            j = (start + 1) % n
+            while edge_flags[j] and not seen_edges[j] and len(edges_in_run) < n:
+                edges_in_run.append(j)
+                seen_edges[j] = True
+                j = (j + 1) % n
+            # Sommets couverts par ces arêtes, dans l'ordre, sans doublon.
+            verts = [edges_in_run[0]]
+            for e in edges_in_run:
+                nxt = (e + 1) % n
+                if nxt != verts[0]:
+                    verts.append(nxt)
+            runs.append(verts)
+        return runs
 
-        # Segment horizontal => candidat "face plafond"
-        if dy <= ANGLE_TOL and dx > ANGLE_TOL:
-            seg_y = (y1 + y2) / 2.0
-            if best_ceiling_y is None or seg_y > best_ceiling_y:
-                best_ceiling_y = seg_y
-                ceiling_idx = [i, (i + 1) % n]
-                ceiling_auto = True
+    wall_idx, wall_auto = [], False
+    ceiling_idx, ceiling_auto = [], False
+    best_wall_x = None
+    best_ceiling_y = None
+
+    for verts in collect_runs(edge_is_vertical):
+        seg_x = sum(points_mm[v][0] for v in verts) / len(verts)
+        if best_wall_x is None or seg_x < best_wall_x:
+            best_wall_x = seg_x
+            wall_idx = verts
+            wall_auto = True
+
+    for verts in collect_runs(edge_is_horizontal):
+        seg_y = sum(points_mm[v][1] for v in verts) / len(verts)
+        if best_ceiling_y is None or seg_y > best_ceiling_y:
+            best_ceiling_y = seg_y
+            ceiling_idx = verts
+            ceiling_auto = True
 
     origin_x = best_wall_x if best_wall_x is not None else xmin
     origin_y = best_ceiling_y if best_ceiling_y is not None else ymax
@@ -634,17 +713,20 @@ def write_control_png(record: dict, out_dir: Path):
     ax.axvline(0, color="gray", linewidth=0.5, linestyle="--")
     ax.plot(0, 0, "r+", markersize=10, markeredgewidth=2)
 
-    # Face mur / plafond en surbrillance
+    # Face mur / plafond en surbrillance — `indices` peut couvrir PLUS de
+    # 2 sommets (tous les sommets consécutifs colinéaires de la face
+    # réelle, cf. detect_wall_and_ceiling_faces) : on trace donc la
+    # polyligne complète du run, pas seulement ses deux extrémités.
     wall_idx = record["face_pose_mur"]["indices"]
-    if wall_idx and len(wall_idx) == 2:
-        wx = [pts[wall_idx[0]][0], pts[wall_idx[1]][0]]
-        wy = [pts[wall_idx[0]][1], pts[wall_idx[1]][1]]
+    if wall_idx and len(wall_idx) >= 2:
+        wx = [pts[i][0] for i in wall_idx]
+        wy = [pts[i][1] for i in wall_idx]
         ax.plot(wx, wy, color="#8a1c1c", linewidth=3, label="Face mur")
 
     ceiling_idx = record["face_pose_plafond"]["indices"]
-    if ceiling_idx and len(ceiling_idx) == 2:
-        cx = [pts[ceiling_idx[0]][0], pts[ceiling_idx[1]][0]]
-        cy = [pts[ceiling_idx[0]][1], pts[ceiling_idx[1]][1]]
+    if ceiling_idx and len(ceiling_idx) >= 2:
+        cx = [pts[i][0] for i in ceiling_idx]
+        cy = [pts[i][1] for i in ceiling_idx]
         ax.plot(cx, cy, color="#1c6a3c", linewidth=3, label="Face plafond")
 
     bbox = record["bbox_mm"]

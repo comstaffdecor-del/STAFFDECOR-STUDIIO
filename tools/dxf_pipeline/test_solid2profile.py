@@ -70,7 +70,11 @@ class TestReglesUnites:
         record, log = _process("TESTSOLIDE_L", tmp_path)
         assert record["statut"] == "OK"
         assert record["source"]["origine_unite"] == "override"
-        assert record["source"]["insunits"] == 4
+        assert record["source"]["insunits"] is None, (
+            "un STL/OBJ n'a pas d'en-tête $INSUNITS DXF : insunits_raw n'est "
+            "qu'un facteur d'échelle de substitution (units_override.csv), "
+            "jamais une valeur de champ DXF -> insunits doit être null"
+        )
         assert record["profil_mm"] != []
 
     def test_batch_continue_apres_erreur_unites(self, tmp_path):
@@ -158,6 +162,29 @@ class TestDetectionMotifVariable:
         record, _ = _process("TESTSOLIDE_DENTICULES", tmp_path)
         assert record["motif"]["auto"] is True
 
+    def test_profil_source_est_union_sections(self, tmp_path):
+        """Non-régression: l'enveloppe convexe a été abandonnée (une
+        corniche a des gorges concaves que le convexe effacerait). Le champ
+        motif.profil_source doit valoir "union_sections", jamais
+        "convex_hull" ou une autre valeur."""
+        record, _ = _process("TESTSOLIDE_DENTICULES", tmp_path)
+        assert record["motif"]["profil_source"] == "union_sections"
+
+    def test_profil_conserve_les_concavites_pas_convexifie(self, tmp_path):
+        """Le profil retenu (union des coupes) doit être STRICTEMENT plus
+        petit en aire que son enveloppe convexe : si les deux aires sont
+        égales, cela signifie que le code convexifie encore le résultat
+        (régression du bug enveloppe-convexe-abandonnée)."""
+        from shapely.geometry import Polygon
+        record, _ = _process("TESTSOLIDE_DENTICULES", tmp_path)
+        poly = Polygon(record["profil_mm"])
+        assert poly.area < poly.convex_hull.area * 0.99, (
+            f"aire profil={poly.area:.1f} vs aire convex hull="
+            f"{poly.convex_hull.area:.1f} : trop proches, le profil semble "
+            "avoir été convexifié (les concavités/gorges auraient dû être "
+            "préservées par l'union brute, pas un convex_hull)"
+        )
+
     def test_height_map_generee_pour_motif_variable(self, tmp_path):
         record, _ = _process("TESTSOLIDE_DENTICULES", tmp_path)
         assert record["assets"]["height"] is not None
@@ -174,6 +201,26 @@ class TestDetectionMotifVariable:
         assert arr.dtype == np.uint16
         assert arr.max() > 0, "height map entièrement à zéro: aucun relief détecté"
         assert (arr > 0).sum() > 10, "trop peu de pixels non-nuls pour un relief régulier sur 47 dents"
+
+    def test_projection_plafond_couvre_tous_les_sommets_colineaires(self, tmp_path):
+        """Non-régression du bug #5 (detect_wall_and_ceiling_faces ne
+        gardait que le PREMIER segment vertical/horizontal rencontré au
+        lieu de collecter tous les sommets colinéaires consécutifs sous
+        tolérance). Sur TESTSOLIDE_DENTICULES, les sommets d'indices 5 à 12
+        sont tous à y ~ 0 (x de 0,04 à 68,0) : la face plafond réelle fait
+        68mm, pas 31,48mm (valeur obtenue avec l'ancien bug qui ne
+        capturait que 2 sommets sur les 8 de la face réelle).
+        Voir dxf2profile.detect_wall_and_ceiling_faces (TOL=0.05mm)."""
+        record, _ = _process("TESTSOLIDE_DENTICULES", tmp_path)
+        assert record["statut"] == "OK"
+        assert abs(record["projection_plafond_mm"] - 68.0) < 0.1, (
+            f"projection_plafond_mm={record['projection_plafond_mm']}, attendu 68.0 "
+            "(régression possible: détection ne collecte plus tous les sommets colinéaires)"
+        )
+        assert len(record["face_pose_plafond"]["indices"]) > 2, (
+            "la face plafond réelle couvre 8 sommets tessellés, pas seulement 2 "
+            "(régression possible: retour à la logique premier-segment-seulement)"
+        )
 
     def test_height_map_couvre_toute_la_longueur_de_la_barre(self, tmp_path):
         """Non-régression du bug #4 (origin_pt = centroïde ACP au lieu du

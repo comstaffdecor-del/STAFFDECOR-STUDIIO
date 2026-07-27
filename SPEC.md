@@ -72,7 +72,7 @@ produit un fichier JSON normalisé par SKU, au format ci-dessous.
 | `marque` | string | oui | Marque commerciale. `""` si inconnue — **jamais inventée**. |
 | `famille` | enum string | oui | `"corniche"`, `"plinthe"`, `"cimaise"`, `"rosace"` (extensible : profil, ornement...). Déduite du calque/nom de fichier si possible, sinon `null`. |
 | `source.fichier` | string | oui | Nom du fichier DXF source utilisé pour l'extraction. |
-| `source.insunits` | int \| null | oui | Valeur brute de `$INSUNITS` lue dans le header DXF. `null` si absente du fichier. Codes DXF standards : `0`=non spécifié, `1`=pouces, `4`=mm, `5`=cm, `6`=m. |
+| `source.insunits` | int \| null | oui | Valeur brute de `$INSUNITS` lue dans le header DXF. `null` si absente du fichier. Codes DXF standards : `0`=non spécifié, `1`=pouces, `4`=mm, `5`=cm, `6`=m. **Pour `solid2profile.py` (source maillage STL/OBJ) : toujours `null`, voir section "Extension — pipeline 3D" ci-dessous — un maillage n'a pas d'en-tête d'unités, il ne faut jamais fabriquer une valeur de champ DXF à partir d'un simple facteur d'échelle de substitution.** |
 | `source.unite_retenue` | string | oui | Unité effectivement utilisée pour produire `profil_mm` (toujours convertie en `mm` en sortie). |
 | `source.origine_unite` | enum string | oui | `"header"` = lue directement dans `$INSUNITS` ; `"override"` = `$INSUNITS` absent/nul et une unité par défaut a été appliquée automatiquement (voir règle batch ci-dessous) ; `"manuel"` = confirmée manuellement par un opérateur. |
 | `profil_mm` | array[[x,y]] | oui (sauf `statut != "OK"`) | Liste ordonnée de sommets du contour fermé, en mm, sens horaire, après aplatissement des courbes et recalage d'origine. Vide (`[]`) si `statut != "OK"`. |
@@ -212,6 +212,7 @@ as d2p`) et réutilise ses fonctions/constantes (`build_error_record`,
 | `motif.periode_mm` | number \| null | Période du motif ornemental, estimée par autocorrélation. `null` si aucun pic net détecté (jamais une valeur inventée). |
 | `motif.methode` | string | `"autocorrelation"`, ou une chaîne explicative si `periode_mm` est `null` (ex : "aucun pic d'autocorrelation net"). |
 | `motif.auto` | bool | `true` — détection systématiquement automatique, même convention que `face_pose_mur.auto`/`face_pose_plafond.auto`. |
+| `motif.profil_source` | string | `"union_sections"` — présent uniquement quand `motif.type == "variable"`. Documente que le polygone de profil retenu (`profil_mm`) est l'**union** (pas l'enveloppe convexe) des 3 coupes min/max/médiane du balayage dense. Voir paragraphe dédié ci-dessous. |
 | `assets.height` | string \| null | Chemin relatif vers la height map PNG 16 bits (`heightmaps/<sku>_height.png`), uniquement pour `motif.type == "variable"`. `null` sinon (jamais générée pour un motif lisse). Base de la future normal map de rendu — hors scope de ce script. |
 
 **Méthode d'extraction (résumé, cf. docstring de `solid2profile.py` pour le
@@ -232,16 +233,41 @@ détail complet)** :
    développement).
 4. `motif.periode_mm` estimée par autocorrélation du signal d'aire
    (`np.correlate` + `scipy.signal.find_peaks`, prominence ≥ 0,15).
-5. Height map : pour un motif variable, distance à la face de pose
+5. **Profil retenu pour un motif variable = UNION (`shapely.unary_union`),
+   PAS enveloppe convexe**, des 3 polygones de coupe aux positions
+   d'aire minimale, maximale et médiane, réellement localisées par le
+   balayage dense (jamais des fractions arbitraires 25/50/75 %).
+   **Correction de spécification** : une version antérieure de ce
+   document préconisait l'enveloppe convexe de ces 3 coupes ; abandonnée
+   car une corniche a des gorges concaves (creux du profil, denticules)
+   que le convexe effacerait, détruisant le galbe réel de la moulure.
+   Vérifié sur `TESTSOLIDE_DENTICULES.stl` : aire de l'union = 2564 mm²
+   contre 4002 mm² pour l'enveloppe convexe des mêmes 3 coupes — la
+   différence mesure exactement l'ampleur de la déformation qu'aurait
+   introduite le convexe. `motif.profil_source="union_sections"`
+   documente ce choix dans le JSON. Cas rare (coupes disjointes) : si
+   l'union renvoie un `MultiPolygon`, on garde le plus grand polygone par
+   aire (même logique que `section_polygon_at` pour une coupe unique).
+6. Height map : pour un motif variable, distance à la face de pose
    échantillonnée sur une grille (axe long × pourtour du profil) par
    ray-casting sur le maillage réel, exportée en PNG 16 bits.
+
+**Unités (`source.insunits`) — cas particulier maillage** : un fichier
+STL/OBJ n'a pas d'en-tête `$INSUNITS` (contrairement au DXF). L'unité est
+toujours fournie par substitution externe (`units_override.csv`,
+`source.origine_unite="override"`). Le facteur d'échelle interne
+(`insunits_raw`, réutilisé via `d2p.INSUNITS_TO_MM` pour la conversion mm)
+n'est **jamais** exposé comme `source.insunits` dans le JSON — ce champ
+vaut systématiquement `null` pour `solid2profile.py`, afin de ne pas faire
+croire qu'un en-tête d'unités DXF a été lu sur un maillage qui n'en a pas.
 
 **Fixtures de validation** (vérité de terrain connue, `tests/fixtures/`,
 jamais dans `assets/`) : `TESTSOLIDE_L.stl` (barre 2 m, profil en L,
 section constante → `motif=null`) et `TESTSOLIDE_DENTICULES.stl` (même
 profil + 47 denticules réguliers tous les 42 mm → `motif.type="variable"`,
-`motif.periode_mm≈42`, height map non triviale). Validées par
-`test_solid2profile.py` (22 tests, tous verts).
+`motif.periode_mm≈42`, height map non triviale, `motif.profil_source=
+"union_sections"`). Validées par `test_solid2profile.py` (26 tests, tous
+verts).
 
 ## Observation — logique de nommage des SKU (suffixes)
 

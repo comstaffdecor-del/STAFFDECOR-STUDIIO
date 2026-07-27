@@ -55,9 +55,11 @@ RÈGLES (mêmes principes que dxf2profile.py, cf. SPEC.md) :
    - aires quasi constantes -> moulure lisse, on garde la coupe la plus
      proche du milieu de la barre comme profil.
    - aires variables -> moulure ORNÉE. motif.type="variable", profil de
-     pose = enveloppe convexe (union) des coupes aux positions d'aire
-     minimale, maximale et médiane RÉELLEMENT LOCALISÉES par le balayage
-     (jamais des fractions arbitraires).
+     pose = UNION (pas enveloppe convexe — une corniche a des gorges
+     concaves que le convexe effacerait, détruisant le galbe réel) des
+     coupes aux positions d'aire minimale, maximale et médiane RÉELLEMENT
+     LOCALISÉES par le balayage (jamais des fractions arbitraires).
+     motif.profil_source="union_sections".
    0 coupe valide sur le balayage -> ERREUR_SELECTION, profil_mm vide.
    LE BATCH CONTINUE.
 
@@ -588,7 +590,10 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
         msg = f"$INSUNITS={insunits_raw} (via units_override.csv) n'a pas de table de conversion mm connue."
         log["statut"] = "ERREUR_UNITES"
         log["message"] = msg
-        rec = d2p.build_error_record(sku, path.name, "ERREUR_UNITES", insunits_raw, msg, origine_unite="override")
+        # insunits=None dans le JSON exposé : un STL/OBJ n'a pas d'en-tête
+        # d'unités DXF, insunits_raw n'est ici qu'un facteur d'échelle de
+        # substitution (units_override.csv), jamais une valeur de champ DXF.
+        rec = d2p.build_error_record(sku, path.name, "ERREUR_UNITES", None, msg, origine_unite="override")
         rec["source"]["methode"] = "section_3d"
         return rec, log
 
@@ -610,7 +615,7 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
         )
         log["statut"] = "ERREUR_ORIENTATION"
         log["message"] = msg
-        rec = d2p.build_error_record(sku, path.name, "ERREUR_ORIENTATION", insunits_raw, msg, origine_unite="override")
+        rec = d2p.build_error_record(sku, path.name, "ERREUR_ORIENTATION", None, msg, origine_unite="override")
         rec["source"]["methode"] = "section_3d"
         return rec, log
 
@@ -635,7 +640,7 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
         )
         log["statut"] = "ERREUR_SELECTION"
         log["message"] = msg
-        rec = d2p.build_error_record(sku, path.name, "ERREUR_SELECTION", insunits_raw, msg, origine_unite="override")
+        rec = d2p.build_error_record(sku, path.name, "ERREUR_SELECTION", None, msg, origine_unite="override")
         rec["source"]["methode"] = "section_3d"
         return rec, log
 
@@ -666,12 +671,20 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
         periode_mm = None
         methode_periode = None
     else:
-        # Moulure ornée : enveloppe convexe (union) des coupes aux positions
-        # d'aire MINIMALE, MAXIMALE et médiane, réellement localisées par le
-        # balayage dense (jamais des fractions arbitraires 25/50/75% —
-        # c'est justement ce qui a fait manquer le motif, voir Bug #1) —
-        # garantit que la moulure rentre dans le gabarit quel que soit
-        # l'endroit du motif le long de la barre.
+        # Moulure ornée : UNION (pas enveloppe convexe) des coupes aux
+        # positions d'aire MINIMALE, MAXIMALE et médiane, réellement
+        # localisées par le balayage dense (jamais des fractions
+        # arbitraires 25/50/75% — c'est justement ce qui a fait manquer le
+        # motif, voir Bug #1) — garantit que la moulure rentre dans le
+        # gabarit quel que soit l'endroit du motif le long de la barre.
+        #
+        # ⚠️ CORRECTION (2ème revue) : l'enveloppe CONVEXE a été abandonnée.
+        # Une corniche a des gorges concaves (creux du profil) ; le convexe
+        # les efface et détruit le galbe réel de la moulure. On garde
+        # l'UNION brute (shapely.unary_union) des 3 polygones de coupe :
+        # elle conserve les concavités tout en capturant l'extension
+        # maximale des denticules (aire union < aire convex hull —
+        # vérifié 2564mm² vs 4002mm² sur TESTSOLIDE_DENTICULES).
         min_offset = float(valid_positions[int(np.argmin(valid_areas))])
         max_offset = float(valid_positions[int(np.argmax(valid_areas))])
         envelope_offsets = sorted({min_offset, max_offset, mid_offset})
@@ -680,7 +693,15 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
             for off in envelope_offsets
         ]
         envelope_polys = [p for p in envelope_polys if p is not None]
-        chosen_poly = unary_union(envelope_polys).convex_hull if envelope_polys else None
+        chosen_poly = None
+        if envelope_polys:
+            union_result = unary_union(envelope_polys)
+            if union_result.geom_type == "MultiPolygon":
+                # Rare (coupes disjointes) : on garde le plus grand
+                # polygone, même logique que section_polygon_at ci-dessus.
+                chosen_poly = max(union_result.geoms, key=lambda p: p.area)
+            else:
+                chosen_poly = union_result
         periode_mm, methode_periode = detect_pattern_period(positions, areas_arr, length_mm)
         motif_type = "variable"
         motif_record = {
@@ -688,13 +709,14 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
             "periode_mm": periode_mm,
             "methode": methode_periode if periode_mm is not None else "autocorrelation",
             "auto": True,
+            "profil_source": "union_sections",
         }
 
     if chosen_poly is None or chosen_poly.is_empty:
         msg = f"Polygone de coupe retenu vide/invalide dans {path.name}."
         log["statut"] = "ERREUR_SELECTION"
         log["message"] = msg
-        rec = d2p.build_error_record(sku, path.name, "ERREUR_SELECTION", insunits_raw, msg, origine_unite="override")
+        rec = d2p.build_error_record(sku, path.name, "ERREUR_SELECTION", None, msg, origine_unite="override")
         rec["source"]["methode"] = "section_3d"
         return rec, log
 
@@ -744,7 +766,11 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
         "famille": None,
         "source": {
             "fichier": path.name,
-            "insunits": insunits_raw,
+            # insunits=None : un STL/OBJ n'a pas d'en-tête $INSUNITS DXF.
+            # insunits_raw n'est qu'un facteur d'échelle de substitution
+            # (units_override.csv) — on ne fabrique jamais une valeur de
+            # champ DXF à partir de cette substitution.
+            "insunits": None,
             "unite_retenue": "mm",
             "origine_unite": "override",
             "methode": "section_3d",
@@ -805,16 +831,20 @@ def write_control_png(record: dict, out_dir: Path):
     ax.axvline(0, color="gray", linewidth=0.5, linestyle="--")
     ax.plot(0, 0, "r+", markersize=10, markeredgewidth=2)
 
+    # `indices` peut couvrir PLUS de 2 sommets (tous les sommets
+    # consécutifs colinéaires de la face réelle, cf.
+    # detect_wall_and_ceiling_faces dans dxf2profile.py) : polyligne
+    # complète du run, pas seulement ses deux extrémités.
     wall_idx = record["face_pose_mur"]["indices"]
-    if wall_idx and len(wall_idx) == 2:
-        wx = [pts[wall_idx[0]][0], pts[wall_idx[1]][0]]
-        wy = [pts[wall_idx[0]][1], pts[wall_idx[1]][1]]
+    if wall_idx and len(wall_idx) >= 2:
+        wx = [pts[i][0] for i in wall_idx]
+        wy = [pts[i][1] for i in wall_idx]
         ax.plot(wx, wy, color="#8a1c1c", linewidth=3, label="Face mur")
 
     ceiling_idx = record["face_pose_plafond"]["indices"]
-    if ceiling_idx and len(ceiling_idx) == 2:
-        cx = [pts[ceiling_idx[0]][0], pts[ceiling_idx[1]][0]]
-        cy = [pts[ceiling_idx[0]][1], pts[ceiling_idx[1]][1]]
+    if ceiling_idx and len(ceiling_idx) >= 2:
+        cx = [pts[i][0] for i in ceiling_idx]
+        cy = [pts[i][1] for i in ceiling_idx]
         ax.plot(cx, cy, color="#1c6a3c", linewidth=3, label="Face plafond")
 
     bbox = record["bbox_mm"]
