@@ -209,12 +209,31 @@ def load_mesh(path: Path):
 def find_long_axis(mesh) -> tuple:
     """ACP sur les sommets du maillage. Retourne (origin, axis, ratio_2_1,
     length_mm) où axis est le vecteur unitaire de l'axe long (plus grande
-    valeur propre), origin le centroïde, ratio_2_1 le rapport de la 2e à
-    la 1re valeur propre (barre bien allongée si << 1), length_mm
-    l'étendue du maillage projetée sur cet axe."""
+    valeur propre), ratio_2_1 le rapport de la 2e à la 1re valeur propre
+    (barre bien allongée si << 1), length_mm l'étendue du maillage
+    projetée sur cet axe.
+
+    origin : ⚠️ PIÈGE DÉTECTÉ ET CORRIGÉ pendant le développement — un
+    4e bug de repère, distinct des trois autres (cf. CONVENTIONS.md côté
+    Dart pour l'inventaire complet). `origin` N'EST PAS le centroïde du
+    maillage : c'est le point du maillage à l'extrémité MINIMALE de sa
+    projection sur `axis` (le vrai début de la barre). Tout le reste du
+    module (sample_areas_along_axis, build_height_map, la sélection
+    min/max/médiane dans process_one_mesh) utilise un offset dans
+    `[0, length_mm]` MESURÉ DEPUIS `origin` — si `origin` était le
+    centroïde (offset 0 = milieu de la barre, comme une première version
+    de cette fonction le faisait), la moitié des offsets de
+    `sample_areas_along_axis`/`build_height_map` (ceux > length_mm/2)
+    tomberait hors du maillage réel dès que le centroïde ACP n'est pas
+    exactement au milieu géométrique de la projection (ce qui est le cas
+    général, pas un cas limite) — vérifié empiriquement sur
+    TESTSOLIDE_DENTICULES : centroïde à proj=0, mais proj réelle
+    ∈ [-987.4, +1012.6] (pas symétrique), donc tout offset > 1012.6
+    (la moitié des 1921 échantillons du balayage dense) sortait du
+    maillage et produisait une height map à moitié nulle."""
     verts = mesh.vertices
-    origin = verts.mean(axis=0)
-    centered = verts - origin
+    centroid = verts.mean(axis=0)
+    centered = verts - centroid
     cov = np.cov(centered.T)
     eigvals, eigvecs = np.linalg.eigh(cov)  # ordre croissant
     order = np.argsort(eigvals)[::-1]
@@ -227,6 +246,9 @@ def find_long_axis(mesh) -> tuple:
 
     proj = centered @ axis
     length_mm = float(proj.max() - proj.min())
+    # origin = extrémité réelle de la barre (proj minimale), pas le
+    # centroïde — voir docstring ci-dessus.
+    origin = centroid + float(proj.min()) * axis
 
     return origin, axis, ratio_2_1, length_mm
 

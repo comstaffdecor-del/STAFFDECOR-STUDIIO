@@ -175,6 +175,53 @@ class TestDetectionMotifVariable:
         assert arr.max() > 0, "height map entièrement à zéro: aucun relief détecté"
         assert (arr > 0).sum() > 10, "trop peu de pixels non-nuls pour un relief régulier sur 47 dents"
 
+    def test_height_map_couvre_toute_la_longueur_de_la_barre(self, tmp_path):
+        """Non-régression du bug #4 (origin_pt = centroïde ACP au lieu du
+        vrai point de départ de la barre, cf. docstring de find_long_axis
+        et geometry/CONVENTIONS.md §4) : si `origin` est mal placé, les
+        offsets échantillonnés le long de l'axe sortent du maillage réel
+        pour une partie de la barre, ce qui produit des lignes ENTIÈREMENT
+        nulles sur une moitié de la height map. Les deux assertions
+        précédentes (max()>0, plus de 10 pixels non-nuls) passaient déjà
+        AVANT correction de ce bug — elles ne le détectaient pas. Ce test
+        vérifie explicitement une couverture quasi-complète sur toute la
+        longueur (axe = lignes de l'image)."""
+        from PIL import Image
+        record, _ = _process("TESTSOLIDE_DENTICULES", tmp_path)
+        height_path = tmp_path / record["assets"]["height"]
+        arr = np.array(Image.open(height_path))
+
+        # Une "ligne" (position le long de l'axe) est considérée couverte si
+        # au moins un pixel du pourtour du profil à cette position a un
+        # relief mesurable.
+        row_max = arr.max(axis=1)
+        lignes_couvertes = int((row_max > 0).sum())
+        n_lignes = arr.shape[0]
+        taux_couverture = lignes_couvertes / n_lignes
+        assert taux_couverture > 0.95, (
+            f"height map couvre seulement {taux_couverture:.1%} de la longueur "
+            f"de la barre ({lignes_couvertes}/{n_lignes} lignes non-nulles) — "
+            "symptôme du bug #4 (origin_pt mal placé, cf. CONVENTIONS.md §4) : "
+            "vérifier find_long_axis()."
+        )
+
+        # Aucune plage contiguë de lignes nulles ne doit dépasser quelques
+        # pas d'échantillonnage (les denticules sont périodiques tous les
+        # 42mm ; un vrai "trou" de couverture serait large, pas un simple
+        # creux entre deux dents).
+        lignes_nulles = row_max == 0
+        run_max = 0
+        run_courant = 0
+        for nul in lignes_nulles:
+            run_courant = run_courant + 1 if nul else 0
+            run_max = max(run_max, run_courant)
+        assert run_max < n_lignes * 0.1, (
+            f"plage contiguë de {run_max} lignes entièrement nulles détectée "
+            f"(sur {n_lignes} lignes au total) — symptôme du bug #4 "
+            "(origin_pt mal placé) : la barre n'est pas couverte sur toute "
+            "sa longueur."
+        )
+
 
 class TestCoherenceRepereFixe:
     """Vérifie indirectement la correction du bug de repère 2D incohérent

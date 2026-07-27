@@ -15,6 +15,11 @@
 ///
 /// ## Convention géométrique (imposée, valable pour tout `geometry/`)
 ///
+/// ⚠️ **Source unique de vérité : `geometry/CONVENTIONS.md`.** Le résumé
+/// ci-dessous n'est qu'un rappel pour ce fichier — toute évolution de la
+/// convention (repère monde, repère profil, fonction de passage
+/// [profileToWorld]) se fait dans `CONVENTIONS.md`, jamais ici en premier.
+///
 /// - **Repère monde** : main droite, **X = droite**, **Y = haut**,
 ///   **Z = vers la caméra** (donc la scène visible depuis une caméra qui
 ///   "regarde vers la pièce" se trouve globalement à Z décroissant).

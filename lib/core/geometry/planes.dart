@@ -8,6 +8,9 @@
 ///
 /// ## Convention géométrique (imposée, valable pour tout `geometry/`)
 ///
+/// ⚠️ **Source unique de vérité : `geometry/CONVENTIONS.md`.** Le résumé
+/// ci-dessous n'est qu'un rappel pour ce fichier.
+///
 /// - **Repère monde** : main droite, **X = droite**, **Y = haut**,
 ///   **Z = vers la caméra** — voir `camera.dart` pour le détail complet
 ///   (même convention, non répétée ici).
