@@ -1,0 +1,5 @@
+sku_ou_fichier,insunits,motif
+TESTSOLIDE_L,4,fixture synthetique - unites natives = mm
+TESTSOLIDE_DENTICULES,4,fixture synthetique - unites natives = mm
+TESTSOLIDE_L.stl,4,fixture synthetique - unites natives = mm
+TESTSOLIDE_DENTICULES.stl,4,fixture synthetique - unites natives = mm

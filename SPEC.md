@@ -135,6 +135,26 @@ produit un fichier JSON normalisé par SKU, au format ci-dessous.
    header DXF et avant toute proposition automatique. Permet de débloquer
    un fichier sans `$INSUNITS` sans jamais deviner silencieusement.
 
+## ⚠️ ALERTE OUTIL — 3DSOLID (ACIS) illisible par FreeCAD et ODA File Converter
+
+**Constat confirmé par l'utilisateur, à respecter dans toute recommandation future :**
+
+- Plusieurs DXF fabricants ne contiennent aucune polyligne 2D de coupe mais
+  un modèle volumique `3DSOLID` (format ACIS, propriétaire Autodesk).
+- **Ni FreeCAD ni ODA File Converter ne savent lire un `3DSOLID` ACIS.**
+  Ces deux outils, utilisés par ailleurs dans ce projet (conversion DWG→DXF
+  via ODA), échouent silencieusement ou refusent ce type d'entité.
+- **Seul AutoCAD ou BricsCAD peut exporter un maillage (STL/OBJ) depuis un
+  `3DSOLID`.** Cette conversion est entièrement manuelle, effectuée par
+  l'utilisateur (comme le lot ODA DWG→DXF), **jamais tentée par le pipeline
+  ou l'agent**.
+- **Ne jamais recommander FreeCAD pour cette étape de conversion** —
+  consigne explicite de l'utilisateur, à respecter dans toute suggestion
+  d'outillage future.
+- Export recommandé : **STL binaire**, **déviation linéaire (tolérance de
+  tessellation) ≤ 0,1 mm** — validé par l'utilisateur. Une fois le maillage
+  obtenu, `solid2profile.py` (voir section suivante) prend le relais.
+
 ## Arborescence
 
 ```
@@ -142,17 +162,22 @@ produit un fichier JSON normalisé par SKU, au format ci-dessous.
   SPEC.md                          <- ce fichier
   assets/dwg/*.dwg                 <- fichiers DWG source (non convertis) -- JAMAIS supprimés
   assets/dxf/*.dxf                 <- fichiers DXF source (issus d'ODA File Converter) -- JAMAIS supprimés
+  assets/solids/*.stl|*.obj        <- maillages 3D (issus d'AutoCAD/BricsCAD depuis un 3DSOLID) -- JAMAIS supprimés
   assets/profiles/<sku>.json       <- sortie JSON par SKU -- JAMAIS supprimé sans confirmation
   assets/profiles/control/<sku>.png<- PNG de contrôle coté
+  assets/profiles/heightmaps/<sku>_height.png <- height map 16 bits (motif variable uniquement)
   tools/dxf_pipeline/
     scan_assets.py                 <- inventaire DWG+DXF (sku, dwg_present, dxf_present, statut)
-    dxf2profile.py                 <- extraction DXF -> JSON + PNG
+    dxf2profile.py                 <- extraction DXF (2D) -> JSON + PNG
+    solid2profile.py               <- extraction maillage 3D (STL/OBJ) -> JSON + PNG + height map
     mapping.csv                    <- correspondance fichier -> sku (source de vérité, non déduite)
     units_override.csv             <- unités forcées par sku/fichier, priorité 2 après $INSUNITS
     inventaire.csv                 <- sortie de scan_assets.py
     logs/                          <- logs détaillés par run (jamais supprimés sans confirmation)
     tests/fixtures/*.dxf           <- fixtures synthétiques de non-régression (pytest) -- permanentes
-    test_dxf2profile.py            <- suite pytest de non-régression sur les fixtures
+    tests/fixtures/*.stl           <- fixtures synthétiques (barres L/denticules) pour solid2profile.py
+    test_dxf2profile.py            <- suite pytest de non-régression (dxf2profile.py)
+    test_solid2profile.py          <- suite pytest de non-régression (solid2profile.py)
 ```
 
 ### `mapping.csv` — schéma
@@ -170,6 +195,53 @@ produit un fichier JSON normalisé par SKU, au format ci-dessous.
 | `sku_ou_fichier` | SKU ou nom de fichier concerné |
 | `insunits` | Code `$INSUNITS` à appliquer (ex: `4` pour mm) |
 | `motif` | Justification humaine (ex: "confirmé par plan papier original") |
+
+## Extension — pipeline 3D (`solid2profile.py`)
+
+**Même schéma JSON, `version_schema: 1` inchangé — aucun schéma parallèle.**
+`solid2profile.py` importe directement `dxf2profile.py` (`import dxf2profile
+as d2p`) et réutilise ses fonctions/constantes (`build_error_record`,
+`write_json`, `load_mapping`, `load_units_override`, `propose_unit_by_bbox`,
+`ensure_clockwise`, `detect_wall_and_ceiling_faces`, `INSUNITS_TO_MM`,
+`SCHEMA_VERSION`). Seuls des champs **additifs** sont introduits :
+
+| Champ | Type | Description |
+|---|---|---|
+| `source.methode` | string | `"section_3d"` pour tout enregistrement produit par `solid2profile.py` (y compris les erreurs). Absent/non renseigné pour `dxf2profile.py`. Ne pas confondre avec `source.origine_unite` (qui décrit l'origine de l'unité, pas la méthode d'extraction du profil). |
+| `motif.type` | enum string | `"lisse"` (aire de section constante) ou `"variable"` (aire variable le long de la barre). `null` (le champ `motif` entier) si non applicable. |
+| `motif.periode_mm` | number \| null | Période du motif ornemental, estimée par autocorrélation. `null` si aucun pic net détecté (jamais une valeur inventée). |
+| `motif.methode` | string | `"autocorrelation"`, ou une chaîne explicative si `periode_mm` est `null` (ex : "aucun pic d'autocorrelation net"). |
+| `motif.auto` | bool | `true` — détection systématiquement automatique, même convention que `face_pose_mur.auto`/`face_pose_plafond.auto`. |
+| `assets.height` | string \| null | Chemin relatif vers la height map PNG 16 bits (`heightmaps/<sku>_height.png`), uniquement pour `motif.type == "variable"`. `null` sinon (jamais générée pour un motif lisse). Base de la future normal map de rendu — hors scope de ce script. |
+
+**Méthode d'extraction (résumé, cf. docstring de `solid2profile.py` pour le
+détail complet)** :
+1. Axe long trouvé par ACP (PCA) sur les sommets du maillage.
+2. Aire de section échantillonnée par un **balayage dense** le long de
+   l'axe (résolution 1 mm) — remplace un échantillonnage à 3 abscisses
+   fixes (25/50/75 %), rejeté après vérification empirique : un motif
+   périodique peut ne tomber sur aucun des 3 points par pur hasard de
+   phase et être manqué en totalité (ex. période 42 mm sur une barre de
+   2000 mm — vérifié sur la fixture `TESTSOLIDE_DENTICULES.stl`).
+3. Un **repère 2D fixe** (`build_fixed_rotation`, dérivé une seule fois de
+   l'axe long) est imposé à toutes les coupes d'un même maillage. Sans
+   cela, `Path3D.to_2D()` (trimesh) recalcule indépendamment un plan de
+   référence par tranche, produisant des origines/rotations différentes
+   d'une coupe à l'autre — rendant toute union/comparaison entre coupes
+   géométriquement invalide (bug détecté et corrigé pendant le
+   développement).
+4. `motif.periode_mm` estimée par autocorrélation du signal d'aire
+   (`np.correlate` + `scipy.signal.find_peaks`, prominence ≥ 0,15).
+5. Height map : pour un motif variable, distance à la face de pose
+   échantillonnée sur une grille (axe long × pourtour du profil) par
+   ray-casting sur le maillage réel, exportée en PNG 16 bits.
+
+**Fixtures de validation** (vérité de terrain connue, `tests/fixtures/`,
+jamais dans `assets/`) : `TESTSOLIDE_L.stl` (barre 2 m, profil en L,
+section constante → `motif=null`) et `TESTSOLIDE_DENTICULES.stl` (même
+profil + 47 denticules réguliers tous les 42 mm → `motif.type="variable"`,
+`motif.periode_mm≈42`, height map non triviale). Validées par
+`test_solid2profile.py` (22 tests, tous verts).
 
 ## Observation — logique de nommage des SKU (suffixes)
 
