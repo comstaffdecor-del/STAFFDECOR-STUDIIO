@@ -171,6 +171,54 @@ produit un fichier JSON normalisé par SKU, au format ci-dessous.
 | `insunits` | Code `$INSUNITS` à appliquer (ex: `4` pour mm) |
 | `motif` | Justification humaine (ex: "confirmé par plan papier original") |
 
+## Observation — logique de nommage des SKU (suffixes)
+
+**Statut : observation empirique, PAS une règle métier confirmée.**
+Cette section documente un motif récurrent observé dans `manifest.csv`
+(1023 fichiers, 710 SKU) en résolvant le lot pilote (SKU `1101`/`1101E`
+sans correspondance exacte). Elle est là pour aider à interpréter les
+~950 SKU restants, mais **ne doit jamais servir à déduire ou fabriquer
+un SKU par regex** — la règle "mapping via `mapping.csv`, jamais déduit"
+reste absolue. En cas de doute sur un SKU réel, se référer à
+`manifest.csv` (source de vérité) et/ou demander confirmation.
+
+De nombreux SKU numériques de la catégorie **Moulures** portent un
+suffixe alphabétique désignant une variante du même profil de base.
+Observé sur le radical `11xx` (ex: `1101`, `1103`, `1200`, `1202`,
+`1207`, `1210`) :
+
+| Suffixe | Catégorie GED observée | Sens probable (hypothèse, non confirmée) |
+|---|---|---|
+| `H` | Angles et doucines / Chapiteaux / Classiques | Angle **H**aut / **H**orizontal ? |
+| `BH` | Angles et doucines (7 occurrences, exclusivement) | Combinaison **B**as+**H**aut ou variante d'angle |
+| `C` | Cimaises / Moulures / Grandes dimensions | Corniche / **C**imaise |
+| `E` | Angles et doucines / Profils LED / Équerres-U-Joints creux | Angle/**É**querre, ou **E**xtrémité |
+| `B` | Classiques / Socles / Ornementées | **B**as / **B**ase |
+| `P` | Moulures / Profils de finition / Rosaces / Puits de lumière | **P**etit, ou **P**rofil |
+| `I` | Profils LED / Équerres-U-Joints creux | **I**ntérieur ? (à l'opposé possible de `E`) |
+| `L` | Passages et meubles de passage / Classiques | **L**inteau ? |
+| `M` | Corniches à éclairage indirect / Modulostaff / Plinthes | **M**odule / **M**oulure |
+| `A` | Grandes dimensions / Plinthes et talons | **A**ngle ? |
+| `S` | Angles et doucines / Plinthes et talons | **S**pécial ? |
+
+**Cas concret ayant motivé cette note** : le SKU radical `1101` (sans
+suffixe) n'existe pas tel quel dans le manifeste — seules ses variantes
+suffixées existent : `1101-1108` (dwg combiné 1101+1108, catégorie
+Moulures), `1101BH`, `1101C` (catégorie Cimaises — donc *pas* la même
+catégorie GED que les autres suffixes 1101), `1101E-1` (noter le `-1`
+additionnel), `1101H`. Le suffixe `E` demandé par l'utilisateur («
+1101E ») correspond en réalité au SKU manifeste `1101E-1` (avec un
+suffixe numérique supplémentaire `-1`, motif non expliqué par ce
+tableau).
+
+**Limite explicite de cette observation** : le mapping `catégorie GED
+↔ suffixe` n'est pas strictement 1:1 (ex. `C` apparaît à la fois en
+Cimaises, Moulures et Grandes dimensions ; `H` apparaît en Angles et
+doucines, Chapiteaux et Classiques) — donc le suffixe seul ne permet
+**pas** de déduire la catégorie ou la géométrie avec certitude. À
+utiliser uniquement comme aide de lecture humaine, jamais comme règle
+de code.
+
 ## Champs commerciaux — rappel
 
 `marque`, `prix_ml`, `longueur_barre_mm` (si non standard) : toujours
