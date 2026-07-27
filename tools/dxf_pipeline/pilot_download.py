@@ -45,6 +45,9 @@ DXF_DIR = Path("/home/user/flutter_app/assets/dxf")
 PILOT_SKUS = {
     "1101", "1102", "1101e", "1101h", "1140c", "1145c",
     "0900", "1000", "1005", "20-54",
+    # Candidats validés par l'utilisateur pour clarifier 1101/1101E
+    # (aucun SKU exact "1101"/"1101E" dans le manifeste — voir rapport) :
+    "1101-1108", "1101bh", "1101c", "1101e-1",
 }
 MAX_SIZE_MO = 1.5
 ALLOWED_TYPES = {"2D", "INDETERMINE"}
