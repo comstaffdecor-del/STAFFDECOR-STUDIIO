@@ -1,0 +1,35 @@
+{
+  "sku": "0900",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "0900.dxf",
+    "insunits": 4,
+    "unite_retenue": "mm",
+    "origine_unite": "header"
+  },
+  "profil_mm": [],
+  "face_pose_mur": {
+    "indices": [],
+    "auto": false
+  },
+  "face_pose_plafond": {
+    "indices": [],
+    "auto": false
+  },
+  "bbox_mm": {
+    "w": 0,
+    "h": 0
+  },
+  "hauteur_mur_mm": 0,
+  "projection_plafond_mm": 0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null
+  },
+  "longueur_barre_mm": 2000,
+  "prix_ml": null,
+  "statut": "ERREUR_SELECTION",
+  "version_schema": 1
+}
