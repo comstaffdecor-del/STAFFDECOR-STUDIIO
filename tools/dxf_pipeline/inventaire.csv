@@ -1,1 +1,8 @@
 sku,dwg_present,dwg_fichier,dxf_present,dxf_fichier,statut,mapping_absent,insunits_dxf,nb_calques_dxf,calques_dxf,nb_polylignes_fermees_candidates_dxf,aire_max_mm2_dxf,nb_spline_dxf,nb_arc_dxf,nb_ellipse_dxf,lisible_dxf,erreur_dxf
+0900,True,0900.dwg,True,0900.dxf,DXF_PRET,False,4,10,0;Cloison;Defpoints;Ligne;Lignes;STAFF Pièce;Traits d'axe;Wireframes;axes;cotations,0,,0,0,0,True,
+1000,True,1000-2D.dwg,True,1000.dxf,DXF_PRET,False,4,6,0;Cloison;Defpoints;General;Ligne;axes,1,6900.0,0,5,0,True,
+1005,False,,True,1005.dxf,DXF_PRET,False,4,4,0;Cloison;Defpoints;General,0,,0,0,0,True,
+1101h,True,Moulures - 1101H.dwg,False,,A_CONVERTIR,False,,,,,,,,,,
+1102,True,Moulures - 1102.dwg,False,,A_CONVERTIR,False,,,,,,,,,,
+1145c,True,1145C-2D.dwg,True,1145C-pièce.dxf,DXF_PRET,False,4,4,0;1145C;Cloison;Defpoints,0,,0,0,0,True,
+20-54,True,20-54.dwg,True,20-54.dxf,DXF_PRET,False,4,12,0;Cloison;D114;Defpoints;Ligne;Lignes;PERIPHERIQUE;STAFF Pièce;Traits d'axe;Wireframes;axes;cotations,0,,0,0,0,True,
