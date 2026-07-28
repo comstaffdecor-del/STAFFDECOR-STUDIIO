@@ -23,81 +23,75 @@ d'utilisable.
 
 ---
 
-## Cas 1 — Profil LISSE (corniche/plinthe/cimaise sans motif répétitif)
+## Format demandé — UNIQUE pour toutes les références : STL/OBJ
 
-**Format demandé, par ordre de préférence :**
+**Décision retenue : on demande systématiquement un maillage 3D (STL de
+préférence, OBJ accepté), quel que soit le type de profil.** Une seule
+règle, aucune ambiguïté sur "quel cas s'applique à ma référence" — le
+maillage couvre aussi bien un profil lisse qu'un profil ornementé, seule
+la longueur exportée diffère (voir ci-dessous).
 
-### Option A (préférée) — DXF avec la coupe 2D dessinée directement
+**Exigences communes, pour toute référence :**
+- Export **`.stl` binaire** (préféré) ou `.obj`, réalisé depuis AutoCAD ou
+  BricsCAD à partir du `3DSOLID` (seuls outils côté BE capables de lire ce
+  format ACIS/SAB).
+- Maillage **fermé (watertight)** : sans trous, sans faces dupliquées.
+  Un maillage ouvert produit des coupes incohérentes ou vides — le
+  pipeline ne répare jamais un maillage silencieusement (règle stricte,
+  jamais de correction/complétion inventée d'un profil).
+- Tronçon de barre **nettement allongé**, axe long identifiable sans
+  ambiguïté.
+- **Confirmer l'unité réelle du modèle** (mm très probablement) — un STL
+  n'a pas d'unité native, elle doit être déclarée explicitement en retour.
 
-- Un fichier `.dxf` **classique** contenant la **coupe transversale du
-  profil dessinée en polyligne fermée** (`LWPOLYLINE` ou `POLYLINE`) — le
-  contour vu de bout, comme sur un plan de coupe papier. **Pas le solide
-  3D : juste le contour 2D.**
-- Sur un calque identifiable comme le contour du profil (pas mélangé aux
-  cotes, cartouche, hachures).
-- Unité `$INSUNITS` renseignée dans l'en-tête DXF (mm attendu).
+**Seule variable selon le type de profil : la longueur du tronçon exporté.**
 
-### Option B (si le profil n'existe qu'en volume dans leur CAO)
+| Type de profil | Longueur exportée |
+|---|---|
+| Lisse (corniche/plinthe/cimaise sans motif répétitif) | Un tronçon représentatif suffit (pas d'exigence de répétition). |
+| Ornementé (denticules, cannelures irrégulières, rosace, tout motif qui varie le long de la barre) | **Au moins 3 à 4 répétitions complètes du motif.** Le pipeline détecte la période par autocorrélation de l'aire de section balayée le long de la barre — un seul denticule ou une demi-période ne donne aucun pic net, la période reste alors `null` (jamais inventée), et le motif est traité comme incomplet. |
 
-- Un fichier **`.stl`** (binaire, préféré) ou **`.obj`**, exporté depuis
-  AutoCAD/BricsCAD à partir du `3DSOLID`.
-- Le maillage doit représenter un tronçon de barre **nettement allongé**
-  (l'axe long doit être identifiable sans ambiguïté).
-- **Fermé (watertight)**, sans trous ni faces dupliquées.
-- Confirmer l'unité réelle du modèle (mm très probablement).
-
----
-
-## Cas 2 — Profil ORNEMENTÉ (denticules, cannelures irrégulières, rosace, tout motif qui varie le long de la barre)
-
-Une coupe 2D unique ne suffit pas : le relief varie le long de la barre.
-**Le volume complet est obligatoire** (Option B ci-dessus), avec deux
-exigences supplémentaires :
-
-1. **Longueur exportée : au moins 3 à 4 répétitions complètes du motif.**
-   Le pipeline détecte la période du motif par autocorrélation de l'aire
-   de section balayée le long de la barre — un seul denticule ou une
-   demi-période ne donne aucun pic net, la période est alors laissée
-   `null` (jamais inventée), et le motif est traité comme incomplet.
-   **Ne pas envoyer un tronçon trop court.**
-2. **Maillage fermé (watertight), sans trous.** Le pipeline calcule des
-   sections planaires tout le long de la barre ; un maillage ouvert
-   produit des coupes incohérentes ou vides. Aucune réparation
-   automatique n'est faite côté pipeline (règle stricte : jamais de
-   correction silencieuse d'un profil).
-
-**Format** : `.stl` (binaire, préféré) ou `.obj`, mêmes exigences
-d'unité que le cas 1B.
+**Exception : si un DXF 2D de la coupe existe déjà chez le BE** (plan de
+fabrication classique, polyligne fermée dessinant directement le contour
+transversal), il reste utilisable directement pour un profil lisse — pas
+besoin de le remodeler en 3D dans ce cas précis. Mais **par défaut, on
+demande du STL/OBJ pour tout**, pour éviter l'aller-retour de
+clarification.
 
 ---
 
 ## Récapitulatif — à copier-coller dans l'email au BE
 
-> Pour chaque référence produit, merci de nous transmettre l'un des
-> formats suivants (jamais le solide 3D `3DSOLID`/ACIS/SAB brut dans un
-> DXF, que nous ne pouvons pas exploiter) :
+> Pour chaque référence produit, merci de nous transmettre un export STL
+> (de préférence binaire) ou OBJ du solide, réalisé depuis AutoCAD ou
+> BricsCAD — jamais le fichier DXF contenant le solide 3D `3DSOLID`/
+> ACIS/SAB brut, que nous ne pouvons pas exploiter directement.
 >
-> 1. **Profil lisse, si vous avez la coupe 2D** : un DXF classique avec la
->    coupe transversale dessinée en polyligne fermée (pas le solide),
->    unité mm renseignée dans l'en-tête.
-> 2. **Profil lisse, si vous n'avez que le volume 3D** : un export STL
->    (ou OBJ) fermé/watertight du solide, tronçon de barre nettement
->    allongé, avec confirmation de l'unité (mm).
-> 3. **Profil ornementé (denticules, motif répétitif, rosace...)** :
->    obligatoirement un STL/OBJ fermé/watertight, couvrant **au moins 3-4
->    répétitions complètes du motif** le long de la barre — un tronçon
->    trop court empêche la détection automatique de la période.
+> Exigences :
+> - Maillage fermé ("watertight"), sans trous.
+> - Tronçon de barre nettement allongé.
+> - Pour un profil **ornementé** (denticules, motif répétitif, rosace...) :
+>   au moins 3 à 4 répétitions complètes du motif sur la longueur
+>   exportée — un tronçon trop court empêche la détection automatique du
+>   pas du motif.
+> - Pour un profil **lisse** : un tronçon représentatif suffit.
+> - Merci de confirmer l'unité du fichier (mm très probablement).
 >
-> Dans tous les cas : jamais de `.dwg` direct (convertir en DXF en amont),
-> et merci de confirmer l'unité du fichier si elle n'est pas explicite.
+> Si vous disposez déjà d'un DXF 2D de la coupe transversale pour un
+> profil lisse (polyligne fermée du contour), il reste utilisable tel
+> quel, sans passer par le 3D.
+>
+> Dans tous les cas : jamais de fichier .dwg directement, merci de le
+> convertir en .dxf en amont si besoin.
 
 ---
 
 ## Ce que le pipeline produit ensuite (pour information au BE, si utile)
 
-- `dxf2profile.py` (Cas 1A) ou `solid2profile.py` (Cas 1B et Cas 2)
-  génèrent un JSON normalisé par référence (`assets/profiles/<sku>.json`,
-  schéma `SPEC.md`) + un PNG de contrôle coté du profil.
+- Le script qui traite les STL/OBJ (ou le DXF 2D dans le cas d'exception
+  ci-dessus) génère un JSON normalisé par référence
+  (`assets/profiles/<sku>.json`, schéma `SPEC.md`) + un PNG de contrôle
+  coté du profil.
 - Pour un motif ornementé détecté comme variable : profil de pose calculé
   par **union** des coupes caractéristiques (jamais l'enveloppe convexe,
   qui effacerait les gorges/denticules), période du motif estimée par
