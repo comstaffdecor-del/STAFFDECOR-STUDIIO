@@ -524,6 +524,7 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
         "mapping_absent": mapping_absent,
         "statut": "",
         "nb_sommets": 0,
+        "nb_sommets_dedup_retires": 0,
         "bbox_w_mm": "",
         "bbox_h_mm": "",
         "hauteur_mur_mm": "",
@@ -726,6 +727,18 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
     pts_mm = [(float(x), float(y)) for x, y in coords]
     pts_mm = d2p.ensure_clockwise(pts_mm)
 
+    # Déduplication À LA SOURCE des sommets confondus/colinéaires
+    # (< d2p.DEDUP_TOLERANCE_MM) — même fonction partagée que
+    # dxf2profile.py (voir dedupe_consecutive_vertices), pas une
+    # réimplémentation locale. Nécessaire ici aussi : shapely.unary_union
+    # (cas motif "variable", coupes ornées) introduit régulièrement des
+    # sommets quasi confondus ou colinéaires à la jonction de deux
+    # polygones de coupe presque superposés (jitter de tessellation, voir
+    # piège #2 documenté dans detect_wall_and_ceiling_faces).
+    nb_avant_dedup = len(pts_mm)
+    pts_mm = d2p.dedupe_consecutive_vertices(pts_mm)
+    nb_dedup_retires = nb_avant_dedup - len(pts_mm)
+
     wall_idx, wall_auto, ceiling_idx, ceiling_auto, origin_x, origin_y = (
         d2p.detect_wall_and_ceiling_faces(pts_mm)
     )
@@ -792,12 +805,19 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
             f"{len(pts_mm_shifted)} sommets. Aire min/moy/max sur balayage dense "
             f"({len(valid_areas)} coupes valides / {len(positions)}): "
             f"{round(area_min, 1)} / {round(area_ref, 1)} / {round(area_max, 1)} mm2."
+            + (
+                f" {nb_dedup_retires} sommet(s) confondu(s)/colinéaire(s) "
+                f"retiré(s) à la source (< {d2p.DEDUP_TOLERANCE_MM}mm)."
+                if nb_dedup_retires > 0
+                else ""
+            )
         ),
         "_layers_found": [],
     }
 
     log["statut"] = "OK"
     log["nb_sommets"] = len(pts_mm_shifted)
+    log["nb_sommets_dedup_retires"] = nb_dedup_retires
     log["bbox_w_mm"] = bbox_w
     log["bbox_h_mm"] = bbox_h
     log["hauteur_mur_mm"] = hauteur_mur_mm

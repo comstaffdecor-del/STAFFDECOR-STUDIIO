@@ -7,6 +7,12 @@ Utilise les fixtures synthétiques permanentes de tests/fixtures/ :
     TESTAMBIGU.dxf  : deux polylignes fermées de même aire -> ERREUR_SELECTION
     TESTARC.dxf     : profil avec bulge/arc à aplatir -> doit donner OK
     TESTVIDE.dxf    : aucune polyligne fermée exploitable -> ERREUR_SELECTION
+    TESTDEDUP.dxf   : profil en L à 8 sommets bruts contenant (1) un sommet
+                      colinéaire redondant sur une arête verticale et (2) un
+                      doublon exact de fermeture (dernier sommet == premier)
+                      -> doit donner OK avec 6 sommets (2 retirés À LA
+                      SOURCE par dedupe_consecutive_vertices, pas dans un
+                      test/loader en aval). Voir TestDedupSommets ci-dessous.
 
 RÈGLE : ces fixtures ne sont JAMAIS supprimées ni modifiées sans validation
 explicite (cf. règle permanente en tête de SPEC.md). Toute sortie de test
@@ -134,6 +140,129 @@ class TestInterdictionSubstitution:
         )
         assert record["prix_ml"] is None
         assert record["marque"] == ""
+
+
+class TestDedupSommets:
+    """Vérifie la déduplication À LA SOURCE (dans process_one_dxf, pas dans
+    un test ou un loader Dart en aval) des sommets confondus/colinéaires.
+    Demande explicite de l'utilisateur : "Un correctif qui vit dans un
+    test ne protège pas la production." — donc ces tests vérifient le
+    comportement du PIPELINE (process_one_dxf), pas seulement la fonction
+    unitaire dedupe_consecutive_vertices (elle-même testée séparément
+    ci-dessous par prudence, mais le test qui compte est celui-ci)."""
+
+    def test_fixture_dedup_retire_le_colineaire_et_le_doublon_fermeture(self, tmp_path):
+        record, log = _process("TESTDEDUP", tmp_path)
+        assert record["statut"] == "OK"
+        # 8 sommets bruts dans la fixture -> 6 attendus après dédup (1
+        # colinéaire + 1 doublon de fermeture retirés).
+        assert len(record["profil_mm"]) == 6
+        assert log["nb_sommets_dedup_retires"] == 2
+
+    def test_fixture_dedup_premier_et_dernier_sommet_distincts(self, tmp_path):
+        """Le doublon de fermeture ne doit plus exister : premier et
+        dernier sommet du profil final doivent être différents."""
+        record, _ = _process("TESTDEDUP", tmp_path)
+        pts = record["profil_mm"]
+        assert pts[0] != pts[-1]
+
+    def test_profil_1000_reel_nb_sommets_reduit_de_50_a_49(self, tmp_path):
+        """Non-régression sur le cas RÉEL qui a motivé ce correctif :
+        assets/profiles/1000.json avait 50 sommets dont le premier et le
+        dernier étaient rigoureusement confondus ((83.0, -30.0) répété) —
+        artefact de tracé DXF. Après correctif à la source, le fichier
+        source assets/dxf/1000.dxf doit être retraité en 49 sommets, sans
+        doublon de fermeture."""
+        project_root = Path(__file__).parent.parent.parent
+        dxf_path = project_root / "assets" / "dxf" / "1000.dxf"
+        assert dxf_path.exists(), f"Fixture réelle manquante: {dxf_path}"
+        import dxf2profile as d2p_module
+
+        mapping = d2p_module.load_mapping(Path(__file__).parent / "mapping.csv")
+        record, log = d2p_module.process_one_dxf(
+            dxf_path, fichier_to_sku=mapping, units_override={}
+        )
+        assert record["statut"] == "OK"
+        assert len(record["profil_mm"]) == 49
+        assert log["nb_sommets_dedup_retires"] == 1
+        assert record["profil_mm"][0] != record["profil_mm"][-1]
+
+    def test_ezdxf_flattening_duplique_systematiquement_le_sommet_de_fermeture(
+        self, tmp_path
+    ):
+        """Découverte faite en écrivant ce correctif : ezdxf.path.flattening()
+        duplique SYSTÉMATIQUEMENT le sommet de fermeture (dernier point ==
+        premier point) sur toute polyligne fermée aplatie — pas seulement
+        sur le cas 1000.json qui a motivé la demande. TESTOK.dxf (profil
+        "propre", sans colinéarité ni doublon dans sa définition source à
+        6 sommets) en fournit la preuve : la fixture DXF elle-même n'a que
+        6 sommets, mais flatten_entity_to_points() en retourne 7 (doublon
+        de fermeture ajouté par ezdxf à l'aplatissement). Ce test
+        documente donc explicitement que le correctif profite à TOUS les
+        profils OK produits par ce pipeline, pas à un cas isolé."""
+        record, log = _process("TESTOK", tmp_path)
+        assert record["statut"] == "OK"
+        # 6 sommets dans la définition source de la fixture -> 1 retiré
+        # (doublon de fermeture ajouté par ezdxf à l'aplatissement).
+        assert len(record["profil_mm"]) == 6
+        assert log["nb_sommets_dedup_retires"] == 1
+        assert record["profil_mm"][0] != record["profil_mm"][-1]
+
+
+class TestDedupeConsecutiveVerticesUnitaire:
+    """Tests unitaires directs sur dedupe_consecutive_vertices (isolés du
+    pipeline DXF complet), pour couvrir des cas synthétiques précis sans
+    dépendre d'une fixture DXF."""
+
+    def test_doublon_exact_de_fermeture_retire(self):
+        pts = [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)]
+        result = d2p.dedupe_consecutive_vertices(pts)
+        assert result == [(0, 0), (10, 0), (10, 10), (0, 10)]
+
+    def test_sommet_colineaire_au_milieu_retire(self):
+        pts = [(0, 0), (5, 0), (10, 0), (10, 10), (0, 10)]
+        result = d2p.dedupe_consecutive_vertices(pts)
+        assert result == [(0, 0), (10, 0), (10, 10), (0, 10)]
+
+    def test_sommet_quasi_confondu_sous_tolerance_retire(self):
+        pts = [(0, 0), (0.005, 0.002), (10, 0), (10, 10), (0, 10)]
+        result = d2p.dedupe_consecutive_vertices(pts)
+        assert len(result) == 4
+
+    def test_profil_deja_propre_totalement_inchange(self):
+        pts = [(0, 0), (10, 0), (10, 10), (0, 10)]
+        result = d2p.dedupe_consecutive_vertices(pts)
+        assert result == pts
+
+    def test_jamais_moins_de_3_sommets_par_colinearite(self):
+        """Filet de sécurité (étape 2, colinéarité) : un rectangle avec un
+        sommet colinéaire ajouté sur CHAQUE côté (8 sommets, dont 4
+        colinéaires redondants) doit se réduire aux 4 coins réels, jamais
+        moins — même si l'algorithme retirait les colinéaires un par un
+        jusqu'à un stade où retirer le suivant ferait descendre sous 3."""
+        pts = [
+            (0, 0), (5, 0), (10, 0),
+            (10, 5), (10, 10),
+            (5, 10), (0, 10),
+            (0, 5),
+        ]
+        result = d2p.dedupe_consecutive_vertices(pts)
+        assert len(result) >= 3
+        assert set(result) == {(0, 0), (10, 0), (10, 10), (0, 10)}
+
+    def test_moins_de_trois_sommets_entree_retournee_telle_quelle(self):
+        pts = [(0, 0), (10, 0)]
+        result = d2p.dedupe_consecutive_vertices(pts)
+        assert result == pts
+
+    def test_ne_fusionne_jamais_deux_sommets_reellement_distants(self):
+        """Distance nettement au-dessus de la tolérance (0.01mm) : aucune
+        fusion, même si les points sont sur une courbe légèrement
+        incurvée (ici volontairement PAS colinéaires, distance point-
+        segment > tolérance)."""
+        pts = [(0, 0), (5, 1.0), (10, 0), (10, 10), (0, 10)]
+        result = d2p.dedupe_consecutive_vertices(pts)
+        assert len(result) == 5  # (5, 1.0) est à 1mm de la droite (0,0)-(10,0), pas colinéaire
 
 
 class TestMappingFichierSku:

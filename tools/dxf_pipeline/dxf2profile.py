@@ -230,6 +230,118 @@ def ensure_clockwise(points):
     return points
 
 
+DEDUP_TOLERANCE_MM = 0.01  # cf. SPEC.md — sommets consécutifs confondus ou
+# colinéaires en deçà de cette distance sont fusionnés À LA SOURCE (voir
+# dedupe_consecutive_vertices ci-dessous). Choisi nettement sous la
+# précision de fabrication (dixième de mm) : ne fusionne jamais deux
+# sommets réellement distincts, seulement le bruit de tracé/tessellation.
+
+
+def dedupe_consecutive_vertices(points, tol_mm=DEDUP_TOLERANCE_MM):
+    """Supprime, sur un contour FERMÉ (le dernier sommet n'est jamais
+    supposé être une répétition explicite du premier — cette fonction
+    élimine précisément ce cas s'il se présente), les sommets consécutifs :
+
+    1. CONFONDUS : distance(sommet[i], sommet[i+1]) < tol_mm. Cas typique
+       observé : le dernier sommet d'un tracé DXF duplique exactement le
+       premier (fermeture explicite côté outil de dessin) — voir
+       assets/profiles/1000.json avant correctif (50 sommets, sommet[0] ==
+       sommet[49] == (83.0, -30.0)). Le contour est déjà fermé par
+       construction (accès par modulo dans sweepMoulure/perimeterMm côté
+       Dart) : ce doublon produit une arête de fermeture de longueur nulle
+       -> triangle dégénéré en aval.
+
+    2. COLINÉAIRES : un sommet strictement entre deux autres, aligné avec
+       eux à moins de tol_mm (distance point-segment), est retiré : il
+       n'apporte aucune information géométrique et peut provenir d'un
+       artefact de tessellation/aplatissement (ex. jitter de tessellation
+       STL entre coupes, cf. docstring de detect_wall_and_ceiling_faces).
+
+    Ce correctif vit ICI (à la source des deux pipelines dxf2profile.py ET
+    solid2profile.py, qui importe et appelle cette fonction), PAS dans un
+    test ni dans un loader Dart en aval — cf. demande explicite de
+    l'utilisateur : "Un correctif qui vit dans un test ne protège pas la
+    production."
+
+    Ne modifie JAMAIS le nombre de sommets si aucun doublon/colinéarité
+    n'est détecté (aucun lissage implicite d'un profil déjà propre).
+
+    Filet de sécurité (étape 2 uniquement, colinéarité) : ne retire jamais
+    un sommet colinéaire si cela ferait descendre le contour sous 3
+    sommets — un contour ne peut pas être réduit à moins d'un triangle par
+    ce nettoyage de colinéarité. Ce filet ne s'applique PAS à l'étape 1
+    (confusion) : un contour véritablement dégénéré en entrée (plusieurs
+    sommets réellement confondus au point de ne plus représenter que 1 ou
+    2 positions distinctes) n'est de toute façon pas un contour fermé
+    valide -> ce cas est déjà écarté plus haut dans le pipeline
+    (`polygon_area`/`len(pts) < 3`, voir collect_closed_candidates) avant
+    même d'appeler cette fonction ; il n'a jamais été observé sur un
+    profil réel."""
+    n = len(points)
+    if n < 3:
+        return list(points)
+
+    def dist(a, b):
+        return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
+
+    def point_segment_distance(p, a, b):
+        """Distance du point p au segment [a, b]."""
+        ax, ay = a
+        bx, by = b
+        px, py = p
+        abx, aby = bx - ax, by - ay
+        seg_len_sq = abx * abx + aby * aby
+        if seg_len_sq < 1e-18:
+            return dist(p, a)
+        t = ((px - ax) * abx + (py - ay) * aby) / seg_len_sq
+        t = max(0.0, min(1.0, t))
+        proj = (ax + t * abx, ay + t * aby)
+        return dist(p, proj)
+
+    # --- Étape 1 : sommets consécutifs confondus (distance < tol_mm). ---
+    # Parcours simple, contour fermé (dernier -> premier inclus) : on
+    # garde un sommet seulement s'il n'est pas confondu avec le DERNIER
+    # sommet déjà conservé.
+    deduped = []
+    for p in points:
+        if deduped and dist(deduped[-1], p) < tol_mm:
+            continue
+        deduped.append(p)
+    # Fermeture : si le dernier sommet conservé est confondu avec le tout
+    # premier, on le retire (cas exact du doublon de fermeture DXF).
+    if len(deduped) >= 2 and dist(deduped[0], deduped[-1]) < tol_mm:
+        deduped.pop()
+
+    if len(deduped) < 3:
+        return deduped
+
+    # --- Étape 2 : sommets colinéaires (distance point-segment < tol_mm
+    # par rapport au segment formé par ses deux voisins immédiats dans le
+    # contour déjà dédoublonné de l'étape 1). Un seul passage : suffisant
+    # pour absorber le bruit de tessellation observé (pas de cas connu de
+    # colinéarités en chaîne nécessitant plusieurs passages sur les
+    # fixtures réelles) ; ne retire jamais un sommet si cela ferait
+    # descendre le contour sous 3 sommets. ---
+    result = []
+    m = len(deduped)
+    for i in range(m):
+        prev_pt = deduped[(i - 1) % m]
+        cur_pt = deduped[i]
+        next_pt = deduped[(i + 1) % m]
+        # Garde-fou : ne retire ce sommet colinéaire que si le contour
+        # conserverait au moins 3 sommets une fois tous les sommets
+        # restants ajoutés (m - i - 1 sommets restant à examiner).
+        remaining_after = m - (i + 1)
+        would_have = len(result) + remaining_after
+        if would_have >= 3 and point_segment_distance(cur_pt, prev_pt, next_pt) < tol_mm:
+            continue
+        result.append(cur_pt)
+
+    if len(result) < 3:
+        return deduped  # sécurité : jamais moins de 3 sommets en sortie
+    return result
+
+
 def collect_closed_candidates(msp):
     """Retourne la liste des candidates (layer, points_natifs, entity) pour
     les polylignes FERMÉES, hors calques bruités. Aucune conversion d'unité
@@ -490,6 +602,7 @@ def process_one_dxf(path: Path, fichier_to_sku=None, units_override=None):
         "mapping_absent": mapping_absent,
         "statut": "",
         "nb_sommets": 0,
+        "nb_sommets_dedup_retires": 0,
         "bbox_w_mm": "",
         "bbox_h_mm": "",
         "hauteur_mur_mm": "",
@@ -616,6 +729,14 @@ def process_one_dxf(path: Path, fichier_to_sku=None, units_override=None):
     pts_mm = [(x * scale_to_mm, y * scale_to_mm) for x, y in chosen_pts_native]
     pts_mm = ensure_clockwise(pts_mm)
 
+    # Déduplication À LA SOURCE des sommets confondus/colinéaires
+    # (< DEDUP_TOLERANCE_MM) — cf. dedupe_consecutive_vertices. Fait avant
+    # la détection mur/plafond pour que les indices retournés restent
+    # cohérents avec profil_mm final (jamais de décalage d'indices).
+    nb_avant_dedup = len(pts_mm)
+    pts_mm = dedupe_consecutive_vertices(pts_mm)
+    nb_dedup_retires = nb_avant_dedup - len(pts_mm)
+
     # Détection auto des faces mur/plafond + recalage d'origine
     wall_idx, wall_auto, ceiling_idx, ceiling_auto, origin_x, origin_y = (
         detect_wall_and_ceiling_faces(pts_mm)
@@ -666,13 +787,20 @@ def process_one_dxf(path: Path, fichier_to_sku=None, units_override=None):
         "_message": (
             f"Contour retenu: calque '{chosen_layer}', "
             f"{len(pts_mm_shifted)} sommets après aplatissement "
-            f"(tolérance {FLATTEN_SAGITTA_MM}mm)."
+            f"(tolérance {FLATTEN_SAGITTA_MM}mm)"
+            + (
+                f", {nb_dedup_retires} sommet(s) confondu(s)/colinéaire(s) "
+                f"retiré(s) à la source (< {DEDUP_TOLERANCE_MM}mm)."
+                if nb_dedup_retires > 0
+                else "."
+            )
         ),
         "_layers_found": layers_all,
     }
 
     log["statut"] = "OK"
     log["nb_sommets"] = len(pts_mm_shifted)
+    log["nb_sommets_dedup_retires"] = nb_dedup_retires
     log["bbox_w_mm"] = bbox_w
     log["bbox_h_mm"] = bbox_h
     log["hauteur_mur_mm"] = hauteur_mur_mm

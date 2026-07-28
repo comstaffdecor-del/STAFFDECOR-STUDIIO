@@ -204,10 +204,6 @@
     [
       103.0,
       -30.0
-    ],
-    [
-      83.0,
-      -30.0
     ]
   ],
   "face_pose_mur": {
@@ -238,5 +234,16 @@
   "longueur_barre_mm": 2000,
   "prix_ml": null,
   "statut": "OK",
-  "version_schema": 1
+  "version_schema": 1,
+  "cote_catalogue_mm": {
+    "diametre_mm": null,
+    "hauteur_mm": null,
+    "cote1_mm": 230.0,
+    "cote2_mm": 2500.0,
+    "cote3_mm": null,
+    "epaisseur_mm": null,
+    "longueur_barre_mm": null,
+    "page_source": 2,
+    "correspondance_sku": "exact"
+  }
 }
