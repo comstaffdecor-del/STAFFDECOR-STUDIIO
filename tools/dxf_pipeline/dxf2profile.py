@@ -67,6 +67,7 @@ import argparse
 import csv
 import datetime as dt
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -88,7 +89,25 @@ except ImportError:
 
 SCHEMA_VERSION = 1
 FLATTEN_SAGITTA_MM = 0.15
-DEFAULT_BAR_LENGTH_MM = 2000
+# SUPPRIMÉ (demande explicite utilisateur) : DEFAULT_BAR_LENGTH_MM = 2000.
+# Cette constante fabriquait une longueur de barre INVENTÉE dès qu'aucune
+# mesure/donnée réelle n'existait, déguisée en valeur mesurée -> elle a
+# produit 3 fausses alertes de recoupement sur 4 (ex. SKU 0900/1000/1145c :
+# le "2000" par défaut était comparé au tarif papier comme s'il s'agissait
+# d'une vraie mesure). RÈGLE DÉSORMAIS : une longueur de barre non connue
+# = `None` + `longueur_barre_mm_origine=None`, jamais une valeur par
+# défaut. Le champ `longueur_barre_mm_origine` indique la provenance :
+#   - "mesure_maillage" : mesurée sur un maillage 3D (solid2profile.py,
+#     axe long trouvé par ACP) — un profil DXF 2D (coupe transversale
+#     seule) ne mesure JAMAIS de longueur de barre, il n'y a donc rien à
+#     mesurer ici dans dxf2profile.py.
+#   - "catalogue" : donnée COMMERCIALE lue dans le tarif papier
+#     (ex. "Corniche en 2 ml", "1,50 ml") — le catalogue fait AUTORITÉ
+#     sur ce champ, la géométrie ne peut structurellement pas la mesurer
+#     (une longueur de barre commerciale n'est pas une propriété du
+#     galbe/profil, c'est une décision de découpe). Voir
+#     inject_cote_catalogue.py qui applique cette autorité.
+#   - None : ni mesuré, ni connu du catalogue.
 
 NOISY_LAYER_HINTS = (
     "cot", "dim", "texte", "text", "cartouche", "axe", "hatch",
@@ -145,6 +164,40 @@ def load_units_override(override_path: Path):
                     except ValueError:
                         continue
     return overrides
+
+
+def normalize_sku(sku: str) -> str:
+    """Normalise une référence SKU pour permettre une correspondance
+    fiable entre les différentes sources (noms de fichier DXF/STL, tarif
+    papier, mapping.csv) qui n'écrivent pas toujours la même référence à
+    l'identique — observé réellement : "20.54" (tarif papier) vs "20-54"
+    (nom de fichier assets/dxf/20-54.dxf), "1145C" (tarif) vs "1145c"
+    (nom de fichier DXF, minuscule).
+
+    RÈGLES (déterministes, aucune inférence) :
+      1. `strip()` + majuscule (insensible à la casse — cf. 1145c/1145C).
+      2. Espaces internes supprimés (jamais rencontrés dans ce jeu de
+         données réel, mais un SKU ne contient normalement aucun espace).
+      3. Point(s) et tiret(s) consécutifs unifiés en UN SEUL tiret `-`
+         (jamais supprimés purement : "20.01" et "2001" sont deux
+         références RÉELLEMENT distinctes du catalogue — supprimer le
+         séparateur au lieu de l'unifier les ferait collisionner, vérifié
+         empiriquement sur les 1596 lignes de catalogue.csv : 13
+         collisions de ce type si le séparateur est supprimé, 0 si il
+         est unifié en tiret).
+
+    Résultat : "20.54" -> "20-54", "20-54" -> "20-54" (même normalisation,
+    donc correspondance réussie), "1145c" -> "1145C", "2001" -> "2001",
+    "20.01" -> "20-01" (reste distinct de "2001", comme il se doit).
+
+    Toute correspondance obtenue via cette normalisation (donc pas un
+    match exact caractère-pour-caractère) DOIT être journalisée par
+    l'appelant — jamais silencieuse (cf. CSV de correspondance produit
+    par les scripts appelants)."""
+    s = (sku or "").strip().upper()
+    s = re.sub(r"\s+", "", s)
+    s = re.sub(r"[.\-]+", "-", s)
+    return s
 
 
 def propose_unit_by_bbox(points_native):
@@ -569,7 +622,10 @@ def build_error_record(sku, fichier, statut, insunits_raw, message, layers_found
         "projection_plafond_mm": 0,
         "motif": None,
         "assets": {"albedo": None, "normal": None},
-        "longueur_barre_mm": DEFAULT_BAR_LENGTH_MM,
+        # SUPPRIMÉ : plus de DEFAULT_BAR_LENGTH_MM (valeur inventée). Une
+        # longueur non mesurée/non connue = None + origine=None.
+        "longueur_barre_mm": None,
+        "longueur_barre_mm_origine": None,
         "prix_ml": None,
         "statut": statut,
         "version_schema": SCHEMA_VERSION,
@@ -780,7 +836,13 @@ def process_one_dxf(path: Path, fichier_to_sku=None, units_override=None):
         "projection_plafond_mm": projection_plafond_mm,
         "motif": None,
         "assets": {"albedo": None, "normal": None},
-        "longueur_barre_mm": DEFAULT_BAR_LENGTH_MM,
+        # dxf2profile.py extrait une COUPE TRANSVERSALE 2D : elle ne
+        # mesure structurellement jamais une longueur de barre (ce n'est
+        # pas une dimension du profil de coupe). Reste None ici ; seul
+        # le catalogue papier (inject_cote_catalogue.py) ou une mesure de
+        # maillage 3D (solid2profile.py) peuvent renseigner ce champ.
+        "longueur_barre_mm": None,
+        "longueur_barre_mm_origine": None,
         "prix_ml": None,
         "statut": "OK",
         "version_schema": SCHEMA_VERSION,

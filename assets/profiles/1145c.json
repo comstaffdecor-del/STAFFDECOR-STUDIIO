@@ -28,8 +28,25 @@
     "albedo": null,
     "normal": null
   },
-  "longueur_barre_mm": 2000,
-  "prix_ml": null,
+  "longueur_barre_mm": 1500.0,
+  "longueur_barre_mm_origine": "catalogue",
+  "prix_ml": 19.32,
   "statut": "ERREUR_SELECTION",
-  "version_schema": 1
+  "version_schema": 3,
+  "cote_catalogue_mm": {
+    "diametre_mm": null,
+    "hauteur_mm": null,
+    "cote1_mm": null,
+    "cote2_mm": null,
+    "cote3_mm": null,
+    "epaisseur_mm": null,
+    "longueur_barre_mm": 1500.0,
+    "prix_ht": 19.32,
+    "prix_ttc": 23.19,
+    "unite_prix": "ml",
+    "date_tarif": "JUILLET 2026",
+    "page_source": 3,
+    "correspondance_sku": "casse_differente"
+  },
+  "longueur_barre_mm_mesure_maillage_mm": null
 }

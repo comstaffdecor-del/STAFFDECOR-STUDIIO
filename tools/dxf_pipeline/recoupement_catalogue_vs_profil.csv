@@ -1,0 +1,8 @@
+sku,correspondance_sku,designation,cote_catalogue_champ,cote_catalogue_mm,cote_mesuree_champ,cote_mesuree_mm,ecart_pct,statut
+0900,exact,Pilastre cannelé 17 x 250 cm,cote1_mm,170.0,,,,AUCUNE_GEOMETRIE_MESUREE
+0900,exact,Pilastre cannelé 17 x 250 cm,cote2_mm,2500.0,,,,AUCUNE_GEOMETRIE_MESUREE
+1000,exact,Pilastre cannelé 23 x 250 cm,cote1_mm,230.0,bbox_mm.w,230.0,0.0,VALIDE
+1000,exact,Pilastre cannelé 23 x 250 cm,cote2_mm,2500.0,bbox_mm.w,230.0,90.8,ALERTE
+1005,exact,Socle de pilastre,,,,,,AUCUNE_COTE_CATALOGUE
+1145c,casse_differente,"Cimaise en 1,50 ml",longueur_barre_mm,1500.0,,,,AUCUNE_GEOMETRIE_MESUREE
+20-54,normalisee,1/2 colonne Ø 14 H. 200 cm + 30 cm,hauteur_mm,2000.0,,,,AUCUNE_GEOMETRIE_MESUREE

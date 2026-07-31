@@ -170,7 +170,13 @@ import dxf2profile as d2p  # noqa: E402
 
 
 SCHEMA_VERSION = d2p.SCHEMA_VERSION  # 1 — même schéma, aucune bascule ici
-DEFAULT_BAR_LENGTH_MM = d2p.DEFAULT_BAR_LENGTH_MM
+# SUPPRIMÉ : DEFAULT_BAR_LENGTH_MM (cf. dxf2profile.py). Ici, contrairement
+# à dxf2profile.py, `length_mm` EST une vraie mesure (étendue du maillage
+# le long de l'axe long trouvé par ACP, voir find_long_axis) — donc pas de
+# fallback à supprimer côté valeur, seulement le principe : si jamais
+# length_mm valait 0/None (cas qui ne devrait pas arriver après le garde-
+# fou ERREUR_ORIENTATION), on ne substitue plus 2000 par défaut, on laisse
+# None + origine=None (jamais une valeur inventée).
 
 # Tolérance relative pour juger deux aires de coupe "identiques" (moulure
 # lisse) vs "différentes" (moulure ornée). 3% : au-delà, on considère qu'il
@@ -796,7 +802,11 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
         "projection_plafond_mm": projection_plafond_mm,
         "motif": motif_record,
         "assets": {"albedo": None, "normal": None, "height": assets_height},
-        "longueur_barre_mm": round(length_mm, 1) if length_mm else DEFAULT_BAR_LENGTH_MM,
+        # length_mm est une vraie MESURE (étendue du maillage le long de
+        # l'axe long, cf. find_long_axis) — pas de fallback inventé si
+        # jamais elle était nulle/absente.
+        "longueur_barre_mm": round(length_mm, 1) if length_mm else None,
+        "longueur_barre_mm_origine": "mesure_maillage" if length_mm else None,
         "prix_ml": None,
         "statut": "OK",
         "version_schema": SCHEMA_VERSION,

@@ -231,10 +231,11 @@
     "albedo": null,
     "normal": null
   },
-  "longueur_barre_mm": 2000,
+  "longueur_barre_mm": null,
+  "longueur_barre_mm_origine": null,
   "prix_ml": null,
   "statut": "OK",
-  "version_schema": 1,
+  "version_schema": 3,
   "cote_catalogue_mm": {
     "diametre_mm": null,
     "hauteur_mm": null,
@@ -243,7 +244,12 @@
     "cote3_mm": null,
     "epaisseur_mm": null,
     "longueur_barre_mm": null,
+    "prix_ht": 185.17,
+    "prix_ttc": 222.2,
+    "unite_prix": "pièce",
+    "date_tarif": "JUILLET 2026",
     "page_source": 2,
     "correspondance_sku": "exact"
-  }
+  },
+  "longueur_barre_mm_mesure_maillage_mm": null
 }

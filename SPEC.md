@@ -57,7 +57,9 @@ produit un fichier JSON normalisé par SKU, au format ci-dessous.
   "projection_plafond_mm": 0,
   "motif": null,
   "assets": { "albedo": null, "normal": null },
-  "longueur_barre_mm": 2000,
+  "longueur_barre_mm": null,
+  "longueur_barre_mm_origine": null,
+  "longueur_barre_mm_mesure_maillage_mm": null,
   "prix_ml": null,
   "statut": "OK",
   "version_schema": 1
@@ -84,10 +86,167 @@ produit un fichier JSON normalisé par SKU, au format ci-dessous.
 | `projection_plafond_mm` | number | oui | Profondeur du profil projetée sur le plafond (0 si non applicable). |
 | `motif` | null \| object | oui | Toujours `null` en sortie du pipeline DXF. Renseigné plus tard, hors chaîne DXF (texture/relief du motif). |
 | `assets.albedo` / `assets.normal` | null \| string | oui | Chemins de textures, renseignés hors pipeline DXF. `null` par défaut. |
-| `longueur_barre_mm` | number | oui | Longueur commerciale standard de la barre. `2000` par défaut (barre standard Staff Décor) sauf indication contraire connue. |
-| `prix_ml` | null \| number | oui | Prix au mètre linéaire. `null` si inconnu — **jamais inventé**. |
+| `longueur_barre_mm` | null \| number | oui | Longueur de barre commerciale, mm. **SUPPRIMÉ le défaut fabriqué `2000`** (ancienne constante `DEFAULT_BAR_LENGTH_MM`, inventée, jamais mesurée — causait de fausses alertes de recoupement). `null` si ni mesurée ni connue du catalogue. Voir `longueur_barre_mm_origine`. |
+| `longueur_barre_mm_origine` | null \| enum string | oui | `"mesure_maillage"` (mesurée par `solid2profile.py`), `"catalogue"` (donnée commerciale du tarif, fait AUTORITÉ dès qu'elle existe), ou `null`. |
+| `longueur_barre_mm_mesure_maillage_mm` | null \| number | oui | Mesure maillage préservée séparément même quand le catalogue prend l'autorité sur `longueur_barre_mm` — jamais écrasée silencieusement. |
+| `prix_ml` | null \| number | oui | Prix au mètre linéaire (HT). Alimenté uniquement si `unite_prix == "ml"`. `null` sinon — **jamais inventé**. |
 | `statut` | enum string | oui | `"OK"`, `"ERREUR_UNITES"`, `"ERREUR_SELECTION"`, `"ERREUR_LECTURE"` (voir règles d'erreur ci-dessous). |
-| `version_schema` | int | oui | `1` pour ce document. |
+| `version_schema` | int | oui | `1` = pipeline DXF/3D seul. `2` = ajout `cote_catalogue_mm` (cotes). `3` = ajout prix (`prix_ht`/`prix_ttc`/`unite_prix`/`date_tarif`) + autorité catalogue sur `longueur_barre_mm` (voir "Extension — TARIF" ci-dessous). |
+
+## Extension — cotes du catalogue papier (`cote_catalogue_mm`, `version_schema: 2`)
+
+**Contexte.** Le tarif papier Staff Décor (`Tarif Juillet 2026`, PDF texte
+natif) est une **seconde source de vérité indépendante** pour les cotes
+commerciales (hauteur, projection, diamètre, longueur de barre), distincte
+de la géométrie mesurée sur le DXF/maillage. Les deux sources ne sont
+**jamais fusionnées ni substituées l'une à l'autre** : le catalogue
+alimente un champ séparé, `cote_catalogue_mm`, ajouté À CÔTÉ des champs
+géométriques mesurés (`bbox_mm`, `hauteur_mur_mm`, `projection_plafond_mm`,
+`longueur_barre_mm`).
+
+**Pipeline associé** (`tools/dxf_pipeline/`) :
+- `catalogue2csv.py` : extrait le tarif PDF (via `pdfplumber`, texte natif
+  confirmé — voir docstring du script pour la vérification scan-vs-texte)
+  en `catalogue.csv` (une ligne par référence tarif, cotes extraites par
+  regex depuis la désignation en clair : `Ø`, `H.`, `A x B [x C] cm`,
+  `Ep.`, `en N ml`). Une cote absente du texte imprimé reste `null` +
+  `statut: A_VERIFIER` — **jamais estimée**.
+- `catalogue_vs_profil.py` : RECOUPEMENT. Compare chaque cote catalogue à
+  chaque champ géométrique mesuré disponible pour le même SKU, retient la
+  meilleure correspondance (écart relatif minimal), et classe :
+  `VALIDE` (écart ≤ 2%), `ALERTE` (écart > 2%, les deux valeurs affichées,
+  jamais arbitrées automatiquement), `AUCUNE_COTE_CATALOGUE`,
+  `AUCUNE_GEOMETRIE_MESUREE`, ou `SKU_INTROUVABLE_DANS_CATALOGUE`. Sortie :
+  `tools/dxf_pipeline/recoupement_catalogue_vs_profil.csv` (jamais sous
+  `assets/` — c'est un rapport, pas une donnée produit).
+- `inject_cote_catalogue.py` : réutilise la même logique de correspondance
+  SKU que `catalogue_vs_profil.py` (jamais une seconde implémentation) et
+  écrit le champ `cote_catalogue_mm` dans `assets/profiles/<sku>.json`,
+  en bascule `version_schema` 1 → 2. C'est la **seule exception documentée**
+  à la règle "écriture additive uniquement" sous `assets/` (voir règle
+  permanente en tête de ce document) : une exception explicitement
+  demandée par l'utilisateur, qui AJOUTE un champ sans jamais toucher aux
+  champs géométriques existants ni aux fichiers DWG/DXF/STL source.
+
+**Correspondance SKU catalogue ↔ profil géométrique** : exacte en
+priorité, repli insensible à la casse en second recours (ex. `1145c` vs
+`1145C`) — **toujours journalisé** dans le champ
+`cote_catalogue_mm.correspondance_sku` (`"exact"` ou `"casse_differente"`),
+jamais silencieux. Une correspondance non résolue de façon fiable (ex.
+`20-54` vs `20.54` — tiret et point ne sont pas normalisés
+automatiquement, pourraient être deux références réellement différentes)
+donne `cote_catalogue_mm: null`, jamais une correspondance devinée.
+
+**Schéma du champ** (`null` si aucune correspondance catalogue fiable OU
+si le catalogue ne porte aucune cote chiffrée pour ce SKU) :
+
+```json
+"cote_catalogue_mm": {
+  "diametre_mm": null,
+  "hauteur_mm": null,
+  "cote1_mm": 230.0,
+  "cote2_mm": 2500.0,
+  "cote3_mm": null,
+  "epaisseur_mm": null,
+  "longueur_barre_mm": null,
+  "prix_ht": 185.17,
+  "prix_ttc": 222.2,
+  "unite_prix": "pièce",
+  "date_tarif": "JUILLET 2026",
+  "page_source": 2,
+  "correspondance_sku": "exact"
+}
+```
+
+`cote1_mm`/`cote2_mm`/`cote3_mm` : cotes rapportées **neutres**, dans
+l'ordre d'apparition dans la désignation catalogue (ex. "23 x 250 cm" →
+`cote1_mm=230.0`, `cote2_mm=2500.0`) — le texte du tarif ne distingue
+jamais explicitement hauteur/projection par un libellé dédié, donc ce
+script ne devine pas laquelle est laquelle ; c'est le rôle du RECOUPEMENT
+(`catalogue_vs_profil.py`) de confronter chaque valeur aux champs
+géométriques mesurés et de rapporter la meilleure correspondance.
+`page_source` : page du PDF (1-indexée) où la ligne tarif a été trouvée,
+pour vérification humaine directe dans le document papier.
+
+## Extension — TARIF : prix et autorité longueur (`version_schema: 3`)
+
+**Contexte.** Le PDF `Tarif-Public-Juillet-2026-PDF.pdf` **est un tarif,
+pas seulement un catalogue de cotes** : `prix_ht`, `prix_ttc` et
+`unite_prix` sont présents sur 100% des 1596 lignes extraites,
+indépendamment de toute cote géométrique. `catalogue2csv.py` extrait en
+plus `date_tarif` (regex `TARIF + mois + année`, relue page par page —
+jamais supposée constante, même si elle l'est actuellement sur les 18
+pages tarif du PDF en vigueur).
+
+**Champs ajoutés dans `cote_catalogue_mm`** : `prix_ht` (float | null),
+`prix_ttc` (float | null), `unite_prix` (string | null — libellé
+normalisé via `UNITE_PRIX_LABELS` : `pièce`, `ml`, `Kg`, `carton`, `m²`,
+ou la valeur brute si non reconnue, ex. anomalie `mul` sur le SKU
+`E1020I`, jamais réinterprétée silencieusement), `date_tarif`
+(string | null).
+
+**Règle d'AUTORITÉ CATALOGUE sur `longueur_barre_mm`**
+(`inject_cote_catalogue.py::reconcile_longueur_barre()`) : la longueur de
+barre commerciale est une décision COMMERCIALE, pas une propriété
+géométrique mesurable — le tarif papier fait seule autorité :
+
+- Si le catalogue connaît `longueur_barre_mm` pour ce SKU : cette valeur
+  devient `longueur_barre_mm` du profil, `longueur_barre_mm_origine =
+  "catalogue"`, et toute mesure maillage préexistante est **préservée
+  sans jamais être perdue** sous `longueur_barre_mm_mesure_maillage_mm`.
+- Sinon, si une mesure maillage existe déjà (`solid2profile.py`), elle
+  est conservée telle quelle (`origine = "mesure_maillage"`).
+- Sinon, les deux champs restent `null`.
+
+**`prix_ml`** : alimenté uniquement quand `unite_prix == "ml"`, avec la
+valeur `prix_ht` (jamais TTC, jamais pour une autre unité).
+
+**Champ SUPPRIMÉ** : `DEFAULT_BAR_LENGTH_MM = 2000` (constante Python
+dans `dxf2profile.py`/`solid2profile.py`). Cette valeur fabriquait une
+mesure inventée dès qu'aucune donnée réelle n'existait, contraire à la
+règle "jamais inventé" de ce document, et provoquait de fausses alertes
+de recoupement. Toute absence de mesure est désormais `null` +
+`longueur_barre_mm_origine: null` — jamais un défaut plausible.
+
+## Extension — RECOUPEMENT comparable uniquement (`catalogue_vs_profil.py`)
+
+**Bug corrigé** : le recoupement cherchait auparavant la meilleure
+correspondance parmi TOUS les champs géométriques mesurés, sans
+distinguer leur nature physique — une cote de section pouvait ainsi être
+comparée à une longueur de barre. **Une comparaison largeur-contre-
+longueur n'est pas une alerte, c'est un bug d'appariement.**
+
+`COMPARABLE_FIELDS_MAP` restreint chaque champ catalogue à l'ensemble
+fermé des champs géométriques de même nature physique :
+`diametre_mm`/`hauteur_mm`/`cote1_mm`/`cote2_mm`/`cote3_mm`/`epaisseur_mm`
+→ `bbox_mm.w`/`bbox_mm.h` uniquement (cotes de section) ;
+`longueur_barre_mm` → `longueur_barre_mm` uniquement (longueur/ml).
+`cote1_mm`/`cote2_mm`/`cote3_mm` restent **neutres** : le recoupement ne
+devine jamais laquelle est la projection, c'est la géométrie qui tranche
+via l'écart relatif le plus faible parmi les candidats comparables.
+
+Nouveau statut **`NON_COMPARABLE`** (distinct de `ALERTE` et de
+`AUCUNE_GEOMETRIE_MESUREE`) : les natures ne correspondent pas ou aucun
+champ comparable n'est disponible — ce n'est pas un écart dimensionnel,
+donc jamais classé `ALERTE`.
+
+## Extension — `normalize_sku()` et journalisation
+
+`normalize_sku()` (`dxf2profile.py`) unifie casse, espaces, points et
+tirets en un séparateur canonique unique (`-`) — **unification, jamais
+suppression** des séparateurs : supprimer les séparateurs provoquerait
+13 collisions réelles sur les 1596 références du catalogue (ex. `20.01`
+et `2001` sont deux références réellement distinctes), alors que
+l'unification produit 0 collision tout en faisant correspondre
+correctement `20.54` = `20-54`.
+
+`match_sku()` (`catalogue_vs_profil.py`, réutilisée par
+`inject_cote_catalogue.py`) résout en 3 paliers : `exact` →
+`casse_differente` (insensible à la casse) → `normalisee` (via
+`normalize_sku()`, acceptée uniquement si un seul candidat non ambigu
+existe) → `AUCUNE`. Toute correspondance non exacte est journalisée
+dans `tools/dxf_pipeline/correspondances_non_exactes.csv` pour relecture
+humaine — jamais un appariement silencieux.
 
 ## Règles strictes de production (rappel, cf. mission d'origine)
 
