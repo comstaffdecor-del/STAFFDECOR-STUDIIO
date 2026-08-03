@@ -230,6 +230,50 @@ Nouveau statut **`NON_COMPARABLE`** (distinct de `ALERTE` et de
 champ comparable n'est disponible — ce n'est pas un écart dimensionnel,
 donc jamais classé `ALERTE`.
 
+## Extension — seuil `LONGUEUR_PRESUMEE` (cote de section ≥ 1000mm)
+
+**Cas motivant** : SKU `1000` ("Pilastre cannelé 23 x 250 cm") —
+`extract_dimensions_mm()` place `cote2_mm=2500.0` (la hauteur du
+pilastre, "250 cm") dans un champ neutre de cote de SECTION. Le
+recoupement comparait ensuite cette valeur à `bbox_mm.w=230.0mm` mesuré
+sur la géométrie de coupe, produisant une fausse `ALERTE` à 90.8%
+d'écart. **Aucune section physique de moulure Staff Décor ne dépasse
+1 mètre** — une telle valeur dans un champ de section est presque
+toujours une longueur de barre mal placée par l'extraction texte du
+tarif, jamais une vraie cote de coupe.
+
+**Règle codée** (`catalogue_vs_profil.py::compare_one()`) : pour tout
+champ de `SECTION_FIELDS` (`diametre_mm`, `hauteur_mm`, `cote1_mm`,
+`cote2_mm`, `cote3_mm`, `epaisseur_mm` — **jamais** `longueur_barre_mm`,
+qui EST déjà une longueur), si la valeur catalogue est
+**≥ `LONGUEUR_PRESUMEE_SEUIL_MM` = 1000mm**, le champ est reclassé en
+statut **`LONGUEUR_PRESUMEE`** avant toute tentative de comparaison
+géométrique — court-circuite `NON_COMPARABLE`/`AUCUNE_GEOMETRIE_MESUREE`/
+`VALIDE`/`ALERTE` pour ce champ précis.
+
+**Principe de neutralité préservé** : `catalogue2csv.py` (extraction)
+**n'est pas modifié** — `cote1_mm`/`cote2_mm`/`cote3_mm` restent extraits
+tels quels, sans réinterprétation à la source (cf. section précédente).
+La reclassification a lieu **uniquement** au moment du recoupement
+géométrique, dans `catalogue_vs_profil.py`, et porte un marqueur
+explicite **`"auto": true`** dans chaque ligne de résultat du CSV
+(`recoupement_catalogue_vs_profil.csv`, nouvelle colonne `auto`) — ce
+n'est jamais une correction silencieuse : c'est une **présomption
+automatique signalée**, à confirmer humainement (par ex. en renseignant
+un futur `longueur_barre_mm` correct sur ces SKU dans le tarif). Toutes
+les autres lignes portent `"auto": false` (mesure réelle ou absence
+directe, pas une heuristique).
+
+**Vérifié sur le jeu de données actuel** (1596 SKU catalogue, 5 profils
+géométriques) : 3 cas détectés — `0900` (cote2_mm=2500.0, "17 x 250 cm"),
+`1000` (cote2_mm=2500.0, "23 x 250 cm"), `20-54` (hauteur_mm=2000.0,
+"Ø 14 H. 200 cm + 30 cm") — tous des pilastres/colonnes dont la
+"hauteur en cm" avait été capturée par le pattern de cote double/triple
+au lieu du pattern longueur de barre. `1000.cote1_mm=230.0` reste
+`VALIDE` (écart 0.0% vs `bbox_mm.w`), seul `cote2_mm` est requalifié —
+confirmant que la règle ne masque pas les vraies cotes de section
+comparables sur la même ligne catalogue.
+
 ## Extension — `normalize_sku()` et journalisation
 
 `normalize_sku()` (`dxf2profile.py`) unifie casse, espaces, points et

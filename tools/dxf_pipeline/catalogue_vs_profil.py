@@ -139,6 +139,27 @@ COMPARABLE_FIELDS_MAP = {
     "longueur_barre_mm": ("longueur_barre_mm",),
 }
 
+# RÈGLE (imposée) — SEUIL LONGUEUR PRÉSUMÉE : dans un tarif de moulure,
+# aucune cote de SECTION physique (largeur/hauteur/épaisseur d'un profil
+# de coupe) ne dépasse plausiblement 1 mètre. Une valeur >= 1000mm
+# trouvée dans un champ cote-de-SECTION (cote1_mm/cote2_mm/cote3_mm/
+# diametre_mm/hauteur_mm/epaisseur_mm — PAS longueur_barre_mm, qui EST
+# déjà une longueur) est presque certainement une LONGUEUR DE BARRE mal
+# classée par extract_dimensions_mm() (ex. SKU 1000 "Pilastre cannelé
+# 23 x 250 cm" -> cote2_mm=2500.0, en réalité la hauteur du pilastre en
+# barre, pas une cote de section). RÈGLE : ne JAMAIS reclasser
+# silencieusement la valeur à l'extraction (catalogue2csv.py reste
+# neutre, cf. son docstring) — on la signale ICI, au moment du
+# recoupement géométrique, avec un statut dédié LONGUEUR_PRESUMEE et un
+# marqueur "auto": true (reclassification AUTOMATIQUE par heuristique de
+# seuil, jamais confirmée manuellement — distincte d'une VALIDE/ALERTE
+# qui elles s'appuient sur une mesure géométrique réelle).
+SECTION_FIELDS = (
+    "diametre_mm", "hauteur_mm", "cote1_mm", "cote2_mm", "cote3_mm",
+    "epaisseur_mm",
+)
+LONGUEUR_PRESUMEE_SEUIL_MM = 1000.0
+
 
 def load_catalogue(path):
     """sku -> liste de rows (liste car un sku peut théoriquement apparaître
@@ -239,8 +260,18 @@ def compare_one(catalogue_row, profil_geom):
         de la nature comparable attendue (ex. dxf2profile.py : jamais de
         longueur_barre_mm mesurée -> une cote catalogue longueur_barre_mm
         reste NON_COMPARABLE, jamais faussement associée à bbox_mm.w).
+      - LONGUEUR_PRESUMEE (auto=true) si cfield est une cote de SECTION
+        (SECTION_FIELDS) mais que sa valeur >= LONGUEUR_PRESUMEE_SEUIL_MM
+        (1000mm) : reclassification heuristique AUTOMATIQUE en longueur
+        de barre présumée, PAS une alerte dimensionnelle (aucune section
+        de moulure ne fait 1 mètre) — priorité sur toute autre logique,
+        vérifié avant la table de comparabilité.
       - VALIDE / ALERTE sinon, sur le meilleur écart parmi les SEULS
-        champs comparables disponibles."""
+        champs comparables disponibles.
+
+    Chaque dict résultat porte aussi "auto": bool — True uniquement pour
+    LONGUEUR_PRESUMEE (reclassification automatique non confirmée),
+    False pour tous les autres statuts (mesure ou absence directe)."""
     results = []
     for cfield in CATALOGUE_DIM_FIELDS:
         raw = catalogue_row.get(cfield)
@@ -251,6 +282,18 @@ def compare_one(catalogue_row, profil_geom):
         except ValueError:
             continue
         if val <= 0:
+            continue
+
+        if cfield in SECTION_FIELDS and val >= LONGUEUR_PRESUMEE_SEUIL_MM:
+            results.append({
+                "cote_catalogue_champ": cfield,
+                "cote_catalogue_mm": val,
+                "cote_mesuree_champ": "",
+                "cote_mesuree_mm": "",
+                "ecart_pct": "",
+                "statut": "LONGUEUR_PRESUMEE",
+                "auto": True,
+            })
             continue
 
         allowed_fields = COMPARABLE_FIELDS_MAP.get(cfield)
@@ -264,6 +307,7 @@ def compare_one(catalogue_row, profil_geom):
                 "cote_mesuree_mm": "",
                 "ecart_pct": "",
                 "statut": "NON_COMPARABLE",
+                "auto": False,
             })
             continue
 
@@ -275,6 +319,7 @@ def compare_one(catalogue_row, profil_geom):
                 "cote_mesuree_mm": "",
                 "ecart_pct": "",
                 "statut": "AUCUNE_GEOMETRIE_MESUREE",
+                "auto": False,
             })
             continue
 
@@ -293,6 +338,7 @@ def compare_one(catalogue_row, profil_geom):
                 "cote_mesuree_mm": "",
                 "ecart_pct": "",
                 "statut": "NON_COMPARABLE",
+                "auto": False,
             })
             continue
 
@@ -310,6 +356,7 @@ def compare_one(catalogue_row, profil_geom):
             "cote_mesuree_mm": best_val,
             "ecart_pct": round(best_ecart, 2),
             "statut": statut,
+            "auto": False,
         })
     return results
 
@@ -366,6 +413,7 @@ def main():
                 "cote_mesuree_mm": "",
                 "ecart_pct": "",
                 "statut": "SKU_INTROUVABLE_DANS_CATALOGUE",
+                "auto": False,
             })
             continue
 
@@ -397,6 +445,7 @@ def main():
                     "cote_mesuree_mm": "",
                     "ecart_pct": "",
                     "statut": "AUCUNE_COTE_CATALOGUE",
+                    "auto": False,
                 })
                 continue
             for comp in comparisons:
@@ -410,19 +459,13 @@ def main():
     fieldnames = [
         "sku", "correspondance_sku", "designation", "cote_catalogue_champ",
         "cote_catalogue_mm", "cote_mesuree_champ", "cote_mesuree_mm",
-        "ecart_pct", "statut",
+        "ecart_pct", "statut", "auto",
     ]
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for row in out_rows:
             writer.writerow(row)
-
-    nb_valide = sum(1 for r in out_rows if r["statut"] == "VALIDE")
-    nb_alerte = sum(1 for r in out_rows if r["statut"] == "ALERTE")
-    nb_aucune_cote = sum(1 for r in out_rows if r["statut"] == "AUCUNE_COTE_CATALOGUE")
-    nb_aucune_geom = sum(1 for r in out_rows if r["statut"] == "AUCUNE_GEOMETRIE_MESUREE")
-    nb_sku_introuvable = sum(1 for r in out_rows if r["statut"] == "SKU_INTROUVABLE_DANS_CATALOGUE")
 
     # Journal des correspondances non exactes (point 5 demandé) — écrit
     # même s'il est vide (0 ligne + en-tête), jamais silencieusement omis.
@@ -435,6 +478,7 @@ def main():
     nb_valide = sum(1 for r in out_rows if r["statut"] == "VALIDE")
     nb_alerte = sum(1 for r in out_rows if r["statut"] == "ALERTE")
     nb_non_comparable = sum(1 for r in out_rows if r["statut"] == "NON_COMPARABLE")
+    nb_longueur_presumee = sum(1 for r in out_rows if r["statut"] == "LONGUEUR_PRESUMEE")
     nb_aucune_cote = sum(1 for r in out_rows if r["statut"] == "AUCUNE_COTE_CATALOGUE")
     nb_aucune_geom = sum(1 for r in out_rows if r["statut"] == "AUCUNE_GEOMETRIE_MESUREE")
     nb_sku_introuvable = sum(1 for r in out_rows if r["statut"] == "SKU_INTROUVABLE_DANS_CATALOGUE")
@@ -448,6 +492,7 @@ def main():
     print(f"  Comparaisons VALIDE (écart <= {ECART_TOL_PCT}%)  : {nb_valide}")
     print(f"  Comparaisons ALERTE (écart > {ECART_TOL_PCT}%)   : {nb_alerte}")
     print(f"  NON_COMPARABLE (natures différentes, pas une alerte) : {nb_non_comparable}")
+    print(f"  LONGUEUR_PRESUMEE (cote >= {LONGUEUR_PRESUMEE_SEUIL_MM:.0f}mm, auto=true)  : {nb_longueur_presumee}")
     print(f"  Cote catalogue absente pour ce produit          : {nb_aucune_cote}")
     print(f"  Géométrie mesurée absente pour ce produit       : {nb_aucune_geom}")
     print(f"  SKU introuvable dans catalogue.csv               : {nb_sku_introuvable}")
@@ -462,6 +507,19 @@ def main():
                     f"{r['cote_catalogue_champ']}={r['cote_catalogue_mm']}mm vs "
                     f"mesuré {r['cote_mesuree_champ']}={r['cote_mesuree_mm']}mm "
                     f"-> écart {r['ecart_pct']}%"
+                )
+
+    if nb_longueur_presumee:
+        print(
+            f"\n--- Détail LONGUEUR_PRESUMEE (cote >= "
+            f"{LONGUEUR_PRESUMEE_SEUIL_MM:.0f}mm reclassée AUTO, à confirmer) ---"
+        )
+        for r in out_rows:
+            if r["statut"] == "LONGUEUR_PRESUMEE":
+                print(
+                    f"  {r['sku']} ({r['designation']}): "
+                    f"{r['cote_catalogue_champ']}={r['cote_catalogue_mm']}mm "
+                    f"-> présumée LONGUEUR DE BARRE, pas une cote de section"
                 )
 
 
