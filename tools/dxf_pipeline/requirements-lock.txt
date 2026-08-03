@@ -1,0 +1,50 @@
+# requirements-lock.txt — dépendances Python figées du pipeline
+# tools/dxf_pipeline/ (dxf2profile.py, solid2profile.py, step2profile.py,
+# catalogue2csv.py, catalogue_vs_profil.py, inject_cote_catalogue.py,
+# ged_fetch.py, build_manifest.py).
+#
+# RÈGLE : `pip install -r requirements-lock.txt` doit toujours produire un
+# environnement fonctionnel pour CE pipeline SANS casser les autres
+# packages déjà installés dans le sandbox (numpy 1.26.4 est une dépendance
+# partagée avec `gensim`/`e2b_charts` — voir INTERDICTION ci-dessous).
+#
+# numpy est ÉPINGLÉ à 1.26.4 : c'est la version exigée par gensim/e2b_charts
+# déjà présents dans l'environnement (numpy>=2.0 casse gensim avec
+# `ValueError: numpy.dtype size changed, may indicate binary
+# incompatibility`). NE JAMAIS laisser un autre package remonter numpy
+# au-delà de 1.x sans re-vérifier explicitement gensim/e2b_charts après.
+numpy==1.26.4
+
+# Lecture DXF (dxf2profile.py)
+ezdxf==1.4.4
+
+# Extraction PDF texte natif (catalogue2csv.py)
+pdfplumber==0.11.10
+
+# Accès HTTP GED (ged_fetch.py, lecture seule stricte)
+requests==2.32.4
+python-dotenv==1.2.2
+
+# Lecture STEP / section B-rep exacte (step2profile.py). OCP SEUL —
+# voir INTERDICTION ci-dessous, ne jamais installer `cadquery`.
+cadquery-ocp==7.9.3.1.1
+
+# ============================================================
+# INTERDICTION EXPLICITE — NE JAMAIS INSTALLER `cadquery`
+# ============================================================
+# Testé et confirmé le 03/08 : `pip install cadquery` fait remonter numpy
+# en dépendance transitive de 1.26.4 vers 2.2.6 (via son propre pin
+# `numpy` non contraint), ce qui CASSE gensim déjà installé dans le
+# sandbox (`ValueError: numpy.dtype size changed, may indicate binary
+# incompatibility. Expected 96 from C header, got 88 from PyObject`) et
+# nécessite un nettoyage manuel (désinstallation de toute la chaîne
+# cadquery + casadi + nlopt + trame* + wslink, puis réinstallation forcée
+# de numpy==1.26.4 avec suppression manuelle des dist-info corrompus).
+#
+# OCP (le binding Python bas niveau d'OpenCASCADE, sans le wrapper
+# haut-niveau `cadquery`) s'installe et fonctionne PARFAITEMENT SEUL,
+# sans ce conflit — validé : STEPControl_Reader (lecture STEP),
+# BRepBndLib/Bnd_Box (bbox exact B-rep), BRepAlgoAPI_Section (section
+# analytique par plan, sans tessellation). C'est le SEUL package CAO
+# autorisé dans ce pipeline pour step2profile.py.
+# ============================================================

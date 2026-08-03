@@ -428,6 +428,113 @@ profil + 47 denticules réguliers tous les 42 mm → `motif.type="variable"`,
 "union_sections"`). Validées par `test_solid2profile.py` (26 tests, tous
 verts).
 
+## PRIORITÉ DES FORMATS SOURCE (révisée)
+
+**Ordre de préférence pour extraire un profil de coupe, du meilleur au
+moins bon** (RÈGLE, pas une simple observation) :
+
+1. **DWG 2D / DXF de coupe** → `dxf2profile.py` (référence absolue).
+   Plan de coupe déjà 2D, aucune reconstruction géométrique nécessaire.
+2. **STEP** → `step2profile.py` (OCP, B-rep exact — voir section
+   dédiée ci-dessous). Section analytique par plan de coupe
+   (`BRepAlgoAPI_Section`), **aucune tessellation** : bien meilleur que
+   STL car la géométrie B-rep exacte ne souffre d'aucune erreur de
+   facettisation (contrairement à un maillage triangulé, où le contour
+   de section est une approximation polygonale dépendant de la finesse
+   du maillage source).
+3. **STL / OBJ** → `solid2profile.py` (repli / fallback). Maillage
+   triangulé uniquement : nécessaire quand ni DXF ni STEP n'existe pour
+   un SKU, mais la section extraite est une approximation (facettes),
+   jamais une courbe exacte.
+
+**Conséquence opérationnelle** : pour un SKU donné, si plusieurs formats
+existent (cas fréquent — voir le nouveau scan GED du 03/08, 437 fichiers
+STEP/STP nouvellement disponibles pour des SKU jusqu'ici traités
+uniquement en STL), le pipeline doit privilégier DXF > STEP > STL dans
+cet ordre, jamais l'inverse, et jamais un choix arbitraire/silencieux
+entre plusieurs formats disponibles pour le même SKU.
+
+## Extension — lecture STEP (`step2profile.py`, `source.methode = "section_step"`)
+
+**Bibliothèque : OCP SEUL (`cadquery-ocp`), JAMAIS `cadquery`.**
+
+### ⚠️ INTERDICTION EXPLICITE — ne jamais installer le package `cadquery`
+
+Testé et confirmé le 03/08 : `pip install cadquery` fait remonter `numpy`
+en dépendance transitive de `1.26.4` vers `2.2.6` (le wrapper haut-niveau
+`cadquery` ne contraint pas la version de numpy dans ses propres
+dépendances), ce qui **casse `gensim`** déjà installé dans
+l'environnement (`ValueError: numpy.dtype size changed, may indicate
+binary incompatibility. Expected 96 from C header, got 88 from
+PyObject`) et nécessite une réparation manuelle en plusieurs étapes
+(désinstallation complète de la chaîne `cadquery` + `casadi` + `nlopt` +
+`trame*` + `wslink`, suppression manuelle des `dist-info` numpy
+corrompus, réinstallation forcée de `numpy==1.26.4`).
+
+`OCP` (le binding Python bas niveau d'OpenCASCADE, sans le wrapper
+`cadquery`) s'installe et fonctionne **parfaitement seul**, sans ce
+conflit — vérifié fonctionnellement (pas seulement importé) :
+`STEPControl_Reader` (lecture STEP), `BRepBndLib`/`Bnd_Box` (bbox exact
+B-rep), `BRepAlgoAPI_Section` (section analytique par plan, sans
+tessellation). C'est le **seul** package CAO autorisé dans ce pipeline.
+
+Verrouillage des versions : voir `tools/dxf_pipeline/requirements-lock.txt`
+(`numpy==1.26.4` épinglé en premier, `cadquery-ocp==7.9.3.1.1`, jamais
+`cadquery` dans ce fichier — la section d'interdiction y est répétée).
+
+### Méthode d'extraction
+
+Même schéma JSON, mêmes règles que `dxf2profile.py`/`solid2profile.py` —
+aucun schéma parallèle :
+- Import STEP via `STEPControl_Reader` (aucun autre chemin de lecture).
+- Unités : lues depuis le fichier STEP si présentes (repère
+  `Length_Unit` de l'en-tête), sinon `units_override.csv` comme pour
+  `solid2profile.py` (`source.origine_unite="override"`) — jamais une
+  supposition silencieuse.
+- **Section B-rep exacte, PAS de tessellation** : plan de coupe défini
+  perpendiculairement à l'axe long (même détection d'axe que
+  `solid2profile.py`), section obtenue par `BRepAlgoAPI_Section` entre
+  le solide B-rep et ce plan — le contour résultant est une courbe
+  analytique exacte (segments/arcs/B-splines réels), jamais une
+  approximation polygonale.
+- Recalage mur/plafond : même logique que `dxf2profile.py`
+  (`detect_wall_and_ceiling_faces`, réutilisée).
+- PNG de contrôle : même convention que les autres scripts
+  (`assets/profiles/control/<sku>.png`).
+- Statuts : `OK`, `ERREUR_UNITES`, `ERREUR_SELECTION`,
+  `ERREUR_LECTURE` — mêmes valeurs, même sémantique.
+- Batch : ne s'arrête jamais sur une erreur individuelle (même
+  comportement que les deux autres scripts — un SKU en erreur ne bloque
+  jamais le traitement des suivants).
+- `source.methode = "section_step"` (nouvelle valeur, à distinguer de
+  `"section_3d"` pour `solid2profile.py` — absent pour `dxf2profile.py`).
+
+### Test — STEP synthétique généré en interne
+
+Aucune dépendance à un fichier STEP réel du BE pour valider le script :
+un STEP synthétique (barre droite, profil en L extrudé, cotes connues à
+l'avance) est généré par OCP lui-même
+(`BRepPrimAPI_MakePrism`/`BRepBuilderAPI_MakePolygon` + export
+`STEPControl_Writer`) dans les fixtures de test, sur le même principe
+que `TESTSOLIDE_L.stl` pour `solid2profile.py` — vérité de terrain
+connue, jamais un fichier BE non contrôlé pour le premier test.
+
+## Règle — toujours interroger `suivi.csv` avant de solliciter le BE
+
+**`suivi.csv`** (produit par `suivi2csv.py` à partir du fichier de
+référence BE "Suivi Bib3 2025", rangé sous `assets/ref/`) est la
+**MATRICE DE DISPONIBILITÉ par SKU** — elle fait autorité sur "quel
+format existe pour quelle référence". **Avant de poser toute question
+au BE sur la disponibilité d'un format pour un SKU** (« avez-vous un
+STEP pour X ? »), ce fichier doit être consulté en premier.
+
+**Cas concret ayant motivé cette règle** : SKU `D105A` — le suivi
+indiquait `STEP=1`, `SKP=1`, `STL=1`. Le fichier existait réellement
+(confirmé par un scan GED direct le 03/08 : `D105A.stp`, `D105A.obj`,
+`D105A.rfa` présents sous le SKU groupé `d105a-b`). Poser la question au
+BE sans consulter `suivi.csv` au préalable aurait fait perdre du temps
+sur une information déjà disponible dans les données déjà en main.
+
 ## Observation — logique de nommage des SKU (suffixes)
 
 **Statut : observation empirique, PAS une règle métier confirmée.**
