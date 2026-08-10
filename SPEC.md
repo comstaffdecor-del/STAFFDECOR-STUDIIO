@@ -5,6 +5,38 @@
 fichier avant modification. Toute évolution du schéma passe par une bascule
 de `version_schema` et une mise à jour de ce document.
 
+## 🔒 RÈGLE PERMANENTE — AUCUN ARTEFACT VALIDÉ NE RESTE DANS `/tmp/`
+
+**Incident constaté** : les profils extraits et validés lors d'une session
+antérieure pour les SKU D899, D631 (Corniches-D631), D898, 1102BH et 1202
+n'ont jamais été commités — ils ont été écrits uniquement sous `/tmp/`, qui
+ne survit pas d'une session à l'autre. Résultat : au début de cette session,
+sur les 5 seuls profils JSON présents dans `assets/profiles/`, 4 étaient
+`ERREUR_SELECTION` (0 sommet) et le 5ᵉ (`1000.json`) était un pilastre, pas
+une corniche — **aucun profil de corniche ornée n'était plus disponible**,
+alors qu'au moins 5 avaient déjà été extraits et validés par le passé.
+
+**Règle, sans exception** :
+
+- Tout JSON de profil qui atteint `statut: "OK"` (production validée par
+  `dxf2profile.py`, `solid2profile.py` ou `step2profile.py`) et son PNG de
+  contrôle associé sont **commités dans `assets/profiles/` (et
+  `assets/profiles/control/`) immédiatement après validation**, dans le
+  même tour de conversation — jamais reporté "pour plus tard", jamais
+  laissé uniquement sous `/tmp/`.
+- `assets/profiles/` est une **sortie versionnée** du pipeline (comme
+  `assets/dxf/`, `assets/dwg/`), pas une donnée source brute — mais la
+  règle "ne jamais supprimer sous `assets/`" (section suivante) s'applique
+  identiquement : un profil commité n'est jamais écrasé/supprimé sans
+  confirmation explicite de l'utilisateur, même s'il est regénéré plus
+  tard par une méthode différente (ex. `section_step` remplaçant
+  `section_3d` pour le même SKU — voir §"PRIORITÉ DES FORMATS SOURCE").
+- `/tmp/` ne sert **qu'aux fichiers jetables** : PNG de diagnostic
+  ad hoc, sorties de test non-livrables, fixtures d'exploration. Tout
+  fichier destiné à survivre au tour de conversation courant doit être
+  sous `assets/` (données produit) ou `tools/dxf_pipeline/` (scripts/CSV
+  intermédiaires), puis commité.
+
 ## 🔒 RÈGLE PERMANENTE — INTÉGRITÉ DES DONNÉES SOUS `assets/`
 
 **On ne supprime, ne déplace, ni n'écrase JAMAIS un fichier sous `assets/`.**
@@ -745,3 +777,41 @@ Aucun changement du pipeline DXF (`dxf2profile.py`, `scan_assets.py`,
 schéma JSON ci-dessus) : `profil_mm` reste la seule donnée géométrique
 consommée par `sweep.dart`. Le pipeline continue de produire du JSON
 neutre, indépendant de la technique de rendu choisie côté Flutter.
+
+## Diagnostic — bande grise plate : géométrie saine, mauvais produit de test
+
+**Contexte** : le rendu `render_corniche_screenshot_test.dart` (corniche
+posée sur `haussmann.jpg`) produisait visuellement une bande grise plate,
+sans relief perceptible — anomalie non expliquée à l'époque.
+
+**Outil de diagnostic** : `test/core/geometry/debug_wireframe_normals_test.dart`
+(commit `a29105c`). Rendu de 300 mm du profil SANS photo, caméra 3/4
+rapprochée cadrée automatiquement sur la bbox réelle du maillage, 3
+panneaux côte à côte consommant `sweep.dart`/`mesh_painter.dart`
+**sans aucune modification** :
+1. fil de fer (arêtes de triangles, aucun calcul de normale/éclairage),
+2. normales en couleur `(r,g,b)=(n+1)/2`, **sans éclairage**,
+3. ombrage lambert actuel (`paintMeshOnCanvas`, inchangé).
+
+**Résultat (sortie brute test, profil `1000.json`, 49 sommets, 294
+sommets de maillage, 98 triangles)** :
+- Panneau 1 : silhouette du profil avec ses gorges — **pas** un simple
+  rectangle/ruban.
+- Panneau 2 : couleurs nettement variées par facette (vert, bordeaux,
+  violet, bleu selon l'orientation) — **pas** monochrome.
+
+**Verdict** : géométrie saine — positions ET normales par facette,
+calculées par `sweep.dart`, sont correctes. Le bug **n'est ni dans
+`sweep.dart` ni dans `mesh_painter.dart`**.
+
+**Cause réelle identifiée** : le SKU `1000` utilisé pour ce test n'est
+**pas une corniche** — c'est un pilastre/colonne (`famille: Colonnes`,
+classification `T_INCERTAIN`, voir §taxonomie), bbox 230×30mm, rapport
+largeur/profondeur ≈ 7,6:1. Posé le long d'une arête mur∩plafond (usage
+normal d'une corniche filante), un profil aussi plat et étroit **ne
+peut visuellement donner qu'un bandeau quasi uniforme**, quel que soit
+la qualité de l'éclairage : ce n'est pas un défaut de rendu, c'est le
+mauvais produit pour juger de l'aspect d'une corniche ornée. Aucune
+correction de code n'était donc requise ni pertinente sur cette base —
+voir §"Récupération d'un vrai profil de corniche" pour la suite
+(remplacement du profil de test par un vrai SKU Corniches via STEP).
