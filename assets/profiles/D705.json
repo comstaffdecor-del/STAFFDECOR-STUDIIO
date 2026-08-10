@@ -1,0 +1,121 @@
+{
+  "sku": "D705",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D705.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      101.4526,
+      0.0
+    ],
+    [
+      49.7554,
+      0.0
+    ],
+    [
+      0.0,
+      61.827
+    ],
+    [
+      0.0,
+      102.661
+    ],
+    [
+      9.7404,
+      102.4754
+    ],
+    [
+      10.0863,
+      92.1056
+    ],
+    [
+      11.6126,
+      81.8428
+    ],
+    [
+      14.2995,
+      71.8211
+    ],
+    [
+      18.1118,
+      62.1712
+    ],
+    [
+      22.9999,
+      53.0191
+    ],
+    [
+      28.8999,
+      44.4842
+    ],
+    [
+      35.7349,
+      36.678
+    ],
+    [
+      43.4155,
+      29.7022
+    ],
+    [
+      51.8417,
+      23.648
+    ],
+    [
+      60.9034,
+      18.5943
+    ],
+    [
+      70.4824,
+      14.6071
+    ],
+    [
+      80.4536,
+      11.7384
+    ],
+    [
+      90.6869,
+      10.0258
+    ],
+    [
+      101.0488,
+      9.4914
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      2,
+      3
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      0,
+      1
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 101.453,
+    "h": 102.661
+  },
+  "hauteur_mur_mm": 40.834,
+  "projection_plafond_mm": 51.697,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}
