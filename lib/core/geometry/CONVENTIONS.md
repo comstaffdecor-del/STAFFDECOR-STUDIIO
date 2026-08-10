@@ -111,8 +111,15 @@ prévue pour `sweep.dart` (livraison suivante) :
 ///   croissant s'éloigne du mur (typiquement l'horizontale perpendiculaire
 ///   au mur, pointant vers l'intérieur de la pièce) ;
 /// - [heightAxis] : direction monde **unitaire** dans laquelle y_profil
-///   décroissant (donc plus négatif) descend depuis le plafond
-///   (typiquement `-up` du monde, soit Y monde décroissant) ;
+///   CROISSANT (donc moins négatif, se rapprochant de 0) monte vers le
+///   plafond — c'est-à-dire que [heightAxis] doit pointer VERS LE HAUT du
+///   monde (typiquement `+up`, soit Y monde CROISSANT), **pas** vers le
+///   bas. INVARIANT DUR (voir §3bis ci-dessous pour la justification et
+///   l'historique du bug de signe déjà rencontré ici) : comme y_profil
+///   est <= 0 pour tout point sous le plafond, le produit
+///   `heightAxis * (yProfilMm / 1000.0)` ne peut être négatif (donc faire
+///   DESCENDRE le point sous le plafond, physiquement correct) QUE SI
+///   `heightAxis` pointe vers le haut (+Y monde) ;
 /// - [alongAxis] : direction monde **unitaire** de l'axe long de la barre
 ///   (le long de laquelle le profil est extrudé par sweep.dart) ;
 /// - [alongOffsetM] : position le long de [alongAxis] (mètres), 0 à
@@ -151,6 +158,48 @@ a besoin de placer un point de profil dans le monde 3D appelle **cette**
 fonction — jamais une base `(u, v)` reconstruite localement par produit
 vectoriel, comme cela a été fait puis corrigé dans `solid2profile.py`
 (voir `build_fixed_rotation`/bug height map, `SPEC.md`).
+
+### 3bis. INVARIANT DUR — signe de `heightAxis` (bug déjà rencontré ici)
+
+**Énoncé de l'invariant, en toutes lettres** : `heightAxis` DOIT être
+l'axe monde unitaire qui pointe VERS LE HAUT (+Y monde, dans le sens
+opposé à la gravité), **jamais** vers le bas — quelle que soit la façon
+dont il est dérivé (normale de plan plafond, produit vectoriel, etc.).
+Toute implémentation qui retourne un vecteur pointant vers le bas viole
+ce contrat et inverse le placement vertical de TOUT le mesh (le construit
+au-dessus du plafond au lieu d'en dessous).
+
+**Pourquoi le sens est "vers le haut" et pas "vers le bas" (piège
+contre-intuitif)** : §2 fixe `yProfilMm <= 0` pour tout point du profil
+situé sous le plafond (0 au plafond, décroît en descendant — donc
+`yProfilMm` est déjà négatif). La formule §3 compose
+`heightAxis * (yProfilMm / 1000.0)`. Pour que ce terme soit **négatif**
+(et fasse donc descendre le point monde SOUS `wallOrigin`, physiquement
+correct), il faut multiplier un nombre déjà négatif par un vecteur qui
+pointe VERS LE HAUT (+Y) — pas vers le bas. Un vecteur "vers le bas"
+combiné à un `yProfilMm` déjà négatif produit une **double négation**
+(signe positif net), qui pousse le point monde AU-DESSUS du plafond.
+
+**Historique du bug (référence, pour ne pas le répéter)** : une
+implémentation antérieure de la fonction dérivant `heightAxis` depuis la
+normale du plan plafond (`_downFromCeiling()` dans `sweep.dart`, nommée
+d'après l'intuition "vers le bas depuis le plafond") retournait
+explicitement un vecteur `-Y` (vers le bas). Combinée à `yProfilMm`
+négatif, elle produisait exactement la double négation décrite ci-dessus
+— confirmé par calcul manuel (`heightAxis.y=-1.0`, `yProfilMm=-202.87mm`
+→ offset world.y = **+0.20287m**, au lieu de -0.20287m attendu) puis par
+un test de non-régression (`test/core/geometry/sweep_height_sign_test.dart`,
+commit `e0908fa` — RED avant correctif, GREEN après renommage en
+`_upFromCeiling()` et inversion du signe retourné). Effet visible : tout
+le mesh de moulure rendu ~20cm au-dessus du plafond réel, hors du cadre
+visible de la photo dans les rendus de démonstration.
+
+**Règle de prévention** : toute fonction qui construit `heightAxis` (ou
+tout axe destiné à être multiplié par une coordonnée de profil dont le
+signe est fixé par convention en §2) doit être nommée et documentée par
+rapport au SIGNE MONDE qu'elle retourne (`+Y` ou `-Y`), jamais par une
+description intuitive ("vers le bas", "vers le haut du point de vue de
+la pièce") qui peut être mal interprétée sans relire la formule de §3.
 
 ## 4. Résumé des bugs de repère déjà rencontrés (pour ne pas les répéter)
 

@@ -261,14 +261,28 @@ Vector3 _orthonormalizeAgainst(
   return v.normalized();
 }
 
-/// Direction "vers le bas depuis le plafond" (règle dure : `y` du profil
-/// décroît en descendant, voir `CONVENTIONS.md` §2), dérivée de la normale
-/// du plan plafond — avec le signe déterminé sans ambiguïté (peu importe le
-/// sens dans lequel l'appelant a construit [ceilingPlane], on choisit
-/// toujours le sens qui pointe vers le bas du monde, Y monde décroissant).
-Vector3 _downFromCeiling(Plane3 ceilingPlane) {
+/// Direction "vers le haut depuis le plafond" (+Y monde), dérivée de la
+/// normale du plan plafond — avec le signe déterminé sans ambiguïté (peu
+/// importe le sens dans lequel l'appelant a construit [ceilingPlane], on
+/// choisit toujours le sens qui pointe vers le haut du monde, Y monde
+/// croissant).
+///
+/// **Pourquoi "vers le haut" et pas "vers le bas" malgré `CONVENTIONS.md`
+/// §2 (`yProfilMm <= 0`, décroît en descendant)** : `profileToWorld`
+/// compose `heightAxis * (yProfilMm / 1000.0)`. Comme `yProfilMm` est déjà
+/// négatif pour un point sous le plafond, il faut que `heightAxis` pointe
+/// VERS LE HAUT (+Y monde) pour que le produit `heightAxis * yProfilMm` soit
+/// NÉGATIF et fasse donc DESCENDRE le point sous le plafond. Une version
+/// antérieure de cette fonction (`_downFromCeiling`, retournant `-n` quand
+/// `n.y > 0`) pointait vers le bas, ce qui produisait une double négation :
+/// `(axe vers le bas) * (nombre déjà négatif)` = valeur POSITIVE ajoutée à
+/// `world.y`, plaçant tout le mesh AU-DESSUS du plafond au lieu d'en
+/// dessous (bug confirmé par
+/// `test/core/geometry/sweep_height_sign_test.dart`, voir aussi
+/// `CONVENTIONS.md` §3 pour l'invariant explicite).
+Vector3 _upFromCeiling(Plane3 ceilingPlane) {
   final n = ceilingPlane.normal;
-  return n.y > 0 ? -n : n.clone();
+  return n.y > 0 ? n.clone() : -n;
 }
 
 /// Construit le repère complet d'un segment de trajet (de [start] à [end]),
@@ -279,7 +293,7 @@ Vector3 _downFromCeiling(Plane3 ceilingPlane) {
 /// Étapes (toutes dérivées des plans/direction RÉELS, jamais d'un produit
 /// vectoriel arbitraire — voir avertissement en tête de section) :
 /// 1. [alongAxis] = direction unitaire de [start] vers [end].
-/// 2. [heightAxis] = direction "vers le bas" du plafond ([_downFromCeiling]),
+/// 2. [heightAxis] = direction "vers le haut" du plafond ([_upFromCeiling]),
 ///    orthogonalisée par rapport à [alongAxis] (Gram-Schmidt) — un no-op
 ///    numérique si le trajet est effectivement horizontal (cas physique
 ///    normal), mais robuste si de petites erreurs d'entrée existent.
@@ -315,7 +329,7 @@ _SegmentFrame _buildSegmentFrame({
   final alongAxis = alongRaw / lengthM;
 
   final heightAxis = _orthonormalizeAgainst(
-    _downFromCeiling(ceilingPlane),
+    _upFromCeiling(ceilingPlane),
     [alongAxis],
     'heightAxis',
   );
