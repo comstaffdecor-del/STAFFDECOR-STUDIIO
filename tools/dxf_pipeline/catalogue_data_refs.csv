@@ -1,0 +1,459 @@
+ref,nom,famille,sfam,unite,barre,prix,a_dwg
+D520,"Corniche en 1,75 ml",Corniches,Classiques,ml,1.75,10.94,True
+D545,"Corniche en 1,75 ml",Corniches,Classiques,ml,1.75,10.94,True
+D560,Corniche en 2 ml,Corniches,Classiques,ml,2.0,54.96,True
+D570,Corniche en 2 ml,Corniches,Classiques,ml,2.0,75.19,True
+D574,Corniche en 2 ml,Corniches,Classiques,ml,2.0,31.31,True
+D601,D601,Corniches,Classiques,ml,2.0,32.75,True
+D604,D604,Corniches,Classiques,ml,2.0,18.92,True
+D605,D605,Corniches,Classiques,ml,2.0,30.61,True
+D606,D606,Corniches,Classiques,ml,2.0,32.75,True
+D607,D607,Corniches,Classiques,ml,2.0,26.23,True
+D608,D608,Corniches,Classiques,ml,2.0,33.39,True
+D609,D609,Corniches,Classiques,ml,2.0,38.03,True
+D610,D610,Corniches,Classiques,ml,1.75,28.05,True
+D611,D611,Corniches,Classiques,ml,1.75,25.63,True
+D612,D612,Corniches,Classiques,ml,2.0,24.88,True
+D614,D614,Corniches,Classiques,ml,1.75,19.94,True
+D616,D616,Corniches,Classiques,ml,1.75,25.63,True
+D618,D618,Corniches,Classiques,ml,2.0,37.08,True
+D622,D622,Corniches,Classiques,ml,1.75,13.84,True
+D624,D624,Corniches,Classiques,ml,1.75,29.7,True
+D625,D625,Corniches,Classiques,ml,1.75,19.65,True
+D626,D626,Corniches,Classiques,ml,1.75,27.66,True
+D627,D627,Corniches,Classiques,ml,2.0,37.67,True
+D630,D630,Corniches,Classiques,ml,1.75,14.35,True
+D650,D650,Corniches,Classiques,ml,2.0,35.09,True
+D650L,D650L,Corniches,Classiques,ml,2.0,45.54,True
+D651,D651,Corniches,Classiques,ml,2.0,34.95,True
+D652,D652,Corniches,Classiques,ml,2.0,34.95,True
+D653,Corniche en 2 ml,Corniches,Classiques,ml,2.0,37.67,True
+D654,Corniche en 2 ml,Corniches,Classiques,ml,2.0,45.34,True
+D655,Corniche en 2 ml,Corniches,Classiques,ml,2.0,31.02,True
+D656,Corniche en 2 ml,Corniches,Classiques,ml,2.0,33.37,True
+D657,Corniche en 2 ml,Corniches,Classiques,ml,2.0,42.22,True
+D658,Corniche en 2 ml,Corniches,Classiques,ml,2.0,63.37,True
+D702,"Corniche en 1,75 ml",Corniches,Classiques,ml,1.75,10.94,True
+D703,"Corniche en 1,75 ml",Corniches,Classiques,ml,1.75,14.53,True
+D704,Corniche en 2 ml,Corniches,Classiques,ml,2.0,13.87,True
+D707,Corniche en 2 ml,Corniches,Classiques,ml,2.0,23.74,True
+D713,Corniche en 2 ml,Corniches,Classiques,ml,2.0,31.06,True
+D717,Corniche en 2 ml,Corniches,Classiques,ml,2.0,27.7,True
+D801,Corniche en 2 ml,Corniches,Classiques,ml,2.0,34.87,True
+D802,Corniche en 2 ml,Corniches,Classiques,ml,2.0,38.65,True
+D820,Corniche en 2 ml,Corniches,Classiques,ml,2.0,33.33,True
+D830,Corniche en 2 ml,Corniches,Classiques,ml,2.0,27.7,True
+D880,D880,Corniches,Classiques,ml,2.0,61.1,True
+D880A,D880A,Corniches,Classiques,ml,2.5,448.72,False
+D886,D886,Corniches,Classiques,ml,2.0,65.59,True
+D888,D888,Corniches,Classiques,ml,2.0,59.86,True
+D892,D892,Corniches,Classiques,ml,2.0,64.0,True
+D896,D896,Corniches,Classiques,ml,2.0,57.51,True
+D106,Profil équerre lumineuse avec joint cre,Corniches,Contemporaines,ml,2.5,42.29,True
+D118,Profil Z avec bord amincis en 2 ml - 15,Corniches,Contemporaines,ml,2.0,39.65,True
+D555,"Corniche en 1,50 ml",Corniches,Contemporaines,ml,1.5,12.92,True
+D556,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,13.9,True
+D561,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,18.65,True
+D562,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,32.95,True
+D563,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,33.63,True
+D564,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,51.71,True
+D565,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,33.61,True
+D567,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,37.63,True
+D568,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,57.54,True
+D572,Profil en 2 ml,Corniches,Contemporaines,ml,2.0,20.85,True
+D573,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,27.81,True
+D575,D575,Corniches,Contemporaines,ml,2.0,29.72,True
+D576,D576,Corniches,Contemporaines,ml,2.0,32.95,True
+D577,D577,Corniches,Contemporaines,ml,2.0,35.09,True
+D578,D578,Corniches,Contemporaines,ml,2.0,31.74,True
+D579,D579,Corniches,Contemporaines,ml,2.0,34.16,True
+D580,D580,Corniches,Contemporaines,ml,2.0,34.95,True
+D620,D620,Corniches,Contemporaines,ml,2.0,21.16,True
+D621,D621,Corniches,Contemporaines,ml,2.0,23.34,True
+D631,D631,Corniches,Contemporaines,ml,2.0,18.65,True
+D632,D632,Corniches,Contemporaines,ml,2.0,37.66,True
+D633,D633,Corniches,Contemporaines,ml,2.0,57.93,True
+D705,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,19.34,True
+D706,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,20.44,True
+D718,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,34.95,True
+D720,Corniche en 2 ml,Corniches,Contemporaines,ml,2.0,37.67,True
+D751,Corniche en 2 ml SUR COMMANDE,Corniches,Contemporaines,ml,2.0,34.29,True
+D752,Corniche en 2 ml SUR COMMANDE,Corniches,Contemporaines,ml,2.0,39.87,True
+D753,Corniche en 2 ml SUR COMMANDE,Corniches,Contemporaines,ml,2.0,40.72,True
+D754,Corniche en 2 ml SUR COMMANDE,Corniches,Contemporaines,ml,2.0,40.72,True
+D891,D891,Corniches,Contemporaines,ml,2.0,60.43,True
+D900,D900,Corniches,Contemporaines,ml,2.0,76.87,True
+D901,D901,Corniches,Contemporaines,ml,2.0,66.51,True
+SDPA1,SDPA1,Corniches,Contemporaines,ml,2.5,49.81,True
+SDPA2,SDPA2,Corniches,Contemporaines,ml,2.5,49.81,True
+SDPA3,SDPA3,Corniches,Contemporaines,ml,2.5,49.81,True
+SDPA4,SDPA4,Corniches,Contemporaines,ml,2.5,49.81,True
+US0740,Profil 7+40+7 cm en 2.5 ml,Corniches,Stratistaff,ml,2.5,63.18,True
+US1040,Profil 10+40+10 cm en 2.5 ml,Corniches,Stratistaff,ml,2.5,71.81,True
+D100,D100,Corniches,LED,ml,2.0,22.43,True
+D101,D101,Corniches,LED,ml,2.0,19.52,True
+D102,D102,Corniches,LED,ml,2.0,26.03,True
+D103,D103,Corniches,LED,ml,2.0,32.54,True
+D104,D104,Corniches,LED,ml,2.0,37.38,True
+D107,Corniche équerre 20 x 5 cm à éclairag,Corniches,LED,ml,2.5,37.91,True
+D108,Profil équerre lumineuse en 2 ml - 12 x,Corniches,LED,ml,2.0,41.89,True
+D109,Profil en 2 ml,Corniches,LED,ml,2.0,37.08,True
+D110,"Profil eclairage indirect en 2 ml - 13,5 x",Corniches,LED,ml,2.0,37.38,True
+D113,Profil éclairage indirect en 2 ml - 15 x 1,Corniches,LED,ml,2.0,37.53,True
+D113M,Profil éclairage indirect en 2 ml - 9 x 14,Corniches,LED,ml,2.0,33.72,True
+D114,Profil éclairage indirect en 2 ml - 20 x 1,Corniches,LED,ml,2.0,37.53,True
+D114M,Profil éclairage indirect en 2 ml - 15 x 1,Corniches,LED,ml,2.0,33.72,True
+D116,Profil éclairage indirect en 2 ml - 20 x 1,Corniches,LED,ml,2.0,37.53,True
+D117,Profil éclairage indirect en 2 ml - 25 x 1,Corniches,LED,ml,2.0,37.53,True
+D121,Profil rétroéclairage en 2.00 ml,Corniches,LED,ml,2.0,33.16,True
+D122,Profil en 2 ml,Corniches,LED,ml,2.0,23.18,True
+D123,Profil Staff en 2.00 ml,Corniches,LED,ml,2.0,35.91,True
+D124,Profil en 2 ml,Corniches,LED,ml,2.0,38.24,True
+D125,Profil en 2 ml,Corniches,LED,ml,2.0,26.65,True
+D708,Corniche en 2 ml,Corniches,LED,ml,2.0,32.75,True
+D709,Corniche en 2 ml,Corniches,LED,ml,2.0,32.75,True
+D710,Corniche en 2 ml,Corniches,LED,ml,2.0,59.86,True
+D748,Corniche en 2 ml,Corniches,LED,ml,2.0,47.1,True
+D749,Corniche en 2 ml,Corniches,LED,ml,2.0,56.5,True
+EBP0430,Equerre bord propre 4 + 30 cm en 2 ml,Corniches,LED,ml,2.0,31.25,True
+1102,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,9.79,True
+1103,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,9.79,True
+1104,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,14.92,True
+1105,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,14.92,True
+1106,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,20.75,True
+1107,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,8.71,True
+1112,"Moulure en 1,15 ml",Moulures,Moulures,ml,1.15,25.75,True
+1115P,1115P,Moulures,Moulures,ml,1.0,27.95,True
+1120,"Couvre-joint en 2,15 ml",Moulures,Moulures,ml,2.15,7.44,True
+1121,"Couvre-joint en 2,15 ml",Moulures,Moulures,ml,2.15,9.79,True
+1124,"Moulure en 2,15 ml",Moulures,Moulures,ml,2.15,9.51,True
+1125,"Couvre-joint en 2,15 ml",Moulures,Moulures,ml,2.15,22.0,True
+1130,"Couvre-joint en 2,15 ml",Moulures,Moulures,ml,2.15,22.0,True
+1131,"Moulure en 2,15 ml",Moulures,Moulures,ml,2.15,23.71,True
+1132,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,19.31,True
+1140C,"Cimaise en 1,50 ml",Moulures,Moulures,ml,1.5,20.33,True
+1145C,1145C,Moulures,Moulures,ml,1.5,19.32,True
+1150,1150,Moulures,Moulures,ml,1.55,50.31,True
+1151,1151,Moulures,Moulures,ml,1.65,50.28,True
+1155,1155,Moulures,Moulures,ml,1.5,23.69,True
+1156,1156,Moulures,Moulures,ml,1.5,23.69,True
+1165,1165,Moulures,Moulures,ml,2.15,9.51,False
+1166,1166,Moulures,Moulures,ml,1.5,10.94,True
+1200,1200,Moulures,Moulures,ml,1.5,8.63,True
+1201,1201,Moulures,Moulures,ml,1.5,9.74,True
+1202,1202,Moulures,Moulures,ml,1.5,8.4,True
+1204,1204,Moulures,Moulures,ml,1.5,10.04,True
+1206,1206,Moulures,Moulures,ml,1.5,8.4,True
+1207,1207,Moulures,Moulures,ml,1.5,8.63,True
+1208,1208,Moulures,Moulures,ml,1.5,10.04,True
+1209,1209,Moulures,Moulures,ml,1.75,22.88,True
+1210,1210,Moulures,Moulures,ml,1.75,27.08,True
+1211,1211,Moulures,Moulures,ml,1.5,8.68,True
+1212,1212,Moulures,Moulures,ml,1.5,8.68,True
+1214,1214,Moulures,Moulures,ml,2.5,10.02,True
+1215,1215,Moulures,Moulures,ml,1.45,9.27,False
+1216,1216,Moulures,Moulures,ml,1.5,36.25,True
+1220,1220,Moulures,Moulures,ml,2.5,29.12,True
+1221,1221,Moulures,Moulures,ml,2.5,29.12,True
+1301,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,22.6,True
+1304,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,28.43,True
+1310,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,11.26,True
+1318,1318,Moulures,Moulures,ml,2.5,15.76,True
+1319,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,10.63,True
+1321,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,10.63,False
+1323,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,16.69,True
+1324,Moulure en 2 ml,Moulures,Moulures,ml,2.0,9.87,True
+1325,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,22.6,True
+1326,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,25.52,True
+1327,Moulure en 2 ml,Moulures,Moulures,ml,2.0,25.51,True
+1340,"Moulure en 1,80 ml",Moulures,Moulures,ml,1.8,13.86,True
+1341,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,18.88,False
+1343,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,13.88,False
+1344,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,10.94,False
+1345,Moulure en 2 ml,Moulures,Moulures,ml,2.0,12.77,False
+1346,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,16.77,True
+1348,"Moulure en 1,50 ml",Moulures,Moulures,ml,1.5,12.41,False
+1350,1350,Moulures,Moulures,ml,1.5,10.72,True
+1361,1361,Moulures,Moulures,ml,2.31,21.43,True
+1362,1362,Moulures,Moulures,ml,2.15,13.88,True
+1363,1363,Moulures,Moulures,ml,2.15,13.89,True
+1364,1364,Moulures,Moulures,ml,2.15,9.36,True
+1365,1365,Moulures,Moulures,ml,1.75,9.53,True
+1366,1366,Moulures,Moulures,ml,2.15,18.2,True
+1367,1367,Moulures,Moulures,ml,2.15,9.36,True
+1370,1370,Moulures,Moulures,ml,1.5,23.72,True
+1380,1380,Moulures,Moulures,ml,2.5,8.63,True
+1381,1381,Moulures,Moulures,ml,1.5,8.26,True
+1382,1382,Moulures,Moulures,ml,2.5,6.83,True
+1383,1383,Moulures,Moulures,ml,2.5,7.27,True
+1384,1384,Moulures,Moulures,ml,2.5,7.35,True
+1385,1385,Moulures,Moulures,ml,2.5,6.83,True
+9302,"Plate bande étroite en 1,75 ml",Moulures,Moulures,ml,1.75,10.55,True
+9304,"Moulure en 2,20 ml",Moulures,Moulures,ml,2.2,21.5,True
+9315C,"Cimaise en 1,50 ml",Moulures,Moulures,ml,1.5,18.14,True
+SDC1,"Cimaise High Line n°1 en carton de 4 cart. 81,77 9",Moulures,Moulures,ml,2.5,103.13,True
+SDC2,"Cimaise High Line n°2 en carton de 4 cart. 81,77 9",Moulures,Moulures,ml,2.5,85.91,True
+1101BH,1101BH,Moulures,Angles,ml,2.5,18.07,True
+1101D,1/4 cercle décoré,Moulures,Angles,ml,2.5,20.46,False
+1101E,Angle 1101E - 90° - 15 x 8 cm,Moulures,Angles,ml,2.5,16.97,True
+1101H,Angle décoré,Moulures,Angles,ml,2.5,37.82,True
+1102BH,1/4 cercle,Moulures,Angles,ml,2.5,18.07,True
+1103BH,1/4 cercle,Moulures,Angles,ml,2.5,18.09,True
+1103H,Angle décoré,Moulures,Angles,ml,2.5,37.82,True
+1104B,Angle décoré,Moulures,Angles,ml,2.5,24.36,False
+1107E,Angle 1107E - 90° - 15 x 8 cm,Moulures,Angles,ml,2.5,15.17,True
+1107P,Doucine,Moulures,Angles,ml,2.5,28.88,True
+1200BH,1200BH,Moulures,Angles,ml,2.5,17.39,True
+1202BH,1202BH,Moulures,Angles,ml,2.5,16.67,True
+1204BH,1204BH,Moulures,Angles,ml,2.5,18.47,False
+1204H,1204H,Moulures,Angles,ml,2.5,26.66,False
+1206R,1206R,Moulures,Angles,ml,2.5,16.67,True
+1206S,1206S,Moulures,Angles,ml,2.5,16.67,True
+1207BH,1207BH,Moulures,Angles,ml,2.5,17.39,True
+1207E,1207E,Moulures,Angles,ml,2.5,15.17,True
+1210BH,1210BH,Moulures,Angles,ml,2.5,37.19,True
+BP10,BP10,Moulures,Plate-bandes,ml,2.5,17.18,False
+BP20,BP20,Moulures,Plate-bandes,ml,2.5,20.8,False
+BP30,BP30,Moulures,Plate-bandes,ml,2.5,23.58,False
+D505,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,38.42,True
+D510,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,38.42,True
+D513,"Corniche en 1,75 ml",Corniches,Ornementées,ml,1.75,13.14,True
+D515,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,38.42,True
+D525,"Corniche en 1,75 ml",Corniches,Ornementées,ml,1.75,19.09,True
+D530,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,31.68,True
+D535,"Corniche en 1,75 ml",Corniches,Ornementées,ml,1.75,19.09,True
+D540,"Corniche en 1,75 ml",Corniches,Ornementées,ml,1.75,18.19,True
+D550,"Corniche en 1,50 ml",Corniches,Ornementées,ml,1.5,19.07,True
+D566,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,35.83,True
+D569,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,36.41,True
+D613,D613,Corniches,Ornementées,ml,2.0,40.55,True
+D615,D615,Corniches,Ornementées,ml,1.75,34.98,True
+D616A,D616A,Corniches,Ornementées,ml,2.5,173.79,False
+D616B,D616B,Corniches,Ornementées,ml,2.5,41.05,False
+D617,D617,Corniches,Ornementées,ml,1.75,13.14,True
+D628,D628,Corniches,Ornementées,ml,2.0,37.67,True
+D629,D629,Corniches,Ornementées,ml,2.0,36.99,True
+D650A,D650A,Corniches,Ornementées,ml,2.5,278.07,False
+D650B,D650B,Corniches,Ornementées,ml,2.5,69.51,False
+D652A,D652A,Corniches,Ornementées,ml,2.5,278.07,False
+D652B,Corniche D652 avec ornement central,Corniches,Ornementées,ml,2.5,69.51,False
+D711,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,30.2,True
+D712,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,26.0,True
+D715,"Corniche en 1,75 ml",Corniches,Ornementées,ml,1.75,26.1,True
+D716,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,50.99,True
+D810,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,38.78,True
+D812,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,38.78,True
+D813,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,38.42,True
+D814,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,38.75,True
+D815,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,38.75,True
+D818,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,31.02,True
+D835,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,33.37,True
+D840,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,27.7,True
+D843,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,48.59,True
+D844,Corniche en 2 ml,Corniches,Ornementées,ml,2.0,61.88,True
+D845,D845,Corniches,Ornementées,ml,2.0,47.31,True
+D846,D846,Corniches,Ornementées,ml,2.0,50.99,True
+D878,D878,Corniches,Ornementées,ml,2.0,113.59,True
+D879,D879,Corniches,Ornementées,ml,2.0,112.41,False
+D879A,D879A,Corniches,Ornementées,ml,2.5,493.78,False
+D879B1,D879B1,Corniches,Ornementées,ml,1.03,184.91,False
+D879B2,D879B2,Corniches,Ornementées,ml,1.03,184.91,False
+D879B3,D879B3,Corniches,Ornementées,ml,0.63,165.99,False
+D879C,D879C,Corniches,Ornementées,ml,2.5,84.05,False
+D880B,D880B,Corniches,Ornementées,ml,2.5,96.3,False
+D881,D881,Corniches,Ornementées,ml,2.5,128.59,True
+D881B,D881B,Corniches,Ornementées,ml,2.0,177.89,True
+D882,D882,Corniches,Ornementées,ml,2.0,55.72,True
+D882B,D882B,Corniches,Ornementées,ml,2.0,94.3,True
+D883,D883,Corniches,Ornementées,ml,2.0,107.16,True
+D884,D884,Corniches,Ornementées,ml,2.0,62.14,True
+D885,D885,Corniches,Ornementées,ml,2.0,63.4,True
+D887,D887,Corniches,Ornementées,ml,2.0,39.13,True
+D889,D889,Corniches,Ornementées,ml,2.0,69.19,True
+D890,D890,Corniches,Ornementées,ml,2.0,63.4,True
+D893,D893,Corniches,Ornementées,ml,2.0,61.91,True
+D894,D894,Corniches,Ornementées,ml,2.0,64.82,True
+D895,D895,Corniches,Ornementées,ml,2.0,78.11,True
+D897,D897,Corniches,Ornementées,ml,2.0,63.4,True
+D898,D898,Corniches,Ornementées,ml,2.0,62.14,True
+D899,D899,Corniches,Ornementées,ml,2.0,69.19,True
+D903,D903,Corniches,Ornementées,ml,2.0,63.38,True
+R561,R561,Corniches,Ornementées,ml,2.5,23.62,False
+S562,S562,Corniches,Ornementées,ml,2.5,23.62,False
+1101C,1101C,Moulures,Cimaises,ml,1.5,19.32,True
+1103C,"Cimaise en 1,50 ml",Moulures,Cimaises,ml,1.5,19.32,True
+1141C,1141C,Moulures,Cimaises,ml,1.5,20.33,True
+7070,7070,Parements,Contemporains,m²,,51.82,True
+7071,7071,Parements,Contemporains,m²,,46.89,True
+7072,7072,Parements,Contemporains,m²,,55.08,True
+7073,7073,Parements,Contemporains,m²,,46.89,True
+7074,7074,Parements,Contemporains,m²,,46.89,True
+7075,7075,Parements,Contemporains,m²,,55.08,True
+7078,7078,Parements,Contemporains,m²,,46.89,True
+7079,7079,Parements,Contemporains,m²,,46.92,True
+SD7045,SD7045,Parements,Contemporains,m²,,65.95,True
+SD7046,SD7046,Parements,Contemporains,m²,,110.93,True
+SD7055,SD7055,Parements,Contemporains,m²,,63.18,False
+7036,7036,Parements,Modernes,m²,,49.57,True
+7036PLIN,7036PLIN,Parements,Modernes,m²,,33.57,True
+7036U,7036U,Parements,Modernes,m²,,13.29,True
+7080,7080,Parements,Modernes,m²,,44.23,False
+CL30,CL30,Parements,Modernes,m²,,151.37,True
+CL32,CL32,Parements,Modernes,m²,,151.37,True
+CL33,CL33,Parements,Modernes,m²,,151.37,False
+CL34,CL34,Parements,Modernes,m²,,151.37,True
+CL35,CL35,Parements,Modernes,m²,,151.37,True
+CL36,CL36,Parements,Modernes,m²,,151.37,True
+7038,7038,Parements,Briques,m²,,61.33,True
+7040,7040,Parements,Briques,m²,,29.43,True
+7041,7041,Parements,Briques,m²,,42.3,True
+7091,7091,Parements,Gdes dimensions,m²,,273.16,True
+CL10,CL10,Parements,Gdes dimensions,m²,,335.08,True
+CL11,CL11,Parements,Gdes dimensions,m²,,335.08,True
+CL12,CL12,Parements,Gdes dimensions,m²,,335.08,True
+CL1213A,CL1213A,Parements,Gdes dimensions,m²,,241.64,True
+CL1213B,CL1213B,Parements,Gdes dimensions,m²,,241.64,True
+CL1213C,CL1213C,Parements,Gdes dimensions,m²,,361.41,True
+CL1213D,CL1213D,Parements,Gdes dimensions,m²,,100.86,True
+CL1374,CL1374,Parements,Gdes dimensions,m²,,335.08,True
+CL39,CL39,Parements,Gdes dimensions,m²,,335.12,True
+1213,1213,Parements,Tuileries,m²,,53.58,True
+1213BH,1213BH,Parements,Tuileries,m²,,42.86,True
+1213G,1213G,Parements,Tuileries,m²,,64.3,True
+1400,1400,Encadrements,Rosaces,pce,,6.04,False
+1401,1401,Encadrements,Rosaces,pce,,6.04,False
+1402,1402,Encadrements,Rosaces,pce,,6.04,False
+1403,1403,Encadrements,Rosaces,pce,,6.04,False
+1404,1404,Encadrements,Rosaces,pce,,6.04,False
+1405,1405,Encadrements,Rosaces,pce,,6.04,True
+1406,1406,Encadrements,Rosaces,pce,,6.04,False
+1407,1407,Encadrements,Rosaces,pce,,6.04,False
+1408,1408,Encadrements,Rosaces,pce,,6.04,False
+1409,1409,Encadrements,Rosaces,pce,,6.04,False
+1410,1410,Encadrements,Rosaces,pce,,6.04,False
+1412,1412,Encadrements,Rosaces,pce,,6.04,False
+1413,1413,Encadrements,Rosaces,pce,,6.04,False
+1414,1414,Encadrements,Rosaces,pce,,7.41,False
+1415,1415,Encadrements,Rosaces,pce,,6.04,False
+1416,1416,Encadrements,Rosaces,pce,,6.04,False
+1417,1417,Encadrements,Rosaces,pce,,6.03,False
+1418,1418,Encadrements,Rosaces,pce,,6.03,False
+1419,1419,Encadrements,Rosaces,pce,,6.03,False
+1420,1420,Encadrements,Rosaces,pce,,6.03,False
+1421,1421,Encadrements,Rosaces,pce,,6.03,False
+1436,Rosette D883,Encadrements,Rosaces,pce,,5.91,True
+M039,M039,Encadrements,Rosaces,pce,,95.45,False
+M045,M045,Encadrements,Rosaces,pce,,70.55,False
+M046,M046,Encadrements,Rosaces,pce,,70.55,False
+M048,M048,Encadrements,Rosaces,pce,,83.5,False
+M051,M051,Encadrements,Rosaces,pce,,95.45,False
+M054,M054,Encadrements,Rosaces,pce,,143.1,False
+M055,M055,Encadrements,Rosaces,pce,,95.4,False
+M060,M060,Encadrements,Rosaces,pce,,119.3,True
+M067,M067,Encadrements,Rosaces,pce,,95.45,False
+M068,M068,Encadrements,Rosaces,pce,,95.45,False
+M069,M069,Encadrements,Rosaces,pce,,119.3,False
+M071,M071,Encadrements,Rosaces,pce,,153.06,False
+M202,M202,Encadrements,Rosaces,pce,,61.28,False
+M208,Rosace 51 x 40 cm,Encadrements,Rosaces,pce,,95.45,False
+M209,Rosace 64 x 48 cm,Encadrements,Rosaces,pce,,61.28,False
+M210,Rosace 60 x 41 cm,Encadrements,Rosaces,pce,,119.3,False
+M250,Rosace Ø 77 cm,Encadrements,Rosaces,pce,,138.08,True
+M251,Rosace Ø 66 cm,Encadrements,Rosaces,pce,,121.52,True
+M252,Rosace Ø 56 cm,Encadrements,Rosaces,pce,,119.3,True
+M253,Rosace Ø 46 cm,Encadrements,Rosaces,pce,,56.91,False
+M254,Rosace Ø 60 cm,Encadrements,Rosaces,pce,,121.52,False
+M255,Rosace Ø 84 cm,Encadrements,Rosaces,pce,,237.55,False
+M298,Rosace 59 x 47 cm,Encadrements,Rosaces,pce,,119.3,False
+M299,Rosace Ø 60 cm,Encadrements,Rosaces,pce,,119.3,False
+M302,Rosace Ø 70 cm,Encadrements,Rosaces,pce,,143.1,False
+M306,Rosace Ø 80 cm,Encadrements,Rosaces,pce,,117.98,True
+M390,Rosace 105 x 83 cm,Encadrements,Rosaces,pce,,214.41,False
+M400,Rosace 100 x 70 cm,Encadrements,Rosaces,pce,,214.41,False
+M401,Rosace Ø 90 cm,Encadrements,Rosaces,pce,,237.55,True
+M402,Rosace Ø 90 cm,Encadrements,Rosaces,pce,,237.55,False
+M403,Rosace Ø 87 cm,Encadrements,Rosaces,pce,,237.55,False
+M404,Rosace Ø 104 cm,Encadrements,Rosaces,pce,,237.55,False
+M405,Rosace Ø 96 cm,Encadrements,Rosaces,pce,,237.55,True
+M406,Rosace 84 x 44 cm,Encadrements,Rosaces,pce,,179.72,False
+M407,Rosace 124 x 80 cm,Encadrements,Rosaces,pce,,237.55,False
+M501,Rosace carrée 84 x 84 cm,Encadrements,Rosaces,pce,,85.51,False
+M502,Rosace moderne motif hexagone livré,Encadrements,Rosaces,pce,,138.23,False
+M503,Rosace Triskel Ø 100 cm - ép 3 cm,Encadrements,Rosaces,pce,,92.47,True
+M504,Rosace Ø103 cm,Encadrements,Rosaces,pce,,249.45,True
+M604,Rosace en Stratistaff Ø158 cm,Encadrements,Rosaces,pce,,729.79,False
+M605,Rosace en Stratistaff Ø146 cm,Encadrements,Rosaces,pce,,526.04,False
+PL201,PL201,Encadrements,Rectangulaires,pce,,722.61,True
+PL319,PL319,Encadrements,Rectangulaires,pce,,796.84,True
+PL204,PL204,Encadrements,Carrés,pce,,737.09,True
+M401P,Rosace M401 plaquiste 120x120cm,Encadrements,Encastrées,pce,,263.02,True
+0760,0760,Colonnes,Pilastres,pce,,91.83,False
+0800,0800,Colonnes,Pilastres,pce,,106.09,False
+0900,0900,Colonnes,Pilastres,pce,,123.45,True
+0905,0905,Colonnes,Pilastres,pce,,18.98,True
+0950,0950,Colonnes,Pilastres,pce,,140.24,False
+1000,1000,Colonnes,Pilastres,pce,,185.17,True
+1005,1005,Colonnes,Pilastres,pce,,18.98,True
+1025,1025,Colonnes,Pilastres,pce,,215.23,False
+1050,1050,Colonnes,Pilastres,pce,,204.03,False
+2000,2000,Colonnes,Pilastres,pce,,246.79,False
+2020,2020,Colonnes,Pilastres,pce,,293.73,False
+2030,2030,Colonnes,Pilastres,pce,,132.45,False
+3000,Pilastre 40 x 250 cm,Colonnes,Pilastres,pce,,367.56,False
+3068,3068,Colonnes,Pilastres,pce,,273.16,True
+BL120,Profil joint creux lumineux brut sans éq,Profils LED,Insertion,ml,2.5,36.99,True
+BL122,Profil joint creux lumineux brut sans éq,Profils LED,Insertion,ml,2.5,43.07,True
+BL130,"Profil pour éclairage indirect en 2,6 ml",Profils LED,Insertion,ml,2.6,32.17,True
+BL131,Profil lumineux en 2.5 ml - 10 x 7 cm,Profils LED,Insertion,ml,2.5,35.54,True
+BL132,"Profil lumineux en 2,5 ml - 8 x 5,5 cm",Profils LED,Insertion,ml,2.5,31.6,True
+BL140,"Profil lumineux en 2,8 ml - 8 x 4 cm",Profils LED,Insertion,ml,2.8,29.89,True
+BL160,Profil gorge lumineuse en 2.00 ml,Profils LED,Insertion,ml,2.0,62.53,True
+BL170,Profil gorge lumineuse H. 2 ml,Profils LED,Insertion,ml,2.0,62.53,True
+BL180,BL180,Profils LED,Insertion,ml,2.0,118.47,True
+BP30P,BP30P,Profils LED,Finition,ml,2.0,31.47,True
+9021,9021,Lambris,Décaissés,m²,,72.28,False
+9201,9201,Lambris,Décaissés,m²,,20.43,True
+9202,9202,Lambris,Décaissés,m²,,23.35,True
+9203,9203,Lambris,Décaissés,m²,,29.11,True
+9204,9204,Lambris,Décaissés,m²,,37.82,True
+9205,9205,Lambris,Décaissés,m²,,46.57,True
+9206,9206,Lambris,Décaissés,m²,,58.21,True
+9211,9211,Lambris,Décaissés,m²,,25.46,True
+9212,9212,Lambris,Décaissés,m²,,29.11,True
+9213,9213,Lambris,Décaissés,m²,,37.09,True
+9214,9214,Lambris,Décaissés,m²,,47.32,True
+9215,9215,Lambris,Décaissés,m²,,58.21,True
+9216,9216,Lambris,Décaissés,m²,,72.75,True
+9221,Lambris décaissé 30 x 85 cm,Lambris,Décaissés,m²,,28.4,False
+9222,Lambris décaissé 40 x 85 cm,Lambris,Décaissés,m²,,32.74,False
+9223,Lambris décaissé 50 x 85 cm,Lambris,Décaissés,m²,,41.49,False
+9224,Lambris décaissé 60 x 85 cm,Lambris,Décaissés,m²,,52.4,False
+9225,Lambris décaissé 80 x 85 cm,Lambris,Décaissés,m²,,65.53,False
+9226,Lambris décaissé 100 x 85 cm,Lambris,Décaissés,m²,,81.52,False
+9227,Lambris décaissé 70 x 85 cm,Lambris,Décaissés,m²,,63.56,False
+9228,Lambris décaissé 90 x 85 cm,Lambris,Décaissés,m²,,77.97,False
+PLIN08,"Plinthe 8 cm en 1,50 ml",Plinthes,Plinthes,ml,1.5,7.88,True
+PLIN08M,"Plinthe moderne 8 cm en 1,50 ml",Plinthes,Plinthes,ml,1.5,7.88,True
+PLIN10,"Plinthe 10 cm en 1,50 ml",Plinthes,Plinthes,ml,1.5,8.76,True
+PLIN10A,Angle sortant de PLIN10,Plinthes,Plinthes,ml,2.5,12.47,True
+PLIN10M,"Plinthe moderne 10 cm en 1,50 ml",Plinthes,Plinthes,ml,1.5,8.76,True
+PLIN10MA,Angle sortant de PLIN10M,Plinthes,Plinthes,ml,2.5,12.47,True
+PLIN12,"Plinthe 12 cm en 1,50 ml",Plinthes,Plinthes,ml,1.5,10.57,True
+PLIN12A,Angle sortant de PLIN12,Plinthes,Plinthes,ml,2.5,13.74,True
+PLIN15,"Plinthe 15 cm en 1,50 ml",Plinthes,Plinthes,ml,1.5,13.06,True
+PLIN15A,Angle sortant de PLIN15,Plinthes,Plinthes,ml,2.5,17.72,True
+PLIN20,"Plinthe 20,5 cm en 1,50 ml",Plinthes,Plinthes,ml,1.5,14.57,True
+PLIN21,"Plinthe 21 cm en 1,50 ml",Plinthes,Plinthes,ml,1.5,17.43,True
+PLIN38,PLIN38,Plinthes,Plinthes,ml,1.5,17.51,True
+PLINT,PLINT,Plinthes,Plinthes,ml,1.5,10.26,True
+PLINTA,PLINTA,Plinthes,Plinthes,ml,2.5,12.47,True
+TAL1343,Talon de porte H.17 L.10.5 ep 3.2cm,Plinthes,Plinthes,ml,2.5,14.95,True
+TAL20,Talon : Ht : 200 mm/ lg :117 mm/ ép : 4,Plinthes,Plinthes,ml,2.5,15.99,True
+TAL26,Talon pour PLIN25.PC.SP SUR COM,Plinthes,Plinthes,ml,2.5,15.76,True
+TAL41,Talon pour PLIN40.PC.SP SUR COM,Plinthes,Plinthes,ml,2.5,16.63,True
+TAL44,TALON 44CM POUR PLIN40.SP.PC,Plinthes,Plinthes,ml,2.5,21.01,True
+TALGM,"Talon de porte G.M. H.17 L.8,5 E. 3 c",Plinthes,Plinthes,ml,2.5,12.31,False
+1443,Modillon D883,Ornements,Ornements,pce,,6.04,True
+3906,Fleur de trumeau,Ornements,Ornements,pce,,31.63,False
+4200,4200,Ornements,Ornements,pce,,11.46,False
+4201,4201,Ornements,Ornements,pce,,13.21,False
