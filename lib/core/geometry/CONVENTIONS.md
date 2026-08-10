@@ -238,3 +238,48 @@ définir une seule et unique convention pour "le début de la barre" le
 long de `alongAxis` (analogue à `origin` dans `find_long_axis`, bug #4
 ci-dessus) et ne jamais la recalculer indépendamment dans une autre
 fonction du fichier.
+
+## 5. Direction de lumière et axe de balayage (`mesh_painter.dart`)
+
+**Règle** : la direction de lumière (`lightDirWorld` de
+[paintMeshOnCanvas]) DOIT avoir une composante significative dans le plan
+**perpendiculaire** à l'axe de balayage (`alongAxis`, voir §3) de la
+moulure rendue. Si la lumière est (quasi) alignée avec `alongAxis`, le
+relief est **invisible quel que soit le terme `ambient`** — baisser
+`ambient` ne compensera jamais un choix de direction géométriquement
+inopérant.
+
+**Pourquoi** : toutes les facettes d'un maillage balayé (`sweepMoulure`)
+partagent le même profil extrudé le long d'un seul axe `alongAxis` — leurs
+normales, dérivées de la géométrie transverse du profil (voir
+`_buildSegmentFrame`), ont donc systématiquement une composante quasi
+nulle le long de `alongAxis` (le profil ne "tourne" jamais autour de son
+propre axe long). Le modèle d'éclairage de `mesh_painter.dart` est
+`brightness = ambient + (1-ambient) * (dot(normal, light)+1)/2` — si
+`light` est presque colinéaire à `alongAxis`, `dot(normal, light)` reste
+presque constant sur toute la surface (proche de 0), donc `brightness`
+reste presque constante elle aussi : aucun contraste, quelle que soit la
+valeur de `ambient`.
+
+**Cas concret découvert** (Point 3, test
+`render_d720_haussmann_dualview_test.dart`, corniche D720 sur
+`haussmann.jpg`) : le mur du fond de cette scène s'étend selon l'axe
+**monde X**, qui est donc aussi `alongAxis` du sweep. Une direction de
+lumière `(0.85, 0.28, 0.45)` — choisie initialement sur l'hypothèse
+(non pertinente ici) "camera-right = +X = côté fenêtres de la photo" —
+avait une composante X dominante, donc quasi inefficace : vérifié
+empiriquement, les 27 normales de facette distinctes du maillage ont
+toutes une composante X quasi nulle. Le relief restait plat malgré
+`ambient=0.20`. Direction corrigée retenue : `(0.5, 0.7, 0.7)` normalisée
+— composante Y/Z dominante (perpendiculaire à `alongAxis=+X`), spread
+`max(dot(n,light)) - min(dot(n,light))` = 1.523 sur les 27 normales
+(meilleur score parmi 6 candidats testés) — relief visible dans le rendu
+final.
+
+**Conséquence pratique** : avant de choisir/ajuster une direction de
+lumière pour une nouvelle scène/preset de calibration, identifier
+`alongAxis` du sweep pour cette scène (dépend de l'orientation du mur du
+fond dans le repère monde, voir `calib_to_camera.dart`) et choisir une
+direction dont la projection sur le plan perpendiculaire à `alongAxis` a
+une norme significative — ne jamais se fier uniquement à une intuition
+"gauche/droite de la photo" sans l'avoir vérifiée par rapport à cet axe.

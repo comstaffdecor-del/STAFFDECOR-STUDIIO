@@ -10,13 +10,16 @@
 //      juger de l'aspect réel de la corniche (le panneau 1 est trop petit
 //      à l'échelle de la photo pour voir le galbe).
 //
-// Éclairage (demande explicite) : terme ambiant réduit à 0,20 (au lieu du
-// défaut historique 0,45 de `mesh_painter.dart`, désormais paramétrable via
-// [paintMeshOnCanvas]'s `ambient`), lumière directionnelle venant des
-// FENÊTRES visibles sur le côté DROIT de `haussmann.jpg` — donc avec une
-// composante X monde dominante et positive (voir §"Direction de lumière"
-// ci-dessous pour la justification complète de repère) — PAS depuis l'axe
-// caméra (qui serait une direction proche de +Z monde, cam.back).
+// Éclairage (demande explicite, CORRIGÉE en cours de session — voir §5
+// "Direction de lumière" ci-dessous) : terme ambiant réduit à 0,20 (au lieu
+// du défaut historique 0,45 de `mesh_painter.dart`, désormais paramétrable
+// via [paintMeshOnCanvas]'s `ambient`), lumière directionnelle
+// (0.5, 0.7, 0.7) normalisée — choisie non pas pour "venir d'un côté de la
+// photo", mais parce qu'elle a une composante significative dans le plan
+// perpendiculaire à l'axe de balayage de la corniche (monde +X pour cette
+// scène, voir CONVENTIONS.md §5 "Direction de lumière et axe de balayage").
+// PAS depuis l'axe caméra (qui serait une direction proche de +Z monde,
+// cam.back, quasi inefficace ici pour la même raison géométrique).
 //
 // ⚠️ Sortie écrite dans `/tmp/` — JAMAIS dans `assets/` (règle SPEC.md
 // "write-once" / anti-suppression) avant validation humaine explicite.
@@ -117,8 +120,9 @@ void main() {
 
   test(
     'rend D720.json (corniche réelle STEP) sur haussmann.jpg — vue '
-    'd\'ensemble + crop ×4 sur 40cm d\'arête plafond, éclairage fenêtre '
-    '(ambiante 0.20, directionnelle côté droit)',
+    'd\'ensemble + crop ×4 sur 40cm d\'arête plafond, éclairage corrigé '
+    '(ambiante 0.20, directionnelle (0.5,0.7,0.7) perpendiculaire à l\'axe '
+    'de balayage)',
     () async {
       await loadDebugFont();
 
@@ -184,25 +188,27 @@ void main() {
       expect(mesh.vertexCount, greaterThan(0));
       expect(mesh.triangleCount, greaterThan(0));
 
-      // ── 5. Direction de lumière — fenêtres côté DROIT de la photo. ──
+      // ── 5. Direction de lumière — CORRIGÉE (voir CONVENTIONS.md §5). ──
       //
-      // Repère monde (`camera.dart`/`CONVENTIONS.md`) : X = droite, Y =
-      // haut, Z = vers la caméra. Vérification directe depuis
-      // `Camera3D.lookingAt` (eye=(0,0,0), target=(0,0,-1), worldUp=
-      // (0,1,0)) : `right = normalize(cross(worldUp, back))` avec
-      // `back = normalize(eye-target) = (0,0,1)` donne
-      // `right = cross((0,1,0),(0,0,1)) = (1,0,0)` — donc l'axe "droite
-      // caméra" (= côté droit de l'image, où sont les fenêtres sur
-      // `haussmann.jpg`) correspond exactement à l'axe **+X monde**.
+      // ⚠️ Direction initialement testée ici, (0.85, 0.28, 0.45) — choisie
+      // sur l'hypothèse "camera-right = +X monde = côté fenêtres de la
+      // photo" — était géométriquement quasi inopérante : le mur du fond
+      // de cette scène s'étend selon l'axe monde X (c'est aussi l'axe de
+      // balayage `alongAxis` du sweep, voir `sweep.dart::
+      // _buildSegmentFrame`), donc TOUTES les normales de facette du
+      // maillage ont une composante X quasi nulle (vérifié : 27 normales
+      // distinctes, aucune avec |x| significatif). La composante X d'une
+      // direction de lumière est donc sans effet sur le contraste de cette
+      // corniche, quelle que soit son amplitude — d'où le relief plat
+      // observé avec la première direction, malgré ambient=0.20.
       //
-      // [lightDirWorld] est la direction VERS la source (voir docstring
-      // `mesh_painter.dart`) : composante X dominante et positive (+0.85)
-      // pour "vient de la droite", Y modérément positive (+0.28, lumière
-      // du jour qui descend depuis la hauteur des fenêtres), Z modérée
-      // (+0.45, les fenêtres sont sur un mur latéral donc la lumière a
-      // aussi une composante vers l'avant-caméra) — PAS (0,0,1) qui serait
-      // l'axe caméra pur (interdit explicitement par la demande).
-      final lightDirWorld = vm.Vector3(0.85, 0.28, 0.45);
+      // Direction retenue : (0.5, 0.7, 0.7) normalisée — sélectionnée par
+      // l'utilisateur parmi 6 candidats testés (spread dot-produit
+      // max-min sur les 27 normales distinctes = 1.523, le meilleur du
+      // lot), précisément parce qu'elle a une composante significative
+      // dans le plan Y/Z, perpendiculaire à l'axe de balayage +X — voir la
+      // règle générale désormais consignée dans CONVENTIONS.md §5.
+      final lightDirWorld = vm.Vector3(0.5, 0.7, 0.7);
       const ambient = 0.20;
 
       // ── 6. Composition "vue d'ensemble" : photo + mesh projeté. ──
@@ -437,8 +443,8 @@ void main() {
           '${lightDirWorld.z.toStringAsFixed(2)}) normalisee '
           '(${lightNorm.x.toStringAsFixed(3)}, '
           '${lightNorm.y.toStringAsFixed(3)}, '
-          '${lightNorm.z.toStringAsFixed(3)}) — cote fenetres (droite '
-          'photo, +X), PAS axe camera (+Z)\n'
+          '${lightNorm.z.toStringAsFixed(3)}) — composante Y/Z dominante, '
+          'perpendiculaire a l\'axe de balayage +X (voir CONVENTIONS.md)\n'
           'Crop : centre u=${uCenterMm.toStringAsFixed(0)}mm, fenetre '
           '[${uMinMm.toStringAsFixed(0)}, ${uMaxMm.toStringAsFixed(0)}]mm, '
           'zoom x${zoomFactor.toStringAsFixed(0)}   |   trajet total '
