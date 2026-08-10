@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Scratch de revue visuelle des PNG de diagnostic (copies de /tmp/... pour
+# lecture via l'outil Read) -- jamais un livrable, capture par erreur par
+# les commits "genspark auto-backup" (fc81f18/6397ef7/4fa4af6), pas par un
+# commit explicite. A ne jamais versionner.
+/tmp_review/
