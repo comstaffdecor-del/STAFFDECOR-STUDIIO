@@ -188,6 +188,30 @@ void main() {
     }
     // ignore: avoid_print
     print('Origine profil (bleu) : $originPx  (3D=$profileOrigin3D)');
+
+    // ── Comparaison au "filet" y≈175 -- REFERENCE INFORMELLE/NON VERIFIEE ──
+    // (releve visuel de crops anterieurs, PAS une mesure a sortie de
+    // commande -- ne doit jamais etre presente comme une valeur "retenue").
+    const filetYInformalRef = 175.0;
+    final offsetLeft = filetYInformalRef - pStart.y;
+    final offsetRight = filetYInformalRef - pEnd.y;
+    final delta = offsetRight - offsetLeft;
+    // ignore: avoid_print
+    print('=== ECART vs filet y=$filetYInformalRef (REFERENCE INFORMELLE, non mesuree par commande -- a ne pas retenir comme valeur finale) ===');
+    // ignore: avoid_print
+    print('Extremite GAUCHE (pres ceilL, x=${pStart.x}) : trajet.y=${pStart.y}  ecart=$offsetLeft px');
+    // ignore: avoid_print
+    print('Extremite DROITE (pres ceilR, x=${pEnd.x}) : trajet.y=${pEnd.y}  ecart=$offsetRight px');
+    // ignore: avoid_print
+    print('Delta (droite - gauche) = $delta px');
+    if (delta.abs() < 1e-6) {
+      // ignore: avoid_print
+      print('=> ECART CONSTANT sur toute la longueur (pas d\'ouverture) : ceilL et ceilR contribuent de facon identique.');
+    } else {
+      // ignore: avoid_print
+      print('=> ECART NON CONSTANT, ouverture de ${delta.abs()} px vers ${delta > 0 ? "la droite (ceilR seul en cause probable)" : "la gauche (ceilL seul en cause probable)"}.');
+    }
+
     // ignore: avoid_print
     print('PNG plein format ecrit: $outPathFull (${pngBytesFull.length} octets)');
     // ignore: avoid_print
