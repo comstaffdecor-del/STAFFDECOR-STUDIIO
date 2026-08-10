@@ -86,14 +86,13 @@ void main() {
       ceilingPlane: scene.ceilingPlane,
     );
 
-    final ringsExposed = computeCrossSectionRings(
-      profile: profile,
-      pathMeters: pathMeters,
-      wallPlanes: wallPlanes,
-      ceilingPlane: scene.ceilingPlane,
-    );
-    final ceilIdx0 = profile.ceilingIndices.first;
-    final profileOrigin3D = ringsExposed.first[ceilIdx0];
+    // ⚠️ CORRECTIF (ce tour) : voir _debug_whitebg_overlay_test.dart pour
+    // la preuve complète (_debug_origin_vs_path_test.dart, commit 8ba3cef)
+    // -- l'ancien calcul `ringsExposed.first[profile.ceilingIndices.first]`
+    // pointait sur le sommet d'indice 3 (profil=(112.79,0.0)mm), pas sur
+    // l'origine du balayage. L'origine définitionnelle est
+    // `pathMeters.first` == `wallOrigin` du premier segment.
+    final profileOrigin3D = pathMeters.first;
 
     final lightDirWorld = vm.Vector3(0.5, 0.7, 0.7);
     const ambient = 0.20;

@@ -108,16 +108,32 @@ void main() {
         ceilingPlane: scene.ceilingPlane,
       );
 
-      // Origine du profil (xProfil=0, yProfil=0 du 1er anneau) -- même
-      // calcul que _debug_overlay_render_test.dart.
-      final ringsExposed = computeCrossSectionRings(
-        profile: profile,
-        pathMeters: pathMeters,
-        wallPlanes: wallPlanes,
-        ceilingPlane: scene.ceilingPlane,
-      );
-      final ceilIdx0 = profile.ceilingIndices.first;
-      final profileOrigin3D = ringsExposed.first[ceilIdx0];
+      // ⚠️ CORRECTIF (ce tour) : la croix bleue "origine du profil" était
+      // dessinée sur `ringsExposed.first[profile.ceilingIndices.first]`
+      // (sommet d'indice 3 pour D720, profil=(112.79,0.0)mm) -- PAS
+      // l'origine du balayage. Prouvé par _debug_origin_vs_path_test.dart
+      // (commit 8ba3cef) : écart exact de 112.7888mm en Z monde,
+      // correspondant bit à bit à `profile.pointsMm[3].x`. L'origine
+      // définitionnelle du balayage (xProfil=0, yProfil=0 conceptuel) est
+      // `pathMeters.first` == `wallOrigin` du premier segment
+      // (`_buildSegmentFrame`, sweep.dart) -- c'est CE point, et lui seul,
+      // qui doit porter la croix bleue, sans dépendre d'un indice de
+      // sommet du profil (voir CONVENTIONS.md §3 : wallOrigin est le point
+      // où xProfil=0 ET yProfil=0 coïncident avec l'arête réelle).
+      final profileOrigin3D = pathMeters.first;
+
+      // ── Question de fond demandée : existe-t-il un sommet à (0,0) dans
+      // profil_mm ? Six lignes brutes, aucune interprétation ici. ──
+      // ignore: avoid_print
+      print('=== SIX PREMIERS POINTS DU PROFIL (pointsMm[0..5]) ===');
+      // ignore: avoid_print
+      print('wallIndices = ${profile.wallIndices}');
+      // ignore: avoid_print
+      print('ceilingIndices = ${profile.ceilingIndices}');
+      for (var i = 0; i < 6; i++) {
+        // ignore: avoid_print
+        print('pointsMm[$i] = (${profile.pointsMm[i].x}, ${profile.pointsMm[i].y})');
+      }
 
       final lightDirWorld = vm.Vector3(0.5, 0.7, 0.7);
       const ambient = 0.20;
