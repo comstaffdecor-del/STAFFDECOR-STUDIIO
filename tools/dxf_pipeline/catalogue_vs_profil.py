@@ -142,21 +142,51 @@ COMPARABLE_FIELDS_MAP = {
 # RÈGLE (imposée) — SEUIL LONGUEUR PRÉSUMÉE : dans un tarif de moulure,
 # aucune cote de SECTION physique (largeur/hauteur/épaisseur d'un profil
 # de coupe) ne dépasse plausiblement 1 mètre. Une valeur >= 1000mm
-# trouvée dans un champ cote-de-SECTION (cote1_mm/cote2_mm/cote3_mm/
-# diametre_mm/hauteur_mm/epaisseur_mm — PAS longueur_barre_mm, qui EST
-# déjà une longueur) est presque certainement une LONGUEUR DE BARRE mal
-# classée par extract_dimensions_mm() (ex. SKU 1000 "Pilastre cannelé
-# 23 x 250 cm" -> cote2_mm=2500.0, en réalité la hauteur du pilastre en
-# barre, pas une cote de section). RÈGLE : ne JAMAIS reclasser
-# silencieusement la valeur à l'extraction (catalogue2csv.py reste
-# neutre, cf. son docstring) — on la signale ICI, au moment du
-# recoupement géométrique, avec un statut dédié LONGUEUR_PRESUMEE et un
-# marqueur "auto": true (reclassification AUTOMATIQUE par heuristique de
-# seuil, jamais confirmée manuellement — distincte d'une VALIDE/ALERTE
-# qui elles s'appuient sur une mesure géométrique réelle).
+# trouvée dans un champ cote-de-SECTION (hauteur_mm/cote1_mm/cote2_mm/
+# cote3_mm/epaisseur_mm — PAS longueur_barre_mm, qui EST déjà une
+# longueur) est presque certainement une LONGUEUR DE BARRE mal classée
+# par extract_dimensions_mm() (ex. SKU 1000 "Pilastre cannelé 23 x 250
+# cm" -> cote2_mm=2500.0, en réalité la hauteur du pilastre en barre,
+# pas une cote de section). RÈGLE : ne JAMAIS reclasser silencieusement
+# la valeur à l'extraction (catalogue2csv.py reste neutre, cf. son
+# docstring) — on la signale ICI, au moment du recoupement géométrique,
+# avec un statut dédié LONGUEUR_PRESUMEE et un marqueur "auto": true
+# (reclassification AUTOMATIQUE par heuristique de seuil, jamais
+# confirmée manuellement — distincte d'une VALIDE/ALERTE qui elles
+# s'appuient sur une mesure géométrique réelle).
+#
+# CORRECTIF (RECADRAGE utilisateur) — `diametre_mm` EXCLU de
+# SECTION_FIELDS : contrairement à une cote de moulure (largeur/hauteur
+# de profil de coupe), le DIAMÈTRE d'une rosace/plafonnier/plafond
+# PEUT légitimement dépasser 1 mètre — ce n'est pas une longueur de
+# barre déguisée, c'est une vraie dimension de la pièce. Cas motivant
+# réel : M303 "Rosace Ø 70 cm" — le principe s'applique de façon
+# générale aux rosaces de grand diamètre du même catalogue (vérifié :
+# M504 Ø103cm=1030mm, M404 Ø104cm=1040mm, M604 Ø158cm=1580mm, M605
+# Ø146cm=1460mm, M422 Ø100cm=1000mm, M503 Ø100cm=1000mm, PL.R200
+# Ø206cm=2060mm, PL503C.BC Ø100cm=1000mm — 8 cas réels dans
+# catalogue.csv, TOUS des diamètres réels, AUCUN n'est une longueur de
+# barre). `diametre_mm` reste dans COMPARABLE_FIELDS_MAP (toujours
+# comparé à bbox_mm.w/bbox_mm.h) mais ne déclenche plus jamais
+# LONGUEUR_PRESUMEE, quelle que soit sa valeur.
+#
+# ⚠️ CONSTAT NON CORRIGÉ ICI (hors périmètre demandé, signalé pour
+# décision utilisateur) : `cote1_mm`/`cote2_mm` >= 1000mm comptent
+# ÉGALEMENT de nombreux cas légitimes non liés à une longueur de barre
+# — dimensions réelles de panneaux/encadrements/plafonniers plats (ex.
+# "Encadrement 150 x 96 cm" -> cote1_mm=1500.0 : une vraie face de
+# panneau, pas une longueur). Vérifié : 92 lignes cote1_mm et 56 lignes
+# cote2_mm >= 1000mm dans catalogue.csv, dont la majorité sont des
+# familles PANNEAUX MURAUX / ENCADREMENTS DE MIROIRS / LUMINAIRES
+# PLAFONNIERS (faces planes, pas des barres) et seule une minorité
+# (familles PILASTRES/COLONNES, motif "H. NNN cm") sont de vraies
+# longueurs mal classées. La règle actuelle sur-marque donc probablement
+# ces panneaux/encadrements/plafonniers en LONGUEUR_PRESUMEE — non
+# corrigé ici (hors périmètre explicite du point 5), à traiter par
+# familles si demandé (ex. limiter le seuil aux familles PILASTRES/
+# COLONNES plutôt qu'à tous les SKU cote1/cote2_mm).
 SECTION_FIELDS = (
-    "diametre_mm", "hauteur_mm", "cote1_mm", "cote2_mm", "cote3_mm",
-    "epaisseur_mm",
+    "hauteur_mm", "cote1_mm", "cote2_mm", "cote3_mm", "epaisseur_mm",
 )
 LONGUEUR_PRESUMEE_SEUIL_MM = 1000.0
 

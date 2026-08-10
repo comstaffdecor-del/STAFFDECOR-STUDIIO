@@ -69,13 +69,32 @@ def test_longueur_barre_mm_jamais_reclassee_en_longueur_presumee():
     assert results[0]["cote_catalogue_champ"] == "longueur_barre_mm"
 
 
-def test_diametre_mm_grand_egalement_reclasse():
-    """La règle s'applique à TOUS les champs de SECTION_FIELDS, pas
-    seulement cote1/2/3_mm (ex. diametre_mm, cas 20-54 réel : hauteur_mm)."""
-    row = _row(diametre_mm="1500.0")
+def test_hauteur_mm_grande_egalement_reclassee():
+    """La règle s'applique aussi à hauteur_mm (cas réel 20-54 :
+    hauteur_mm=2000.0, "H. 200 cm" d'une colonne, pas une section)."""
+    row = _row(hauteur_mm="1500.0")
     results = compare_one(row, {"bbox_mm.w": 150.0})
     assert results[0]["statut"] == "LONGUEUR_PRESUMEE"
     assert results[0]["auto"] is True
+
+
+def test_diametre_mm_jamais_reclasse_meme_tres_grand():
+    """CORRECTIF (RECADRAGE) — diametre_mm est EXCLU de SECTION_FIELDS :
+    un grand diamètre (rosace, plafond) est une vraie dimension, jamais
+    une longueur de barre déguisée. Cas motivant réel : M303 "Rosace
+    Ø 70 cm" (700mm, sous le seuil) ; règle générale vérifiée sur des
+    diamètres RÉELS >= 1000mm du catalogue (M604 Ø158cm=1580mm,
+    PL.R200 Ø206cm=2060mm...) : aucun ne doit jamais devenir
+    LONGUEUR_PRESUMEE, quelle que soit la valeur."""
+    row = _row(diametre_mm="2060.0")  # cas réel PL.R200, Ø 206 cm
+    results = compare_one(row, {"bbox_mm.w": 2058.0})
+    assert results[0]["statut"] == "VALIDE"
+    assert results[0]["auto"] is False
+
+    row2 = _row(diametre_mm="9999.0")  # valeur extrême arbitraire
+    results2 = compare_one(row2, {})
+    assert results2[0]["statut"] == "AUCUNE_GEOMETRIE_MESUREE"
+    assert results2[0]["auto"] is False
 
 
 def test_toutes_les_lignes_portent_la_cle_auto():

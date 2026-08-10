@@ -243,13 +243,42 @@ toujours une longueur de barre mal placée par l'extraction texte du
 tarif, jamais une vraie cote de coupe.
 
 **Règle codée** (`catalogue_vs_profil.py::compare_one()`) : pour tout
-champ de `SECTION_FIELDS` (`diametre_mm`, `hauteur_mm`, `cote1_mm`,
-`cote2_mm`, `cote3_mm`, `epaisseur_mm` — **jamais** `longueur_barre_mm`,
-qui EST déjà une longueur), si la valeur catalogue est
+champ de `SECTION_FIELDS` (`hauteur_mm`, `cote1_mm`, `cote2_mm`,
+`cote3_mm`, `epaisseur_mm` — **jamais** `longueur_barre_mm`, qui EST
+déjà une longueur), si la valeur catalogue est
 **≥ `LONGUEUR_PRESUMEE_SEUIL_MM` = 1000mm**, le champ est reclassé en
 statut **`LONGUEUR_PRESUMEE`** avant toute tentative de comparaison
 géométrique — court-circuite `NON_COMPARABLE`/`AUCUNE_GEOMETRIE_MESUREE`/
 `VALIDE`/`ALERTE` pour ce champ précis.
+
+**CORRECTIF (RECADRAGE utilisateur) — `diametre_mm` EXCLU de
+`SECTION_FIELDS`** : contrairement à une largeur/hauteur de profil de
+moulure, le **diamètre** d'une rosace/plafonnier/plafond peut
+légitimement dépasser 1 mètre — ce n'est pas une longueur de barre
+déguisée. Cas motivant réel : `M303` ("Rosace Ø 70 cm", 700mm, sous le
+seuil dans ce cas précis, mais la règle générale aurait produit un faux
+`LONGUEUR_PRESUMEE` sur toute rosace de grand diamètre). Vérifié sur
+`catalogue.csv` : 8 SKU avec `diametre_mm >= 1000mm`, TOUS des diamètres
+réels (`M504` Ø103cm=1030mm, `M404` Ø104cm=1040mm, `M604`
+Ø158cm=1580mm, `M605` Ø146cm=1460mm, `M422`/`M503`/`PL503C.BC`
+Ø100cm=1000mm, `PL.R200` Ø206cm=2060mm) — aucun n'est une longueur de
+barre. `diametre_mm` reste dans `COMPARABLE_FIELDS_MAP` (toujours
+comparé à `bbox_mm.w`/`bbox_mm.h`) mais ne déclenche plus jamais
+`LONGUEUR_PRESUMEE`.
+
+**⚠️ Constat non corrigé (hors périmètre demandé, signalé pour
+décision)** : `cote1_mm`/`cote2_mm` ≥ 1000mm comptent également des cas
+légitimes non liés à une longueur de barre — dimensions réelles de
+panneaux/encadrements/plafonniers plats (ex. "Encadrement 150 x 96 cm"
+→ `cote1_mm=1500.0`, une vraie face de panneau). Vérifié : 92 lignes
+`cote1_mm` et 56 lignes `cote2_mm` ≥ 1000mm dans `catalogue.csv`, dont
+la majorité proviennent des familles PANNEAUX MURAUX / ENCADREMENTS DE
+MIROIRS / LUMINAIRES PLAFONNIERS (faces planes) et seule une minorité
+(familles PILASTRES/COLONNES, motif "H. NNN cm") sont de vraies
+longueurs mal classées. La règle actuelle sur-marque donc probablement
+ces panneaux/encadrements/plafonniers en `LONGUEUR_PRESUMEE` — **non
+corrigé** (seul `diametre_mm` a été explicitement demandé), à traiter
+par famille si demandé.
 
 **Principe de neutralité préservé** : `catalogue2csv.py` (extraction)
 **n'est pas modifié** — `cote1_mm`/`cote2_mm`/`cote3_mm` restent extraits
