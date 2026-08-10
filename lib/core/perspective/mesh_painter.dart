@@ -24,12 +24,18 @@
 ///    globalement convexe/quasi plane le long du trajet, jamais de
 ///    repli sur elle-même à cette échelle).
 /// 3. **Éclairage** : un seul directionnel fixe (approximation simple,
-///    pas de PBR) — luminosité par sommet = `0.45 + 0.55 *
+///    pas de PBR) — luminosité par sommet = `ambient + (1-ambient) *
 ///    (dot(normal, lightDir) + 1) / 2`, appliquée en multipliant
 ///    [baseColor]. Les normales par facette (flat shading, déjà produites
 ///    par [Mesh], règle dure #6 de `sweep.dart`) donnent donc des facettes
 ///    visuellement distinctes (arêtes vives), fidèle à l'aspect réel d'une
 ///    moulure en plâtre.
+///    [ambient] par défaut = 0.45 — reproduit EXACTEMENT l'ancienne
+///    constante figée `0.45 + 0.55 * ...` (aucun changement de rendu pour
+///    les appelants existants qui ne précisent pas [ambient]). Un appelant
+///    qui veut un contraste plus marqué (ex. lumière directionnelle nette
+///    venant d'une fenêtre plutôt qu'un éclairage de pièce diffus) passe
+///    une valeur plus basse, ex. `ambient: 0.20`.
 library;
 
 import 'dart:ui' as ui;
@@ -47,12 +53,17 @@ import '../geometry/sweep.dart';
 /// direction de propagation du rayon), repère monde — défaut choisi pour
 /// une lumière venant d'en haut et légèrement de face, cohérent avec un
 /// éclairage de pièce standard (plafonnier + lumière du jour latérale).
+///
+/// [ambient] : terme ambiant (0..1) du modèle d'éclairage — voir point 3
+/// de la docstring de tête de fichier. Défaut 0.45 (comportement historique
+/// inchangé pour tout appelant qui ne précise pas ce paramètre).
 void paintMeshOnCanvas(
   ui.Canvas canvas,
   Mesh mesh,
   Camera3D camera, {
   ui.Color baseColor = const ui.Color(0xFFEDEAE4),
   vm.Vector3? lightDirWorld,
+  double ambient = 0.45,
 }) {
   final light = (lightDirWorld ?? vm.Vector3(-0.4, 0.6, 0.7)).normalized();
   final vertexCount = mesh.vertexCount;
@@ -87,7 +98,8 @@ void paintMeshOnCanvas(
       positions.add(screenPos[vi]);
       final n = mesh.normalAt(vi);
       final ndotl = n.dot(light).clamp(-1.0, 1.0);
-      final brightness = (0.45 + 0.55 * ((ndotl + 1.0) / 2.0)).clamp(0.0, 1.0);
+      final brightness = (ambient + (1.0 - ambient) * ((ndotl + 1.0) / 2.0))
+          .clamp(0.0, 1.0);
       colors.add(
         ui.Color.from(
           alpha: 1.0,
