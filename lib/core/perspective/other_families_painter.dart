@@ -1,5 +1,5 @@
 /// Rendu des familles restantes : Lambris, Parements, Colonnes,
-/// Encadrements (rosaces plafond), Ornements.
+/// Rosaces (peintre plafond — anciennement nommé "Encadrements"), Ornements.
 ///
 /// Port fidèle de leurs `case` respectifs dans `renderProductOnPhoto`
 /// (studio.js), consommant le [VanishingPoint] partagé unique — corrige
@@ -148,10 +148,23 @@ void paintColonne(
   }
 }
 
-/// ── Encadrements (rosaces) : ellipse concentrique dans la zone plafond
-/// visible (entre le haut de l'image et l'arête plafond/mur), position
-/// [xPct] dans la largeur de l'image. ──
-void paintEncadrement(
+/// ── Rosace (rebaptisée depuis `paintEncadrement`, retour utilisateur :
+/// le nom "Encadrement" — cadre mural — ne correspondait pas au rendu
+/// réellement produit) : ellipse concentrique + rayons, TOUJOURS dans la
+/// zone PLAFOND visible de l'image (entre le haut de l'image et l'arête
+/// plafond/mur, jamais sur le mur du fond) — position [xPct] dans la
+/// largeur de l'image.
+///
+/// PASSAGE AU PEINTRE PLAFOND : ce renommage acte explicitement que cette
+/// fonction est — et a toujours été, cf. `ceilMidY` ci-dessous — le peintre
+/// de la famille "plafond" (rosaces, plafonniers), par opposition aux
+/// peintres "mur" (Lambris, Parements, Colonnes, Ornements) du même
+/// fichier. Le calcul de position reste la même approximation 2D par
+/// [VanishingPoint] (pas encore raccordé au plan 3D `ceilingPlane` de
+/// `calib_to_camera.dart`/`sweep.dart` utilisé par le pipeline de rendu
+/// photo-réaliste — ce raccordement dépasserait la portée du présent
+/// renommage et n'a pas été demandé). ──
+void paintRosace(
   Canvas canvas,
   VanishingPoint vp, {
   required double xPct,
@@ -160,6 +173,9 @@ void paintEncadrement(
   required double imgLeft,
   required double imgW,
 }) {
+  // Zone PLAFOND (jamais mur) : entre le haut de l'image (imgTop) et
+  // l'arête plafond/mur (vp.fTL.dy) — c'est la définition même du
+  // "peintre plafond".
   final ceilMidY = imgTop + (vp.fTL.dy - imgTop) * 0.55;
   final rX = imgLeft + xPct * imgW;
   final rY = ceilMidY;

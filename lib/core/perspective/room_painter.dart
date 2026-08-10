@@ -196,7 +196,11 @@ class RoomPainter extends CustomPainter {
           break;
 
         case 'Encadrements':
-          paintEncadrement(
+          // Peintre plafond (rosaces) — fonction rebaptisée paintRosace,
+          // le nom de famille catalogue 'Encadrements' est conservé ici
+          // tel quel (taxonomie catalogue_data.dart non touchée par ce
+          // renommage, hors périmètre demandé).
+          paintRosace(
             canvas,
             vp,
             xPct: xPct,
