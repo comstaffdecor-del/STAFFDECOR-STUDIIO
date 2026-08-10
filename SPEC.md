@@ -815,3 +815,48 @@ mauvais produit pour juger de l'aspect d'une corniche ornée. Aucune
 correction de code n'était donc requise ni pertinente sur cette base —
 voir §"Récupération d'un vrai profil de corniche" pour la suite
 (remplacement du profil de test par un vrai SKU Corniches via STEP).
+
+## Limitation connue — `sweep.dart` : 2 points de trajet = 2 anneaux seulement
+
+**Statut : limitation réelle identifiée, non corrigée dans `sweep.dart`.
+Contournée localement dans un test appelant — correction définitive
+reportée à une session future.**
+
+**Constat** : `sweepMoulure(pathMeters: [...])` génère un anneau de
+sommets par point de `pathMeters` reçu. Quand l'appelant ne passe que les
+2 extrémités du trajet (cas de `render_corniche_screenshot_test.dart` et,
+initialement, de `render_d720_haussmann_dualview_test.dart` — Point 3),
+le maillage produit n'a donc que **2 anneaux**, et `mesh.uvAt(i).x`
+(abscisse curviligne réelle en mm le long du trajet, jamais normalisée —
+voir `CONVENTIONS.md`) ne prend alors que **2 valeurs possibles** : `0`
+et la longueur totale du trajet.
+
+**Conséquence pratique rencontrée** : toute requête géométrique qui doit
+sélectionner les sommets dans une **fenêtre localisée** du trajet (ex.
+"tous les sommets dans les 40cm centraux", nécessaire pour un crop ×4
+ciblé — Point 3) échoue systématiquement avec seulement 2 anneaux : la
+fenêtre `[uCenter-200mm, uCenter+200mm]` ne contient jamais aucun sommet
+sauf coïncidence exacte avec une extrémité.
+
+**Contournement appliqué (test-local uniquement, PAS dans
+`sweep.dart`)** : `render_d720_haussmann_dualview_test.dart` subdivise
+lui-même le segment droit `ceilLOnEdge → ceilROnEdge` tous les 50mm avant
+d'appeler `sweepMoulure`, en répétant le même `wallPlanes` (un seul mur,
+un seul plan) pour chaque sous-segment inséré. Ce contournement fonctionne
+pour ce cas d'usage précis, mais **ne doit pas devenir le pattern
+standard** : chaque futur test/appelant qui a besoin d'une résolution de
+trajet plus fine réinventerait sa propre subdivision, dupliquant la même
+logique (et le même risque d'erreur — pas de garantie qu'un futur
+appelant respecte la même convention `wallPlanes.length ==
+pathMeters.length - 1`).
+
+**Correction attendue (future session, PAS ce tour-ci)** : la
+subdivision doit être **paramétrable dans `sweep.dart` lui-même** — par
+exemple un paramètre optionnel `sweepMoulure(..., maxSegmentLengthMm:
+...)` (ou une fonction utilitaire dédiée de subdivision de trajet
+appelée en interne avant l'extrusion) qui densifie automatiquement
+`pathMeters`/`wallPlanes` reçus en entrée si l'espacement entre deux
+points consécutifs dépasse un seuil donné — pour que TOUT appelant
+(pas seulement les tests qui pensent à le faire eux-mêmes) bénéficie
+d'une granularité de trajet suffisante pour des requêtes localisées par
+`uvAt(i).x`. Ne pas laisser cette responsabilité à chaque appelant.
