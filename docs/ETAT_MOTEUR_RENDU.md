@@ -153,6 +153,27 @@ prendre.
   JFIF uniquement — cette photo précise n'aurait de toute façon pas pu
   fournir de focale par EXIF.
 
+- **`prodProfiles['D720']` décrit comme « 222×258 mm » (contenu initial
+  de la section 5, tel que committé en `387f9a1`)** : c'était faux. Ces
+  `w`/`h` sont des pixels d'une image de coupe (confirmé par l'en-tête du
+  générateur `prod-profiles.js` et par l'absence totale du PNG source),
+  pas des millimètres — la comparaison à `bbox_mm` (STEP, en mm) qui en
+  découlait n'a donc jamais été une comparaison homogène. Détail complet
+  en section 5 ci-dessous, qui réécrit intégralement cette partie.
+
+- **Concordance à 0,0 mm sur le produit `1000` prise pour une validation
+  générale de la mesure géométrique** : cette concordance valide
+  uniquement la chaîne d'extraction DXF (`dxf2profile.py`), pas la chaîne
+  STEP (`step2profile.py`) qui a produit `D705`/`D718`/`D720` — les deux
+  voies sont des implémentations distinctes, sans recoupement l'une avec
+  l'autre. Détail en section 5.
+
+- **Arbitrage « la table PDF fait foi » (commit `5580799`)** : portait sur
+  une source (`prodProfiles`) dépourvue de toute dimension métrique — cet
+  arbitrage ne peut donc pas être maintenu tel quel. Reformulé en section
+  5 comme une répartition des rôles entre sources, plutôt qu'un choix
+  entre sources concurrentes.
+
 ---
 
 ## 4. Échelle
@@ -202,21 +223,59 @@ alors entièrement d'une échelle postulée, non mesurée.
 
 ---
 
-## 5. Trois descriptions concurrentes de D720
+## 5. Répartition des rôles entre les sources (D720 et le catalogue corniches)
+
+**RÉTRACTATION EXPLICITE — ces lignes annulent le contenu de la version
+initiale de cette section, telle que committée en `387f9a1`.** Cette
+version affirmait « PDF → w 222, h 258 mm » : c'était faux. Le résumé
+court de cette rétractation (et des deux autres qui en découlent) est
+aussi consigné en section 3 ci-dessus, dans la liste des conclusions
+annulées. Le détail complet est développé ici, dans la section réécrite
+intégralement ci-après.
 
 - **STEP, `assets/profiles/D720.json`** (relu intégralement à la
-  rédaction de ce document) : champ `bbox_mm = {w: 199.145, h: 202.87}` ;
-  recalcul indépendant à partir des 25 sommets de `profil_mm` (min/max
-  des coordonnées x et y) : extent x = 199,1447 mm, extent y = 202,8698 mm,
-  ratio x/y = 0,9816379766727231 (≈ 0,9816). Les deux sources (champ
-  `bbox_mm` déclaré dans le JSON et recalcul direct depuis `profil_mm`)
-  concordent.
+  rédaction initiale de ce document) : champ `bbox_mm = {w: 199.145, h:
+  202.87}` ; recalcul indépendant à partir des 25 sommets de `profil_mm`
+  (min/max des coordonnées x et y) : extent x = 199,1447 mm, extent y =
+  202,8698 mm, ratio x/y = 0,9816379766727231 (≈ 0,9816). Les deux
+  sources (champ `bbox_mm` déclaré dans le JSON et recalcul direct depuis
+  `profil_mm`) concordent. **Unité désormais vérifiée** (pas seulement
+  documentée comme convention) : `assets/step/D720.stp` déclare
+  `SI_UNIT(.MILLI.,.METRE.)` dans son en-tête (confirmé par `grep -io
+  "SI_UNIT([^)]*)" assets/step/D720.stp`, identique sur `D705.stp` et
+  `D718.stp`) ; `tools/dxf_pipeline/step2profile.py` lit cette unité via
+  `Interface_Static.CVal_s("xstep.cascade.unit")` après un `ReadFile()`
+  réel (lignes 285-286) plutôt que de la présumer — sa docstring (lignes
+  47-62) documente explicitement `ERREUR_UNITES` (profil vide) comme
+  seule issue si l'unité résolue n'est ni reconnue ni couverte par
+  `units_override.csv`, jamais une supposition silencieuse. Le champ
+  `source` écrit dans `D720.json` (et dans `D705.json`/`D718.json`) le
+  confirme : `{'fichier': 'D720.stp', 'insunits': None, 'unite_retenue':
+  'mm', 'origine_unite': 'step_header', 'methode': 'section_step'}` —
+  `insunits: None` prouve que le repli `units_override.csv` n'a même pas
+  été consulté, l'en-tête STEP ayant suffi. En-tête du fichier source :
+  généré par « Delcam plc STEP library », daté du 06/11/2017 — un export
+  CAO industriel d'origine, pas une reconstruction faite pour ce projet.
 
-- **`prodProfiles['D720']`, `lib/data/prod_profiles_data.dart`, ligne 225** :
-  `ProdProfile(w: 222, h: 258, r: 0.86)` — valeurs issues de pixels de PNG
-  de coupe extraits de PDF (catalogue GED), selon la docstring de
-  `lib/core/perspective/ratio_lookup.dart` (lignes 1-6 : « 283 entrées
-  extraites des PDF GED »).
+- **`prodProfiles['D720']`, `lib/data/prod_profiles_data.dart`, ligne
+  225** : `ProdProfile(w: 222, h: 258, r: 0.86)`. **Ces `w`/`h` sont des
+  pixels d'image de coupe, pas des millimètres** — confirmé en remontant
+  au générateur du fichier, trouvé hors du dépôt Flutter
+  (`/home/user/staff-decor-sources/webapp/public/static/js/
+  prod-profiles.js`, absent de toute copie versionnée avec historique
+  git — ce dépôt source n'a lui-même aucun commit). Son en-tête dit
+  explicitement : « 283 produits : dimensions du PNG profil pour calcul
+  du ratio d'aspect [...] Image accessible via /static/profiles/
+  {ref}.png ». Le PNG en question (qui mesurerait 222×258 px si l'unité
+  est bien le pixel) est introuvable : le répertoire `/static/profiles/`
+  référencé n'existe dans aucune copie disponible du dépôt source (0
+  fichier `.png` au total dans `staff-decor-sources`), et les seuls PNG
+  portant le nom `D720`/`D718`/`D705` présents dans ce dépôt Flutter
+  (`assets/profiles/control/*.png`) font tous exactement 885×888 px —
+  taille identique sur les trois, donc un rendu de contrôle généré par le
+  pipeline `dxf_pipeline`, pas le PNG de coupe source. La seule grandeur
+  que cette table est censée fournir (le ratio `r = w/h`) est donc, elle
+  aussi, un ratio de pixels d'image, pas un ratio de cotes physiques.
 
 - **Proportion implicite des coefficients en dur** de
   `StripThickness.corniceDefault` (`lib/core/perspective/
@@ -226,13 +285,71 @@ alors entièrement d'une échelle postulée, non mesurée.
   `0.055 / 0.140 = 0,3928571...` (≈ 0,39) — sans lien avec les deux
   sources précédentes.
 
-L'écart entre la première source (ratio 0,9816) et la seconde
-(0,86) est de l'ordre de 14 % — signalé sans être investigué plus avant
-dans ce fil. Si la table PDF a été mesurée avec marges (hypothèse non
-vérifiée), les 283 entrées de `prodProfiles` seraient potentiellement
-concernées, pas seulement D720 — cette hypothèse n'a fait l'objet
-d'aucune vérification par commande dans ce fil et doit être traitée comme
-**estimation non vérifiée**.
+**Reformulation de l'arbitrage du 5580799 (« la table PDF fait foi »)** :
+cet arbitrage portait sur une source qui ne contient aucune dimension
+métrique — il ne peut donc pas être maintenu tel quel. Ce n'est plus un
+conflit à trois sources à trancher, mais une répartition des rôles,
+établie par lecture directe (pas par arbitrage) :
+  - `prodProfiles` (table PDF) : écartée pour toute question d'échelle —
+    ne contient que des pixels d'image, aucune mm.
+  - `catalogue.csv` (tarif papier, `tools/dxf_pipeline/catalogue.csv`,
+    1596 lignes) : reste autoritaire pour les longueurs de barre et les
+    prix (`longueur_barre_mm` renseigné sur 338/1596 lignes,
+    `prix_ht`/`prix_ttc` sur la quasi-totalité) — mais **muet sur la
+    section des 153 lignes désignées « corniche »** : `cote1_mm` n'y est
+    renseigné que sur 2/153 lignes (`D107`, cas atypique « équerre à
+    éclairage » avec cote dans son libellé ; `D650L`, dont le champ
+    capturé est en réalité une longueur de barre, pas une section), et
+    aucune des trois références pilotes de ce fil (`D705`, `D718`,
+    `D720`) n'en fait partie — leurs colonnes `cote1_mm`/`cote2_mm`/
+    `hauteur_mm`/`diametre_mm` sont toutes vides sur leur ligne
+    catalogue. Sur l'ensemble du tarif, `cote1_mm` n'est renseigné que
+    sur 300/1596 lignes au total.
+  - **STEP (`assets/step/*.stp`, `assets/profiles/*.json` produits par
+    `step2profile.py`) : unique source de section pour la famille
+    corniche**, son unité étant désormais vérifiée par lecture d'en-tête
+    (voir ci-dessus) plutôt que présumée par convention. Disponibilité :
+    **3 fichiers `.stp`** (`D705`, `D718`, `D720`) pour **8 profils JSON**
+    au total dans `assets/profiles/` — les 5 autres (`0900`, `1000`,
+    `1005`, `1145c`, `20-54`) proviennent d'une voie DXF distincte
+    (`tools/dxf_pipeline/dxf2profile.py`, champ `source.origine_unite:
+    'header'`, pas `'step_header'` — deux chaînes d'extraction séparées,
+    ne pas confondre).
+
+**Validation métrique obtenue, et sa portée exacte** : le seul
+recoupement chiffré disponible entre une cote catalogue et une bbox
+mesurée porte sur le SKU `1000` (`Pilastre cannelé 23 x 250 cm`, ligne 59
+de `catalogue.csv` : `cote1_mm=230.0` en clair) contre `bbox_mm.w=230.0`
+de `assets/profiles/1000.json` — écart de 0,0 mm, sans circularité
+(vérifié en lisant `tools/dxf_pipeline/inject_cote_catalogue.py`,
+fonction `build_cote_catalogue_mm` : `dims[field] = float(catalogue_row.
+get(field))`, aucune lecture de `bbox_mm`/`profil_mm` dans cette
+fonction). **Ce recoupement valide la chaîne d'extraction DXF, PAS la
+chaîne STEP** : `1000.json` provient de `dxf2profile.py` (voie DXF), pas
+de `step2profile.py` (voie STEP, celle qui a produit `D705`/`D718`/
+`D720`). Les deux chaînes sont des implémentations distinctes ; aucun
+recoupement métrique catalogue-vs-géométrie n'existe à ce jour pour la
+voie STEP, et — le tarif étant muet sur la section des corniches — aucun
+ne pourra être obtenu depuis cette source pour `D705`/`D718`/`D720`.
+
+**Vraisemblance, marquée comme telle et non comme mesure** : la section
+et le prix au mètre linéaire croissent ensemble sur les trois corniches
+pilotes — `D705` (bbox ≈101 mm, 19,34 €/ml), `D718` (bbox ≈153 mm, 34,95
+€/ml), `D720` (bbox ≈199 mm, 37,67 €/ml), valeurs lues dans
+`catalogue.csv` et `assets/profiles/*.json`. Cette progression conjointe
+serait improbable si l'une des trois bbox était grossièrement aberrante ;
+elle exclut une erreur d'un facteur 10 (confusion cm/mm) ou 25,4
+(confusion pouce/mm) mais pas un facteur fin (ex. 1,1) — ce n'est pas une
+mesure, seulement un indice de vraisemblance.
+
+**Recherche d'anomalies dans la voie DXF** : 4 des 5 profils DXF
+(`0900`, `1005`, `1145c`, `20-54`) portent `statut: "ERREUR_SELECTION"`
+et une géométrie vide (`profil_mm`: 0 point, `bbox_mm: {w:0, h:0}`) —
+seul `1000` a un statut `OK` sur cette voie. Aucun `ERREUR_SELECTION` sur
+la voie STEP : les trois profils `D705`/`D718`/`D720` ont tous `statut:
+"OK"`. Ce déséquilibre concerne la robustesse de la sélection de face sur
+la voie DXF, pas la voie STEP — mais il réduit d'autant l'échantillon
+DXF disponible pour tout recoupement futur (1 cas exploitable sur 5).
 
 ---
 
@@ -299,6 +416,17 @@ Questions ouvertes, sans réponse à la date de rédaction de ce document :
   mesure sur ceilR ou ceilL ne pourra rien prouver de plus tant que la
   question de l'échelle (source de la focale, de la profondeur, du point
   de branchement métrique) n'est pas tranchée en amont.
+- **Validité du plan de coupe choisi sur les profils STEP de la famille
+  corniche** (`D705`/`D718`/`D720`) : l'unité de ces fichiers est
+  désormais vérifiée (section 5), mais rien ne garantit que le plan de
+  coupe retenu par `step2profile.py` pour extraire `profil_mm` correspond
+  bien à la section transversale que la pièce physique présenterait à la
+  découpe. Cette question est distincte de la question d'unité et n'est
+  **pas recoupable depuis le tarif** : la famille pour laquelle une
+  validation serait utile (corniche) est précisément celle dont le
+  catalogue ne donne aucune cote de section (voir section 5, 2/153 lignes
+  cotées, aucune des trois pilotes). Elle ne pourra être tranchée que par
+  comparaison directe à une pièce réelle.
 
 ---
 
@@ -309,3 +437,14 @@ rédaction), couvrant l'historique jusqu'au commit `5580799` inclus
 test ou rendu n'a été exécuté pour la rédaction de ce document — seules
 des commandes de lecture (`git show`, `git log`, `grep`, lecture directe
 de fichiers) ont été utilisées.
+
+**Mise à jour du 2026-08-12** (date système du sandbox à la rédaction de
+cette mise à jour) : correction de la section 5, qui affirmait à tort
+trois choses (voir rétractations ajoutées en section 3 et réécriture
+complète en section 5) — couvre l'historique jusqu'au commit `387f9a1`
+inclus (dernier commit du dépôt avant celui de cette mise à jour, vérifié
+par `git log --oneline -1` → `387f9a1 docs: etat des deux lignees de
+rendu (2D livree / 3D non branchee) et question d'echelle`). Aucun code,
+test ou rendu n'a été exécuté pour cette mise à jour — seules des
+commandes de lecture ont été utilisées, plus une mise à jour de ce
+fichier de documentation lui-même.
