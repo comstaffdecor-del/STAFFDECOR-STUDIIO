@@ -90,7 +90,34 @@ const double _kRatioLatFondHoriz = 0.200 / 0.140;
 ///   275 des 283 références du catalogue, qui n'ont pas de profil JSON
 ///   associé, voir `ProfileDims`). Les deux dimensions viennent du même
 ///   `ProfileDims` : on ne mélange jamais une dimension réelle avec un
-///   repli pour l'autre.
+///   repli pour l'autre ;
+/// - `retombeeMm` OU `projectionMm` n'est pas un nombre strictement
+///   positif ET fini — c'est-à-dire s'il est nul, négatif, `NaN` ou
+///   infini.
+///   ⚠️ Garde ajouté délibérément à l'entrée de cette fonction, PLUTÔT que
+///   de compter sur le fait que la chaîne amont (`loadProfileDims`) rejette
+///   déjà ce cas : les 4 refs `ERREUR_SELECTION` du catalogue DXF ont
+///   `bbox_mm = {w:0, h:0}` et `loadProfileDims` en renvoie bien `null`
+///   aujourd'hui (testé dans `profile_dims_test.dart`), donc aucun chemin
+///   connu actuel n'amène un `ProfileDims` invalide jusqu'ici. Mais SANS ce
+///   garde, si une telle valeur arrivait un jour malgré tout (bug amont,
+///   nouvelle source de données), cette fonction produirait silencieusement
+///   une bande invisible — épaisseur nulle pour `0`/négatif, `NaN` pour une
+///   coordonnée `NaN` (`Canvas.drawRect` avec `NaN` ne lève pas, elle ne
+///   dessine simplement rien), pixels infinis pour `double.infinity`. Ce
+///   garde local rend l'invariant vrai indépendamment de la chaîne amont,
+///   à coût nul, ici même où il compte le plus : au dernier point avant la
+///   conversion en pixels.
+///
+///   Forme du garde délibérément écrite comme la NÉGATION d'un prédicat
+///   positif (`!(x > 0)`) plutôt que comme une liste de cas négatifs
+///   (`x <= 0`) : `NaN <= 0` vaut `false` en IEEE 754 (comme toute
+///   comparaison impliquant `NaN`), donc une forme `<= 0` laisserait
+///   passer `NaN` sans le rejeter — un bug réellement rencontré lors de
+///   l'écriture de ce garde, corrigé avant tout usage en production.
+///   `!(x > 0)` capture zéro, négatif ET `NaN` d'un seul coup, par
+///   construction. `double.infinity` est positif et non couvert par
+///   `!(x > 0)` seul ; `isFinite` complète le garde pour ce cas.
 ///
 /// L'appelant DOIT gérer le cas `null` en retombant sur
 /// `StripThickness.corniceDefault(pH)` (ou `.plintheDefault(pH)` selon le
@@ -116,6 +143,12 @@ StripPxResult? stripPxFromDims({
 }) {
   final factor = pxParMm(pH: pH, metresHauteur: metresHauteur);
   if (factor == null || retombeeMm == null || projectionMm == null) {
+    return null;
+  }
+  if (!(retombeeMm > 0) ||
+      !(projectionMm > 0) ||
+      !retombeeMm.isFinite ||
+      !projectionMm.isFinite) {
     return null;
   }
 

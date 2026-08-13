@@ -226,6 +226,142 @@ void main() {
   );
 
   test(
+    'GARDE — retombeeMm == 0 -> null, PAS une bande d\'épaisseur nulle. '
+    'Motivation : les 4 refs ERREUR_SELECTION du catalogue DXF ont '
+    'bbox_mm = {w:0, h:0}. loadProfileDims les rejette déjà (testé dans '
+    'profile_dims_test.dart), donc aucun chemin connu aujourd\'hui ne '
+    'fait arriver un ProfileDims à 0 mm jusqu\'ici — mais si un tel '
+    'chemin apparaissait un jour (bug amont, nouvelle source de '
+    'ProfileDims, etc.), un retombeeMm=0 produirait SANS ce garde un '
+    'résultat non-null avec faceMurFondPx=0/faceMurLatPx=0 : une bande '
+    'invisible, sans erreur ni notification. Un garde à l\'entrée de '
+    'cette fonction pure est plus sûr que de compter sur le fait que '
+    'toute la chaîne amont empêche ce cas — c\'est la fonction la plus '
+    'interne, le dernier point où l\'invariant peut encore être vérifié '
+    'à coût nul.',
+    () {
+      final r = stripPxFromDims(
+        pH: 500.0,
+        metresHauteur: 2.5,
+        retombeeMm: 0.0,
+        projectionMm: 199.145,
+      );
+      expect(r, isNull);
+    },
+  );
+
+  test(
+    'GARDE — projectionMm == 0 -> null (même motivation, symétrique sur '
+    'l\'autre dimension)',
+    () {
+      final r = stripPxFromDims(
+        pH: 500.0,
+        metresHauteur: 2.5,
+        retombeeMm: 202.87,
+        projectionMm: 0.0,
+      );
+      expect(r, isNull);
+    },
+  );
+
+  test(
+    'GARDE — retombeeMm négatif -> null (une dimension physique de '
+    'profil ne peut pas être négative ; un tel cas ne peut provenir '
+    'aujourd\'hui d\'aucun chemin connu, mais le garde protège contre '
+    'une donnée corrompue future de la même façon que le garde sur 0)',
+    () {
+      final r = stripPxFromDims(
+        pH: 500.0,
+        metresHauteur: 2.5,
+        retombeeMm: -5.0,
+        projectionMm: 199.145,
+      );
+      expect(r, isNull);
+    },
+  );
+
+  test(
+    'GARDE — projectionMm négatif -> null (symétrique)',
+    () {
+      final r = stripPxFromDims(
+        pH: 500.0,
+        metresHauteur: 2.5,
+        retombeeMm: 202.87,
+        projectionMm: -1.0,
+      );
+      expect(r, isNull);
+    },
+  );
+
+  test(
+    'GARDE — retombeeMm == double.nan -> null. Motivation : `nan <= 0` '
+    'vaut FALSE en Dart (comme dans toute norme IEEE 754), donc un garde '
+    'écrit `if (retombeeMm <= 0 || ...) return null;` (forme testée par '
+    'les 4 cas ci-dessus) laisse passer NaN sans le rejeter — celui-ci '
+    'traverserait alors la multiplication et produirait quatre champs '
+    'NaN, c\'est-à-dire une bande NON DESSINÉE (Canvas.drawRect avec une '
+    'coordonnée NaN ne lève pas, elle ne dessine rien) : exactement le '
+    'symptôme silencieux que le garde est censé rendre impossible. '
+    'Ce test verrouille la forme correcte du garde : négation du '
+    'prédicat positif (`!(x > 0)`), qui capture zéro, négatif ET NaN '
+    'd\'un seul coup, plutôt qu\'une liste de cas particuliers.',
+    () {
+      final r = stripPxFromDims(
+        pH: 500.0,
+        metresHauteur: 2.5,
+        retombeeMm: double.nan,
+        projectionMm: 199.145,
+      );
+      expect(r, isNull);
+    },
+  );
+
+  test(
+    'GARDE — projectionMm == double.nan -> null (symétrique)',
+    () {
+      final r = stripPxFromDims(
+        pH: 500.0,
+        metresHauteur: 2.5,
+        retombeeMm: 202.87,
+        projectionMm: double.nan,
+      );
+      expect(r, isNull);
+    },
+  );
+
+  test(
+    'GARDE — retombeeMm == double.infinity -> null. Motivation : '
+    '`double.infinity <= 0` vaut FALSE (l\'infini positif n\'est pas '
+    '<= 0), donc ce cas traverserait aussi un garde écrit en forme '
+    '`<= 0` et produirait des pixels infinis en sortie — silencieux de '
+    'la même façon (pas un throw, un résultat non-null mathématiquement '
+    'absurde). Couvert par la même forme corrigée du garde '
+    '(`!retombeeMm.isFinite`).',
+    () {
+      final r = stripPxFromDims(
+        pH: 500.0,
+        metresHauteur: 2.5,
+        retombeeMm: double.infinity,
+        projectionMm: 199.145,
+      );
+      expect(r, isNull);
+    },
+  );
+
+  test(
+    'GARDE — projectionMm == double.infinity -> null (symétrique)',
+    () {
+      final r = stripPxFromDims(
+        pH: 500.0,
+        metresHauteur: 2.5,
+        retombeeMm: 202.87,
+        projectionMm: double.infinity,
+      );
+      expect(r, isNull);
+    },
+  );
+
+  test(
     'NON-RÉGRESSION — le résultat null, combiné à '
     'StripThickness.corniceDefault(pH) côté appelant, doit reproduire '
     'bit-à-bit les coefficients actuels pour les 275 références sans '
