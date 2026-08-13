@@ -467,6 +467,50 @@ un commit déjà clos). `flutter analyze` propre et suite de tests
 `flutter test` (98 tests, tout le dépôt) intégralement verte au moment de
 cette mise à jour.
 
+**Mise à jour du 2026-08-13 (sonde `--force-with-lease`)** : trace
+empirique du comportement de `--force-with-lease=<refname>:<expect>`
+quand `<refname>` ne correspond pas à la ref réellement poussée, obtenue
+sur **git version 2.39.5** (le comportement autour des refs non listées
+et de l'interaction avec `push.default` a connu des ajustements selon
+les versions — cette trace n'est réutilisable qu'avec cette réserve de
+version explicite).
+
+Protocole : branche jetable poussée une première fois (tip A), puis
+divergence RÉELLE créée localement par `git reset --hard <parent
+commun>` suivi d'un nouveau commit (tip B, frère de A, PAS descendant —
+vérifié par `git merge-base --is-ancestor A HEAD` qui échoue). Trois
+pushs tentés sur cette même divergence :
+
+1. Push nu, sans force ni bail → `! [rejected] (non-fast-forward)`.
+2. Push avec `--force-with-lease="main:<sha-de-main>"` (nom de ref
+   délibérément erroné — la ref poussée est la branche jetable, pas
+   `main`) → `! [rejected] (non-fast-forward)`, PAS `(stale info)`.
+3. Push avec `--force-with-lease="<branche-jetable>:<tip-A-reel>"` (nom
+   et SHA corrects) → `+ A...B (forced update)`.
+
+Point de méthode capital sur le résultat 2, à ne pas mal résumer : le
+SHA fourni pour `main` (`be72a82`) était lui-même périmé par rapport au
+`main` distant réel (`4557f46`) au moment du test. Si le bail nommé
+`main` avait été évalué, le rejet aurait porté la mention `(stale
+info)`, pas `(non-fast-forward)`. Il ne l'a pas portée. La conclusion
+correcte est donc double, et les deux moitiés sont nécessaires : (a) le
+bail nommé sur une ref non poussée par cette commande n'est pas
+seulement inopérant, il est **inerte** — il n'est pas évalué du tout ;
+(b) la ref réellement poussée retombe sur la règle fast-forward
+ordinaire du transport git, indépendamment de tout bail présent dans la
+commande. C'est la conjonction de (a) et (b), pas (a) seul, qui donne le
+mode de défaillance sûr : dire seulement « le bail mal nommé ne force
+pas » laisserait croire à un rôle protecteur du bail alors qu'il n'a
+joué aucun rôle, protecteur ou autre.
+
+Nettoyage : les deux branches jetables utilisées (une pour la première
+série de tests, invalidée après coup car elle ne produisait que des
+fast-forwards déguisés ; une seconde pour la divergence réelle
+ci-dessus) ont été supprimées localement et sur le remote après chaque
+série. Aucune trace résiduelle sur `main`.
+
+---
+
 **Mise à jour du 2026-08-12** (date système du sandbox à la rédaction de
 cette mise à jour) : correction de la section 5, qui affirmait à tort
 trois choses (voir rétractations ajoutées en section 3 et réécriture
