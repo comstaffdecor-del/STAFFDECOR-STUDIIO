@@ -44,7 +44,43 @@ class RoomPainter extends CustomPainter {
     required this.selectedProducts,
     required this.prodPositions,
     this.withProducts = true,
-  });
+  }) : super(repaint: ProductTextureCache.instance);
+  // ⚠️ repaint: branché explicitement sur ProductTextureCache.instance.
+  //
+  // Sans ce paramètre, CustomPainter._repaint reste null et
+  // CustomPainter.addListener(...) — appelé par RenderCustomPaint sur
+  // chaque nouvelle instance — ne fait RIEN (voir le SDK :
+  // `void addListener(VoidCallback listener) => _repaint?.addListener(...)`).
+  //
+  // shouldRepaint (ci-dessous) est structurellement mort pour TOUS les
+  // champs collection (selectedProducts, prodPositions) : ce ne sont que
+  // 6 comparaisons `!=` de références brutes, sans mapEquals/longueur/
+  // compteur de version. AppState.selectedProducts/prodPositions sont
+  // mutés en place (selectedProducts.add(...), prodPositions[ref] = ...),
+  // jamais réassignés — la référence reste donc identique d'un build à
+  // l'autre. Vérifié expérimentalement (scratch, non commité) : même un
+  // AJOUT DE PRODUIT réel (mutation in-place de la même liste, comme
+  // AppState.selectedProducts.add le fait) donne shouldRepaint == false.
+  //
+  // Ce qui rafraîchit l'écran aujourd'hui à l'ajout d'un produit n'est
+  // donc PAS shouldRepaint : c'est le rebuild de l'ancêtre déclenché par
+  // AppState.notifyListeners() (context.watch<AppState>() dans
+  // _PhotoZone), qui force Flutter à recréer le RenderObject sous-jacent
+  // plutôt qu'à réutiliser l'instance existante — un chemin entièrement
+  // extérieur à shouldRepaint.
+  //
+  // ProductTextureCache n'a, lui, aucun AppState équivalent au-dessus de
+  // lui pour déclencher ce rebuild d'ancêtre : le
+  // ListenableBuilder(listenable: ProductTextureCache.instance, ...) qui
+  // enveloppe CustomPaint dans studio_screen.dart et
+  // comparateur_screen.dart ne fait que reconstruire une NOUVELLE
+  // instance de RoomPainter — pas l'ancêtre — donc shouldRepaint reste
+  // le seul juge, et il dit non.
+  //
+  // Ce super(repaint: ...) active le vrai chemin CustomPainter.addListener
+  // (géré par RenderCustomPaint, attach/detach automatique — pas de fuite
+  // avec ce singleton) et rend CE repaint garanti, indépendamment du
+  // rebuild d'ancêtre dont dépendent les autres champs.
 
   @override
   void paint(Canvas canvas, Size size) {
