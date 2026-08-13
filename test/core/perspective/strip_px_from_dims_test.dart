@@ -60,11 +60,23 @@
 //     -> faceMurFondPx = 30.7094, faceHorizFondPx = 30.681
 //     -> faceMurLatPx = 30.7094 * (0.080/0.055) = 44.668218...
 //     -> faceHorizLatPx = 30.681 * (0.200/0.140) = 43.830
+//   D705 (seul profil avec axe y inverse cote plafond, cf. lecture
+//   directe de assets/profiles/D705.json) : retombeeMm = 102.661,
+//   projectionMm = 101.4526
+//     -> faceMurFondPx = 20.5322, faceHorizFondPx = 20.29052
+//     -> faceMurLatPx = 20.5322 * (0.080/0.055) = 29.865018...
+//     -> faceHorizLatPx = 20.29052 * (0.200/0.140) = 28.986457...
 library;
 
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:staff_decor_studio/core/perspective/strip_px_from_dims.dart';
+// Import du peintre uniquement dans le TEST, pour lire les champs réels
+// de StripThickness.corniceDefault — jamais dans strip_px_from_dims.dart
+// lui-même (qui reste pur, sans dart:ui). Le sens de la dépendance est
+// peintre -> conversion pure, jamais l'inverse ; ce test la vérifie sans
+// l'inverser : il consulte le peintre, il ne l'alimente pas.
+import 'package:staff_decor_studio/core/perspective/cornice_plinth_painter.dart';
 
 void main() {
   const tol = 0.001;
@@ -98,6 +110,32 @@ void main() {
     expect(r.faceMurLatPx, closeTo(44.668218, tol));
     expect(r.faceHorizLatPx, closeTo(43.830, tol));
   });
+
+  test(
+    'D705, pH=500, metresHauteur=2.5 -> conversion métrique réelle, '
+    'SEUL profil du lot avec axe y inversé (max(y)==0 côté plafond au '
+    'lieu de min(y)==0) : exerce la normalisation sign-insensible du '
+    'loader (distance absolue au plan de pose) en aval de cette '
+    'conversion. Valeurs épinglées en littéraux, calculées à la main '
+    'par lecture directe de profil_mm/face_pose_mur/face_pose_plafond '
+    'dans assets/profiles/D705.json puis vérifiées par calcul '
+    'indépendant (retombeeMm=102.661, projectionMm=101.4526, '
+    'cohérent avec bbox_mm={w:101.453,h:102.661}) — PAS recalculées ici '
+    'à partir de 0.080/0.055, pour ne pas rendre ce test tautologique.',
+    () {
+      final r = stripPxFromDims(
+        pH: 500.0,
+        metresHauteur: 2.5,
+        retombeeMm: 102.661,
+        projectionMm: 101.4526,
+      );
+      expect(r, isNotNull);
+      expect(r!.faceMurFondPx, closeTo(20.5322, tol));
+      expect(r.faceHorizFondPx, closeTo(20.29052, tol));
+      expect(r.faceMurLatPx, closeTo(29.865018, tol));
+      expect(r.faceHorizLatPx, closeTo(28.986457, tol));
+    },
+  );
 
   test(
     'ratio lat/fond préservé : identique à StripThickness.corniceDefault '
@@ -186,24 +224,19 @@ void main() {
     'NON-RÉGRESSION — le résultat null, combiné à '
     'StripThickness.corniceDefault(pH) côté appelant, doit reproduire '
     'bit-à-bit les coefficients actuels pour les 275 références sans '
-    'profil : ce test documente les valeurs que l\'appelant doit '
-    'obtenir en repli, pour qu\'un futur changement de '
-    'StripThickness.corniceDefault ne passe pas inaperçu ici',
+    'profil. Ce test appelle RÉELLEMENT StripThickness.corniceDefault '
+    'et lit ses champs — il ne recopie plus 0.055/0.140/0.080/0.200 à '
+    'la main : recopier ces littéraux ferait passer ce test même si '
+    'corniceDefault changeait un jour, ce qui viderait la garantie de '
+    'non-régression qu\'il est censé apporter.',
     () {
       const pH = 500.0;
-      // Reflet exact de StripThickness.corniceDefault(pH) —
-      // cornice_plinth_painter.dart lignes 81-86.
-      const attenduFaceMurFond = 0.055 * pH;
-      const attenduFaceHorizFond = 0.140 * pH;
-      const attenduFaceMurLat = 0.080 * pH;
-      const attenduFaceHorizLat = 0.200 * pH;
-      expect(attenduFaceMurFond, closeTo(27.5, tol));
-      expect(attenduFaceHorizFond, closeTo(70.0, tol));
-      expect(attenduFaceMurLat, closeTo(40.0, tol));
-      expect(attenduFaceHorizLat, closeTo(100.0, tol));
+      final attendu = StripThickness.corniceDefault(pH);
 
-      // Le null renvoyé par stripPxFromDims dans ce cas ne doit rien
-      // ajouter ni retirer à ces valeurs.
+      // Le null renvoyé par stripPxFromDims (dims absentes) ne doit
+      // rien ajouter ni retirer aux valeurs de corniceDefault : c'est
+      // l'appelant qui doit reconstruire StripThickness.corniceDefault
+      // dans ce cas, stripPxFromDims lui-même ne calcule rien.
       final r = stripPxFromDims(
         pH: pH,
         metresHauteur: 2.5,
@@ -211,6 +244,14 @@ void main() {
         projectionMm: null,
       );
       expect(r, isNull);
+
+      // Valeurs lues sur l'objet réel, pas recalculées : si
+      // corniceDefault change, ces expect changent avec lui et le
+      // test reste un miroir fidèle plutôt qu'une copie figée.
+      expect(attendu.faceMurFond, closeTo(27.5, tol));
+      expect(attendu.faceHorizFond, closeTo(70.0, tol));
+      expect(attendu.faceMurLat, closeTo(40.0, tol));
+      expect(attendu.faceHorizLat, closeTo(100.0, tol));
     },
   );
 }
