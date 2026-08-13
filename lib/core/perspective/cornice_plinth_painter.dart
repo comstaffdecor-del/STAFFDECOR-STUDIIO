@@ -26,6 +26,7 @@ import 'dart:ui';
 import 'persp_geometry.dart';
 import 'vanishing_point.dart';
 import 'profile_strip.dart';
+import 'strip_px_from_dims.dart';
 
 /// ⚠️ CORRECTION Bug "bande diagonale décrochée" (retour utilisateur :
 /// "aucun suivi de la perspective... l'appli doit fonctionner avec
@@ -92,6 +93,29 @@ class StripThickness {
     faceHorizFond: pH * 0.115,
     faceMurLat: pH * 0.095,
     faceHorizLat: pH * 0.165,
+  );
+
+  /// Construit un [StripThickness] à partir d'un [StripPxResult] déjà
+  /// résolu (dimensions réelles du profil converties en pixels canvas,
+  /// voir `strip_px_from_dims.dart`).
+  ///
+  /// Factory PURE : copie 1:1 les 4 champs de [StripPxResult] vers les 4
+  /// champs de [StripThickness] (mêmes 4 grandeurs, même unité px), sans
+  /// aucun calcul. Volontairement placée ICI (dans ce fichier, qui
+  /// importe déjà `dart:ui`) plutôt que côté `strip_px_from_dims.dart` —
+  /// ce dernier reste pur et sans dépendance vers le peintre ; c'est ce
+  /// fichier qui dépend de la conversion mm→px, jamais l'inverse.
+  ///
+  /// Cette factory ne gère PAS le cas où la conversion n'a pas pu être
+  /// calculée (dimensions absentes, `metresHauteur<=0`) : dans ce cas,
+  /// `stripPxFromDims` renvoie `null` et c'est à l'appelant de retomber
+  /// sur [StripThickness.corniceDefault]/[StripThickness.plintheDefault]
+  /// plutôt que d'appeler cette factory.
+  factory StripThickness.fromPx(StripPxResult r) => StripThickness(
+    faceMurFond: r.faceMurFondPx,
+    faceHorizFond: r.faceHorizFondPx,
+    faceMurLat: r.faceMurLatPx,
+    faceHorizLat: r.faceHorizLatPx,
   );
 }
 
