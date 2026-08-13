@@ -25,7 +25,9 @@ import 'cornice_plinth_painter.dart';
 import 'moulure_painter.dart';
 import 'other_families_painter.dart';
 import 'product_texture_cache.dart';
+import 'profile_dims_cache.dart';
 import 'ratio_lookup.dart';
+import 'strip_px_from_dims.dart';
 
 /// Dessine la pièce (photo + architecture démo si aucune photo) et,
 /// optionnellement, les produits sélectionnés en perspective réelle.
@@ -36,6 +38,18 @@ class RoomPainter extends CustomPainter {
   final List<ProjectItem> selectedProducts;
   final Map<String, SnapPos> prodPositions;
   final bool withProducts;
+  final double metresHauteur;
+
+  // ⚠️ static final, PAS un champ d'instance : construit UNE SEULE FOIS
+  // pour toute la durée du process, jamais recréé à chaque nouvelle
+  // instance de RoomPainter (RoomPainter est reconstruit à chaque frame
+  // par les ListenableBuilder de studio_screen.dart/comparateur_screen.dart
+  // — un Listenable.merge par instance serait un objet jetable recréé en
+  // pure perte, sans aucun bénéfice, à chaque frame).
+  static final Listenable _repaintSource = Listenable.merge([
+    ProductTextureCache.instance,
+    ProfileDimsCache.instance,
+  ]);
 
   RoomPainter({
     required this.roomImage,
@@ -44,8 +58,10 @@ class RoomPainter extends CustomPainter {
     required this.selectedProducts,
     required this.prodPositions,
     this.withProducts = true,
-  }) : super(repaint: ProductTextureCache.instance);
-  // ⚠️ repaint: branché explicitement sur ProductTextureCache.instance.
+    required this.metresHauteur,
+  }) : super(repaint: _repaintSource);
+  // ⚠️ repaint: branché explicitement sur Listenable.merge([ProductTextureCache
+  // .instance, ProfileDimsCache.instance]) — voir _repaintSource ci-dessus.
   //
   // Sans ce paramètre, CustomPainter._repaint reste null et
   // CustomPainter.addListener(...) — appelé par RenderCustomPaint sur
@@ -69,18 +85,32 @@ class RoomPainter extends CustomPainter {
   // plutôt qu'à réutiliser l'instance existante — un chemin entièrement
   // extérieur à shouldRepaint.
   //
-  // ProductTextureCache n'a, lui, aucun AppState équivalent au-dessus de
-  // lui pour déclencher ce rebuild d'ancêtre : le
+  // Ni ProductTextureCache ni ProfileDimsCache n'ont, eux, un AppState
+  // équivalent au-dessus d'eux pour déclencher ce rebuild d'ancêtre : les
   // ListenableBuilder(listenable: ProductTextureCache.instance, ...) qui
-  // enveloppe CustomPaint dans studio_screen.dart et
-  // comparateur_screen.dart ne fait que reconstruire une NOUVELLE
+  // enveloppent CustomPaint dans studio_screen.dart et
+  // comparateur_screen.dart ne font que reconstruire une NOUVELLE
   // instance de RoomPainter — pas l'ancêtre — donc shouldRepaint reste
   // le seul juge, et il dit non.
   //
   // Ce super(repaint: ...) active le vrai chemin CustomPainter.addListener
   // (géré par RenderCustomPaint, attach/detach automatique — pas de fuite
-  // avec ce singleton) et rend CE repaint garanti, indépendamment du
-  // rebuild d'ancêtre dont dépendent les autres champs.
+  // avec ce singleton, ni avec le Listenable.merge qui l'englobe, lui
+  // aussi construit une seule fois) et rend CE repaint garanti,
+  // indépendamment du rebuild d'ancêtre dont dépendent les autres champs.
+  //
+  // ⚠️ "Pop" de première frame (comportement VOULU, pas un bug) : pour les
+  // 8 refs couvertes par assets/profiles/ (D705, D718, D720, 0900, 1000,
+  // 1005, 1145c, 20-54), la toute première frame après ajout au projet
+  // affiche le repli StripThickness.corniceDefault(pH) (27,5/70 pour
+  // pH=500 — ProfileDimsCache.getIfLoaded renvoie encore `null`, chargement
+  // asynchrone pas terminé), PUIS bascule sur les dimensions réelles
+  // (40,6/39,8 pour D720, pH=500) dès que ProfileDimsCache notifie — via
+  // exactement ce Listenable.merge. Identique, dans son mécanisme, au
+  // "pop" déjà existant sur la texture produit (ProductTextureCache) : ni
+  // l'un ni l'autre n'est une régression de ce commit, c'est la latence
+  // réseau/disque incompressible entre le premier paint() et la résolution
+  // du cache.
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -160,6 +190,31 @@ class RoomPainter extends CustomPainter {
 
       switch (fam) {
         case 'Corniches':
+          // ⚠️ Conversion métrique réelle (mm -> px), remplace le repli en
+          // dur StripThickness.corniceDefault(pH) SEUL par un essai de
+          // dimensions réelles (profil JSON, assets/profiles/<ref>.json)
+          // quand disponibles — voir corniceFor (cornice_plinth_painter.dart)
+          // pour la sélection pure, et stripPxFromDims (strip_px_from_dims
+          // .dart) pour la conversion. `ensureLoading` + `getIfLoaded`
+          // immédiat, même pattern que ProductTextureCache juste au-dessus :
+          // asynchrone, jamais bloquant dans paint(), repaint garanti par
+          // _repaintSource (Listenable.merge) dès que ProfileDimsCache
+          // notifie. Repli sur corniceDefault(pH) tant que rien n'est en
+          // cache (voir "pop" de première frame documenté au constructeur).
+          //
+          // Site 'Plinthes' (juste en dessous) volontairement INTACT :
+          // aucun profil JSON de plinthe n'existe à ce jour dans le
+          // catalogue (voir docstring de strip_px_from_dims.dart).
+          ProfileDimsCache.instance.ensureLoading(item.ref);
+          final dims = ProfileDimsCache.instance.getIfLoaded(item.ref);
+          final stripPx = dims == null
+              ? null
+              : stripPxFromDims(
+                  pH: pH,
+                  metresHauteur: metresHauteur,
+                  retombeeMm: dims.retombeeMm,
+                  projectionMm: dims.projectionMm,
+                );
           paintCorniceSet(
             canvas,
             vp,
@@ -167,7 +222,7 @@ class RoomPainter extends CustomPainter {
             fTR: cp.ceilR,
             wallTL: cp.wallTL,
             wallTR: cp.wallTR,
-            th: StripThickness.corniceDefault(pH),
+            th: corniceFor(stripPx, pH),
             ratio: ratio,
             texture: texture,
           );

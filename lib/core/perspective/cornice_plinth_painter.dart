@@ -119,6 +119,23 @@ class StripThickness {
   );
 }
 
+/// Sélection pure de l'épaisseur à utiliser pour une CORNICHE : si [r]
+/// (résultat déjà résolu de `stripPxFromDims`, voir `strip_px_from_dims.dart`)
+/// est disponible, on l'utilise (`StripThickness.fromPx`) ; sinon on retombe
+/// sur [StripThickness.corniceDefault].
+///
+/// Extraite du site d'appel `room_painter.dart` (case 'Corniches') pour
+/// rendre le verrouillage bit-à-bit testable SANS `TestWidgetsFlutterBinding`
+/// ni rendu : une simple assertion à quatre champs sur un appel de fonction.
+/// `paint()` se réduit alors à `th: corniceFor(r, pH)`.
+///
+/// Ne concerne QUE les corniches — la plinthe garde
+/// `StripThickness.plintheDefault(pH)` en dur au site d'appel, aucun profil
+/// JSON de plinthe n'existant à ce jour dans le catalogue (voir docstring
+/// de `strip_px_from_dims.dart`).
+StripThickness corniceFor(StripPxResult? r, double pH) =>
+    r == null ? StripThickness.corniceDefault(pH) : StripThickness.fromPx(r);
+
 /// Dessine une corniche continue de [wallTL] à [wallTR], en passant par
 /// [fTL]→[fTR] (mur du fond), avec onglets géométriques réels aux angles
 /// si les murs latéraux existent (longueur > 8px canvas — même seuil que

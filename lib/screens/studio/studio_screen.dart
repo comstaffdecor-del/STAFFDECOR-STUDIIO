@@ -278,6 +278,7 @@ class _PhotoZone extends StatelessWidget {
                     selectedProducts: state.selectedProducts,
                     prodPositions: state.prodPositions,
                     withProducts: state.showProductOverlay,
+                    metresHauteur: state.metresHauteur,
                   ),
                   size: size,
                 ),

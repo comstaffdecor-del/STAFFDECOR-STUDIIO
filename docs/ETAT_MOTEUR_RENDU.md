@@ -361,6 +361,19 @@ perspective en pixels canvas) à une grandeur métrique réelle :
 implémentée** dans le code actuel — elle est formulée ici comme le point
 de branchement identifié, pas comme un fait du code.
 
+> **Mise à jour (voir footer « Statut »)** : cette affirmation ne vaut
+> plus que pour la famille PLINTHE. Pour la famille CORNICHE, la relation
+> est désormais implémentée (`lib/core/perspective/strip_px_from_dims.dart`,
+> `pxParMm`) et branchée dans `room_painter.dart` (case `'Corniches'`, via
+> `corniceFor` de `cornice_plinth_painter.dart`), mais UNIQUEMENT pour les
+> 8 références couvertes par `assets/profiles/*.json` — les 275 autres
+> références de corniche, ainsi que la totalité de la famille plinthe,
+> continuent de dépendre exclusivement des coefficients en dur
+> `StripThickness.corniceDefault(pH)`/`.plintheDefault(pH)` décrits plus
+> haut dans ce document. Le reste de cette section (métrique produit
+> hors 8 refs couvertes, plinthe, décisions en attente) reste
+> intégralement valide.
+
 `metresHauteur` : champ de `lib/state/app_state.dart`, ligne 81
 (`double metresHauteur = 2.5;`), lu et écrit par ailleurs aux lignes 585,
 606, 769, 800, 837, 901-902 de ce même fichier. Saisi par l'utilisateur
@@ -437,6 +450,20 @@ rédaction), couvrant l'historique jusqu'au commit `5580799` inclus
 test ou rendu n'a été exécuté pour la rédaction de ce document — seules
 des commandes de lecture (`git show`, `git log`, `grep`, lecture directe
 de fichiers) ont été utilisées.
+
+**Mise à jour du 2026-08-13** (date système du sandbox à la rédaction de
+cette mise à jour) : câblage de la conversion métrique mm→px dans le
+peintre pour la famille CORNICHE (voir note ajoutée en section 6) —
+troisième et dernier commit d'une séquence de trois (`StripThickness
+.fromPx` seul, puis `ProfileDimsCache`, puis ce câblage). Couvre
+l'historique jusqu'au commit de ce câblage inclus (premier de la séquence
+à changer quelque chose de visible à l'écran : voir section 6 pour le
+périmètre exact — 8 références sur 283, corniche seule, plinthe
+inchangée). Hash de ce commit non connu au moment de la rédaction de
+cette ligne (rédigée dans le même commit) — voir `git log --oneline -1`
+pour le résoudre après coup. `flutter analyze` propre et suite de tests
+`flutter test` (98 tests, tout le dépôt) intégralement verte au moment de
+cette mise à jour.
 
 **Mise à jour du 2026-08-12** (date système du sandbox à la rédaction de
 cette mise à jour) : correction de la section 5, qui affirmait à tort
