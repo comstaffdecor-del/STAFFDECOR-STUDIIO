@@ -459,9 +459,11 @@ troisième et dernier commit d'une séquence de trois (`StripThickness
 l'historique jusqu'au commit de ce câblage inclus (premier de la séquence
 à changer quelque chose de visible à l'écran : voir section 6 pour le
 périmètre exact — 8 références sur 283, corniche seule, plinthe
-inchangée). Hash de ce commit non connu au moment de la rédaction de
-cette ligne (rédigée dans le même commit) — voir `git log --oneline -1`
-pour le résoudre après coup. `flutter analyze` propre et suite de tests
+inchangée). Hash de ce commit : `7440195` (rédigé après coup — l'entrée
+initiale renvoyait au `git log --oneline -1` faute de connaître le hash
+avant l'écriture de son propre commit ; corrigé ici par une modification
+distincte, sans reword du commit `7440195` lui-même, pour ne pas rouvrir
+un commit déjà clos). `flutter analyze` propre et suite de tests
 `flutter test` (98 tests, tout le dépôt) intégralement verte au moment de
 cette mise à jour.
 
