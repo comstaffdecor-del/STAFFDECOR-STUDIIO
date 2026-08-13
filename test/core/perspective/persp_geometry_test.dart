@@ -193,4 +193,108 @@ void main() {
       },
     );
   });
+
+  // ---------------------------------------------------------------------
+  // perpUp (plinthe) — ajouté en commit additif après 5f4de67, suite à
+  // une réserve explicite : 5f4de67 ne couvre que perpDown/corniche.
+  // perpUp n'est PAS du code mort — grep -n "perpUp" lib/ confirme trois
+  // appels réels dans cornice_plinth_painter.dart::paintPlintheSet
+  // (upFond, upLatG, upLatD), donc le tester a un objet.
+  //
+  // Mutation testing appliquée le 2026-08-13, séparément de celle de
+  // perpDown : suppression de la négation dans perpUp (devient un
+  // doublon de perpDown au lieu de son opposé), suite complète relancée
+  // (102 tests, avec 5f4de67 déjà en place) -> `All tests passed!`.
+  // Confirme que 5f4de67 ne couvre PAS indirectement le chemin plinthe :
+  // ce commit additif a un objet réel, ce n'est pas un doublon inutile.
+  // Fichier de production ensuite restauré depuis backup, `git diff
+  // --stat` réverifié vide avant d'écrire ce group.
+  // ---------------------------------------------------------------------
+  group('perpUp — convention canvas Y-up, segment du sol du fond', () {
+    // Arête sol représentative : quasi horizontale (fBL.dy == fBR.dy),
+    // comme dans l'appel réel `perpUp(fBL, fBR, th.faceMurFond)` de
+    // `paintPlintheSet`. Y plus grand qu'un exemple de ligne plafond
+    // typique, cohérent avec une scène où le sol est sous le plafond.
+    const fBL = Offset(100.0, 600.0);
+    const fBR = Offset(700.0, 600.0);
+
+    test(
+      'Fixture A (synthétique, ordre de grandeur D704 — mêmes valeurs '
+      'que le group perpDown ci-dessus, retombée > projection) : le '
+      'haut de la bande produit par perpUp() se trouve strictement '
+      'AU-DESSUS de l\'arête sol (dy décroissant = monte, convention '
+      'canvas Flutter Y vers le bas), et l\'amplitude de la montée vaut '
+      'th.faceMurFond — jamais th.faceHorizFond. Passe par le pipeline '
+      'réel stripPxFromDims -> corniceFor, comme le group perpDown, '
+      'pour ne pas mélanger les styles de fixture dans ce fichier.',
+      () {
+        final faceMurFond = faceMurFondPourFixtureSynthetique(
+          retombeeMmSynthetique: 73.0,
+          projectionMmSynthetique: 49.0,
+        );
+
+        final offset = perpUp(fBL, fBR, faceMurFond);
+        final topL = fBL + offset;
+        final topR = fBR + offset;
+
+        expect(
+          topL.dy,
+          lessThan(fBL.dy),
+          reason:
+              'Le sommet haut doit être STRICTEMENT au-dessus de l\'arête '
+              'sol (dy canvas croît vers le bas, donc "monter" = dy plus '
+              'petit) : la plinthe monte vers l\'intérieur de la pièce, '
+              'jamais en dessous du niveau du sol.',
+        );
+        expect(topR.dy, lessThan(fBR.dy));
+        expect(offset.dy, closeTo(-faceMurFond, tol));
+      },
+    );
+
+    test(
+      'Fixture B (synthétique, ordre de grandeur D621 — mêmes valeurs '
+      'que le group perpDown ci-dessus, retombée < projection, RATIO '
+      'OPPOSÉ à la fixture A) : même invariant que la fixture A malgré '
+      'le ratio inversé — même rôle discriminant que pour perpDown.',
+      () {
+        final faceMurFond = faceMurFondPourFixtureSynthetique(
+          retombeeMmSynthetique: 102.0,
+          projectionMmSynthetique: 122.0,
+        );
+
+        final offset = perpUp(fBL, fBR, faceMurFond);
+        final topL = fBL + offset;
+        final topR = fBR + offset;
+
+        expect(
+          topL.dy,
+          lessThan(fBL.dy),
+          reason:
+              'Le sommet haut doit être STRICTEMENT au-dessus de l\'arête '
+              'sol, même avec un profil dont la projection dépasse la '
+              'retombée (ratio opposé à la fixture A).',
+        );
+        expect(topR.dy, lessThan(fBR.dy));
+        expect(offset.dy, closeTo(-faceMurFond, tol));
+      },
+    );
+
+    test(
+      'RÉGRESSION DE MUTATION (documentaire) : cette assertion est '
+      'formulée pour rougir immédiatement si perpUp() perdait sa '
+      'négation par rapport à perpDown() (mutation testée manuellement '
+      'le 2026-08-13 : Offset(-p.dx, -p.dy) -> Offset(p.dx, p.dy), '
+      'suite complète alors verte à 102/102 SANS ce group — la preuve '
+      'que ce chemin était non couvert malgré 5f4de67). Segment '
+      'purement horizontal (dy=0) : perpUp doit renvoyer un décalage '
+      'purement vertical (dx≈0) et négatif (dy<0) ; la mutation '
+      'renverrait dy>0 ici (identique à perpDown au lieu de son '
+      'opposé).',
+      () {
+        final offset = perpUp(fBL, fBR, 27.5);
+        expect(offset.dx, closeTo(0.0, tol));
+        expect(offset.dy, lessThan(0.0));
+      },
+    );
+  });
 }
