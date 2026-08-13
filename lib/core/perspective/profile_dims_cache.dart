@@ -139,13 +139,25 @@ class ProfileDimsCache extends ChangeNotifier {
     // plusieurs produits) planifieraient deux microtâches de chargement
     // pour le même ref.
     _loading.add(ref);
-    // Invariant STRUCTUREL, pas correctif ponctuel (voir 97879ac pour le
-    // raisonnement complet) : tout le travail réel — y compris la
-    // consultation du manifeste — est différé à une microtâche, jamais
-    // exécuté directement dans la pile d'appel de ensureLoading. Ceci
-    // garantit qu'aucune notifyListeners() ne peut jamais partir de
-    // façon synchrone, quoi que contienne le corps de _resolve, y
-    // compris du code qui n'existe pas encore.
+    // Garde défensive calquée sur ProductTextureCache (97879ac) : tout le
+    // travail réel — y compris la consultation du manifeste — est différé
+    // à une microtâche plutôt qu'exécuté directement dans la pile d'appel
+    // de ensureLoading. Objectif : qu'aucun futur préfixe synchrone
+    // susceptible de lever, ajouté en tête de _resolve, ne puisse faire
+    // partir notifyListeners() de façon synchrone.
+    //
+    // Portée réelle, vérifiée par mutation testing (flutter test
+    // test/core/perspective/ avec ce microtask retiré → 35/35 tests
+    // passent toujours, y compris le test dédié à cet invariant dans
+    // profile_dims_cache_test.dart) : garantie par construction, NON
+    // couverte par un test aujourd'hui, par absence de chemin
+    // déclencheur. _resolve commence par `await
+    // _ensureCoveredRefsLoaded()` — aucun code synchrone susceptible de
+    // lever ne précède la première suspension, donc rien n'exerce
+    // actuellement la différence entre appel direct et microtâche. Ce
+    // n'est pas le cas de ProductTextureCache._load, dont le Uri.parse
+    // pré-await était le vrai défaut corrigé par 97879ac — d'où un test
+    // qui, lui, verrouille réellement l'invariant côté texture.
     Future.microtask(() => _resolve(ref));
   }
 
