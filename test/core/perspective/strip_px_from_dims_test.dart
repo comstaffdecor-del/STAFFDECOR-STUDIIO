@@ -112,16 +112,21 @@ void main() {
   });
 
   test(
-    'D705, pH=500, metresHauteur=2.5 -> conversion métrique réelle, '
-    'SEUL profil du lot avec axe y inversé (max(y)==0 côté plafond au '
-    'lieu de min(y)==0) : exerce la normalisation sign-insensible du '
-    'loader (distance absolue au plan de pose) en aval de cette '
-    'conversion. Valeurs épinglées en littéraux, calculées à la main '
-    'par lecture directe de profil_mm/face_pose_mur/face_pose_plafond '
-    'dans assets/profiles/D705.json puis vérifiées par calcul '
-    'indépendant (retombeeMm=102.661, projectionMm=101.4526, '
-    'cohérent avec bbox_mm={w:101.453,h:102.661}) — PAS recalculées ici '
-    'à partir de 0.080/0.055, pour ne pas rendre ce test tautologique.',
+    'D705, pH=500, metresHauteur=2.5 -> conversion métrique réelle. '
+    'CE TEST NE VÉRIFIE PAS LE SIGNE : stripPxFromDims reçoit ici deux '
+    'double en millimetres déjà calculés (littéraux), le loader n\'est '
+    'jamais appelé, aucune information de signe ne traverse cette '
+    'fonction. La couverture de l\'axe y inversé de D705 vit dans '
+    'profile_dims_test.dart, où D705.json est réellement lu depuis '
+    'l\'asset. Ce que ce cas apporte ICI : un TROISIÈME jeu de valeurs '
+    'indépendant (D720, D718, D705) pour verrouiller l\'arithmétique '
+    'de conversion elle-même. Valeurs épinglées en littéraux, calculées '
+    'à la main par lecture directe de '
+    'profil_mm/face_pose_mur/face_pose_plafond dans '
+    'assets/profiles/D705.json puis vérifiées par calcul indépendant '
+    '(retombeeMm=102.661, projectionMm=101.4526, cohérent avec '
+    'bbox_mm={w:101.453,h:102.661}) — PAS recalculées ici à partir de '
+    '0.080/0.055, pour ne pas rendre ce test tautologique.',
     () {
       final r = stripPxFromDims(
         pH: 500.0,
@@ -245,9 +250,12 @@ void main() {
       );
       expect(r, isNull);
 
-      // Valeurs lues sur l'objet réel, pas recalculées : si
-      // corniceDefault change, ces expect changent avec lui et le
-      // test reste un miroir fidèle plutôt qu'une copie figée.
+      // Valeurs lues sur l'objet réel, pas recalculées : c'est bien
+      // la garantie voulue. Si corniceDefault change un jour, ces
+      // expect contre 27.5/70.0/40.0/100.0 ECHOUERONT — c'est ça, le
+      // verrou. (À ne pas « réparer » en recalculant depuis les
+      // coefficients de la factory : cela annulerait le verrou et
+      // ferait passer le test même en cas de régression.)
       expect(attendu.faceMurFond, closeTo(27.5, tol));
       expect(attendu.faceHorizFond, closeTo(70.0, tol));
       expect(attendu.faceMurLat, closeTo(40.0, tol));
