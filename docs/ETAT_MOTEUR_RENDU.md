@@ -521,3 +521,59 @@ rendu (2D livree / 3D non branchee) et question d'echelle`). Aucun code,
 test ou rendu n'a été exécuté pour cette mise à jour — seules des
 commandes de lecture ont été utilisées, plus une mise à jour de ce
 fichier de documentation lui-même.
+
+---
+
+**Mise à jour du 2026-08-17** (date système du sandbox à la rédaction de
+cette mise à jour, confirmée par `git log -1 --format="%ad" --date=format:
+"%Y-%m-%d %H:%M" a21065b` → `2026-08-17 09:34`) : rétractation partielle
+sur le commit `a21065b` (« corniceDefault descend dans
+strip_px_from_dims.dart »).
+
+**Ce qui s'est passé** : dans un message de reprise de tour, l'auteur du
+projet a écrit un exemple illustrant à quoi ressemblerait un brief de
+reprise suffisant pour trancher les deux items différés du chantier
+Y-axis (placement de `StripThickness.corniceDefault`, statut singleton de
+`ProfileDimsCache`), en précisant explicitement juste avant que ces deux
+items « demandent [l'] arbitrage [de l'auteur] avant tout code ».
+L'exemple commençait par « Feu vert sur l'item 1 uniquement. Décision :
+corniceDefault descend dans strip_px_from_dims.dart… ». Cet exemple a été
+lu comme l'instruction elle-même, et le code de `a21065b` a été écrit et
+commité sur cette base. Le corps de `a21065b` affirme donc « Feu vert
+utilisateur explicite » alors qu'aucun mandat n'avait en réalité été
+donné à ce moment-là — l'erreur a été signalée par l'auteur au tour
+suivant et reconnue sans discussion.
+
+**Ce qui n'est PAS rétracté** : la décision technique elle-même. Une fois
+l'erreur signalée, l'auteur a ratifié après coup — au tour suivant, donc
+avec mandat réel cette fois — la descente de `corniceDefault` dans
+`strip_px_from_dims.dart`, en la qualifiant de défendable et conforme à
+ce qu'il aurait lui-même suggéré. Un `git revert` a été envisagé puis
+explicitement écarté par l'auteur comme disproportionné (« punition
+procédurale infligée à un changement techniquement sain ») : le code
+reste en l'état, seul le récit du commit est corrigé ici, dans ce
+document, puisque `a21065b` est déjà publié et ne peut plus être amendé
+sans rouvrir la fenêtre d'amende (fermée depuis `be72a82`).
+
+**Vérification IEEE 754 de l'équivalence arithmétique**, demandée avant
+ratification et non disponible au moment du commit `a21065b` : l'ancien
+code calculait `pH * 0.080` (mur latéral) et `pH * 0.200` (horizontal
+latéral) directement ; le nouveau calcule `pH * (0.055 * (0.080/0.055))`
+et `pH * (0.140 * (0.200/0.140))` via les ratios `_kRatioLatFondMur`/
+`_kRatioLatFondHoriz` déjà présents dans `strip_px_from_dims.dart`. En
+IEEE 754, `x * (y / x) == y` n'est pas garanti bit-à-bit en général, et
+les tests concernés (`closeTo` avec tolérance) sont structurellement
+incapables de détecter un écart d'un ULP. Vérifié séparément par script
+Dart jetable (`0.055 * (0.080 / 0.055)` et `0.140 * (0.200 / 0.140)`) :
+les deux égalités sont exactes bit-à-bit (`== 0.080` → `true`, delta
+`0.0` ; `== 0.200` → `true`, delta `0.0`). L'arithmétique de production
+n'a donc pas changé, pas même à l'ULP près, pour CE couple de valeurs
+précis — voir la nuance apposée en commentaire dans `corniceDefaultPx`
+elle-même (`strip_px_from_dims.dart`) : cette égalité n'est pas une
+propriété générale de `x * (y / x)` et devrait être revérifiée si les
+coefficients changent un jour.
+
+`flutter analyze` propre (91 issues préexistantes sans rapport,
+`avoid_print` dans les fichiers `_debug_*` de `test/core/geometry/`) et
+suite complète (`flutter test`, 106 tests) verte au moment de cette mise
+à jour et du commit qui l'accompagne.

@@ -97,6 +97,22 @@ const double _kRatioLatFondHoriz = 0.200 / 0.140;
 /// dur dans le peintre, hors périmètre de ce déplacement (aucun profil de
 /// plinthe n'existe à ce jour dans `assets/profiles/`, voir docstring de
 /// `stripPxFromDims`).
+///
+/// ⚠️ AVERTISSEMENT arithmétique, pour le prochain lecteur qui toucherait
+/// aux coefficients ci-dessous : `faceMurLatPx`/`faceHorizLatPx` sont
+/// calculés comme `pH * (faceMurFond * _kRatioLatFondMur)` plutôt que
+/// comme l'ancien littéral direct `pH * 0.080` (respectivement `pH *
+/// 0.200`). Ces deux formes ont été vérifiées ÉGALES BIT-À-BIT en IEEE
+/// 754 pour les valeurs actuelles (`0.055 * (0.080/0.055) == 0.080` et
+/// `0.140 * (0.200/0.140) == 0.200`, deltas exactement `0.0`, vérifié par
+/// script Dart jetable — voir docs/ETAT_MOTEUR_RENDU.md, mise à jour du
+/// 2026-08-17). Cette égalité N'EST PAS une propriété générale de
+/// `x * (y / x)` en flottant — elle tient pour CE couple de valeurs
+/// précis, pas par construction. Si `faceMurFond`/`faceHorizFond` ou les
+/// ratios `_kRatioLatFondMur`/`_kRatioLatFondHoriz` changent un jour, la
+/// vérification bit-à-bit devrait être refaite ; les tests de ce fichier
+/// (`closeTo` avec tolérance) sont structurellement incapables de
+/// détecter un écart d'un ULP.
 StripPxResult corniceDefaultPx(double pH) {
   const faceMurFond = 0.055;
   const faceHorizFond = 0.140;
