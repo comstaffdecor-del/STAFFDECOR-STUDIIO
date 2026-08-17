@@ -79,12 +79,14 @@ class StripThickness {
   /// Épaisseurs par défaut pour une CORNICHE, proportionnelles à [pH]
   /// (port exact des coefficients 0.055/0.140 fond, 0.080/0.200 latéral
   /// de l'ancien code mort `Corniches_DISABLED`).
-  factory StripThickness.corniceDefault(double pH) => StripThickness(
-    faceMurFond: pH * 0.055,
-    faceHorizFond: pH * 0.140,
-    faceMurLat: pH * 0.080,
-    faceHorizLat: pH * 0.200,
-  );
+  ///
+  /// Délègue à [corniceDefaultPx] (`strip_px_from_dims.dart`) : les
+  /// coefficients ne sont plus portés en dur ici — ce fichier importe la
+  /// valeur au lieu de la définir, pour la même raison que
+  /// `stripPxFromDims` ne porte plus les siens (une seule source de
+  /// vérité, voir la docstring de `corniceDefaultPx`).
+  factory StripThickness.corniceDefault(double pH) =>
+      StripThickness.fromPx(corniceDefaultPx(pH));
 
   /// Épaisseurs par défaut pour une PLINTHE (coefficients 0.065/0.115
   /// fond, 0.095/0.165 latéral — port exact de `Plinthes_DISABLED`).

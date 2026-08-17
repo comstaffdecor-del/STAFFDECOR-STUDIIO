@@ -79,6 +79,37 @@ typedef StripPxResult = ({
 const double _kRatioLatFondMur = 0.080 / 0.055;
 const double _kRatioLatFondHoriz = 0.200 / 0.140;
 
+/// Coefficients par défaut pour une CORNICHE (proportionnels à [pH]),
+/// utilisés quand aucune dimension réelle n'est disponible (275 des 283
+/// références du catalogue, sans profil JSON).
+///
+/// ⚠️ Descendus ici depuis `StripThickness.corniceDefault`
+/// (`cornice_plinth_painter.dart`) pour la même raison que le reste de ce
+/// fichier : une seule source de vérité pour ces quatre coefficients,
+/// dans le fichier qui détient déjà `_kRatioLatFondMur`/
+/// `_kRatioLatFondHoriz` dont ils dérivent (`0.080/0.055` = 0.080/0.055,
+/// `0.200/0.140` = 0.200/0.140 — les deux ratios sont exactement ceux
+/// appliqués ci-dessous). `StripThickness.corniceDefault` délègue à cette
+/// fonction plutôt que de porter les coefficients en dur ; le peintre
+/// IMPORTE cette valeur, il ne la définit plus.
+///
+/// Ne concerne QUE la corniche — `StripThickness.plintheDefault` reste en
+/// dur dans le peintre, hors périmètre de ce déplacement (aucun profil de
+/// plinthe n'existe à ce jour dans `assets/profiles/`, voir docstring de
+/// `stripPxFromDims`).
+StripPxResult corniceDefaultPx(double pH) {
+  const faceMurFond = 0.055;
+  const faceHorizFond = 0.140;
+  final faceMurFondPx = pH * faceMurFond;
+  final faceHorizFondPx = pH * faceHorizFond;
+  return (
+    faceMurFondPx: faceMurFondPx,
+    faceHorizFondPx: faceHorizFondPx,
+    faceMurLatPx: pH * (faceMurFond * _kRatioLatFondMur),
+    faceHorizLatPx: pH * (faceHorizFond * _kRatioLatFondHoriz),
+  );
+}
+
 /// Calcule les épaisseurs en pixels des quatre faces d'un segment
 /// (fond + latéral), à partir des dimensions réelles (mm) d'un profil et
 /// du facteur d'échelle courant de la scène (`pH`, `metresHauteur`).

@@ -406,4 +406,26 @@ void main() {
       expect(attendu.faceHorizLat, closeTo(100.0, tol));
     },
   );
+
+  test(
+    'corniceDefaultPx(pH) — descente des coefficients 0.055/0.140/0.080/'
+    '0.200 depuis StripThickness.corniceDefault (cornice_plinth_painter.dart) '
+    'vers ce fichier, décidée pour que le peintre importe cette valeur au '
+    'lieu de la porter en dur : une seule source de vérité pour ces quatre '
+    'coefficients, dans le même fichier que _kRatioLatFondMur/'
+    '_kRatioLatFondHoriz dont ils dérivent. Valeurs épinglées en littéraux '
+    '(27.5/70.0/40.0/100.0), PAS recalculées à partir de 0.055/0.140 ici : '
+    'ce sont exactement les mêmes littéraux que le test de non-régression '
+    'ci-dessus, qui continue de les vérifier via '
+    'StripThickness.corniceDefault(500) — les deux tests doivent rester '
+    'verts simultanément, preuve que la délégation ne change aucun '
+    'comportement observable.',
+    () {
+      final r = corniceDefaultPx(500.0);
+      expect(r.faceMurFondPx, closeTo(27.5, tol));
+      expect(r.faceHorizFondPx, closeTo(70.0, tol));
+      expect(r.faceMurLatPx, closeTo(40.0, tol));
+      expect(r.faceHorizLatPx, closeTo(100.0, tol));
+    },
+  );
 }
