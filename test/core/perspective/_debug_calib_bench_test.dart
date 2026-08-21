@@ -249,4 +249,70 @@ void main() {
       candidateLabel: 'MODERNE - ITERATION 1',
     );
   });
+
+  test('banc d\'essai (non commité) : scandinave.jpg — itération 1', () async {
+    final projectRoot = Directory.current.path;
+    final photoPath = '$projectRoot/assets/demo_scenes/scandinave.jpg';
+    final bytes = await File(photoPath).readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final roomImage = frame.image;
+
+    // Canvas RÉEL 1400x975, letterboxing calculé via la formule exacte de
+    // computeImgDraw (lib/state/app_state.dart) pour scandinave.jpg
+    // (1920x1088) : scale=min(1400/1920, 975/1088)=0.729167,
+    // dw=1920*0.729167=1400.00, dh=1088*0.729167=793.33,
+    // dx=(1400-1400)/2=0.00, dy=(975-793.33)/2=90.83.
+    const size = Size(1400.0, 975.0);
+    const imgDraw = ImgDraw(dx: 0.0, dy: 90.83, dw: 1400.0, dh: 793.33, scale: 0.729167);
+
+    Directory('/tmp/diag_room_painter').createSync(recursive: true);
+
+    // ── ITERATION 1 — coin réel de la pièce localisé à x≈82.8% (vérifié
+    // vertical : x=82.80/81.70/81.65/81.70/82.80/82.80/82.80% sur y=5→75%,
+    // écart max 1.15 point — angle de pièce réel, pas une fuite oblique).
+    // MUR DU FOND retenu = panneau bois brun (x>83%, jusqu'au bord droit
+    // du cadre) : c'est le plan quasi perpendiculaire à la caméra qui
+    // ferme la profondeur visible ; le mur à étagères+poutre (x<83%) est
+    // le mur LATERAL gauche qui fuit (raison pour laquelle sa ligne
+    // plafond n'a jamais donné de crête nette en bande serrée : atténuée
+    // par le raccourci de perspective).
+    //
+    // Ligne plafond (mesurée, bande serrée ±2% autour de la cible visuelle
+    // y≈2.7-3.5%, gradient + saturation rapportés par point, aucune valeur
+    // metallique — R>G>B constant, bois mat) :
+    //   x=83.0% -> y=2.65% (grad=-83.0, sat=29.0)
+    //   x=98.0% -> y=3.35% (grad=-39.3, sat=19.5)
+    //   -> pente mesurée ≈ +0.046 %y/%x, montée monotone, pas de bruit.
+    // Ligne plinthe (même méthode, cible y≈83.5-83.7%) :
+    //   x=83.0% -> y=83.65% (grad=+93.3, sat=41.5)
+    //   x=98.0% -> y=83.45% (grad=+25.9, sat=30.5)
+    //   -> pente mesurée ≈ -0.015 %y/%x.
+    // Intersection des deux droites : x≈1402%, y≈63.4% (hors cadre, ~14x
+    // la largeur) -> mur du fond LEGEREMENT OBLIQUE (pentes non nulles et
+    // de signes opposés), PAS frontal, mais point de fuite très éloigné :
+    // obliquité faible, rapportée telle que mesurée, ni forcée ni niée.
+    // wallTL/wallTR/wallBL/wallBR (mur latéral gauche, x<83%) : ESTIMATION
+    // non mesurée avec la même rigueur (bande serrée non concluante sur ce
+    // plan, cf. rapport) — bornes de cadre approximatives seulement.
+    const candidateScandinaveIt1 = PerspCalib(
+      ceilL: CalibPoint(xPct: 0.830, yPct: 0.0265),
+      ceilR: CalibPoint(xPct: 0.993, yPct: 0.0335),
+      floorL: CalibPoint(xPct: 0.830, yPct: 0.8365),
+      floorR: CalibPoint(xPct: 0.993, yPct: 0.8345),
+      wallTL: CalibPoint(xPct: 0.00, yPct: 0.047), // ESTIMATION non mesurée
+      wallTR: CalibPoint(xPct: 1.00, yPct: 0.034), // ESTIMATION non mesurée
+      wallBL: CalibPoint(xPct: 0.00, yPct: 0.891), // ESTIMATION non mesurée
+      wallBR: CalibPoint(xPct: 1.00, yPct: 0.834), // ESTIMATION non mesurée
+    );
+
+    await renderWireframeCandidate(
+      roomImage: roomImage,
+      imgDraw: imgDraw,
+      calib: candidateScandinaveIt1,
+      size: size,
+      outPath: '/tmp/diag_room_painter/wireframe_scandinave_it1.png',
+      candidateLabel: 'SCANDINAVE - ITERATION 1',
+    );
+  });
 }
