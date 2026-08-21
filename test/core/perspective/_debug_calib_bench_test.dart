@@ -110,12 +110,20 @@ Future<void> renderWireframeCandidate({
 
   drawCross(canvas, vp.vp, const Color(0xFF00CC00));
 
-  drawLabel(canvas, '1', cp.ceilL + const Offset(8, -34), const Color(0xFFFF0000));
-  drawLabel(canvas, '2', cp.ceilR + const Offset(8, -34), const Color(0xFFFF0000));
-  drawLabel(canvas, '3', cp.floorR + const Offset(8, 4), const Color(0xFFFF0000));
-  drawLabel(canvas, '4', cp.floorL + const Offset(8, 4), const Color(0xFFFF0000));
+  // ⚠️ CORRECTION ce tour (itération moderne) : les labels texte '1'..'4'
+  // et le titre candidateLabel s'affichaient en glyphes "tofu"
+  // (rectangles noir/blanc) dans l'environnement `flutter test` headless
+  // (pas de police système chargée) — masquant precisement la ligne
+  // plafond/mur (ceilL/ceilR) qu'il fallait inspecter. Remplacés par de
+  // simples points pleins (pas de texte, pas de dépendance police), et le
+  // titre déplacé en bas de canevas, hors de la zone d'évaluation.
+  void dot(Offset p, Color c) => canvas.drawCircle(p, 7, Paint()..color = c);
+  dot(cp.ceilL, const Color(0xFFFF0000));
+  dot(cp.ceilR, const Color(0xFFFF0000));
+  dot(cp.floorR, const Color(0xFFFF0000));
+  dot(cp.floorL, const Color(0xFFFF0000));
 
-  drawLabel(canvas, candidateLabel, const Offset(20, 20), const Color(0xFF000000));
+  drawLabel(canvas, candidateLabel, Offset(20, size.height - 34), const Color(0xFF000000));
 
   final picture = recorder.endRecording();
   final image = await picture.toImage(size.width.round(), size.height.round());
@@ -189,6 +197,56 @@ void main() {
       size: size,
       outPath: '/tmp/diag_room_painter/wireframe_candidat1.png',
       candidateLabel: 'CANDIDAT 1',
+    );
+  });
+
+  test('banc d\'essai (non commité) : moderne.jpg — itération 1', () async {
+    final projectRoot = Directory.current.path;
+    final photoPath = '$projectRoot/assets/demo_scenes/moderne.jpg';
+    final bytes = await File(photoPath).readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final roomImage = frame.image;
+
+    // Canvas RÉEL de la scène (1400x975), letterboxing RÉEL calculé au
+    // point 2 de ce tour via la formule exacte de computeImgDraw
+    // (lib/state/app_state.dart) : scale=min(1400/1960, 975/1470)=0.66327,
+    // dw=1960*0.66327=1300.00, dh=1470*0.66327=975.00,
+    // dx=(1400-1300)/2=50.00, dy=(975-975)/2=0.00 — PAS le raccourci
+    // dx=0,dy=0 du candidat haussmann : la logique de letterboxing est ici
+    // délibérément exercée (Réserve 2).
+    const size = Size(1400.0, 975.0);
+    const imgDraw = ImgDraw(dx: 50.0, dy: 0.0, dw: 1300.0, dh: 975.0, scale: 0.66327);
+
+    Directory('/tmp/diag_room_painter').createSync(recursive: true);
+
+    // ── ITERATION 1 — placée à l'œil sur assets/demo_scenes/moderne.jpg,
+    // à partir de la reconnaissance de ce tour :
+    //   - ligne plafond/mur mesurée (gradient luminance, zones de mur
+    //     propres hors poutres/fenêtres) : y≈2.7-2.9% → arrondi 0.028.
+    //   - bornes latérales du mur du fond estimées à l'œil sur la grille :
+    //     gauche x≈6% (après la poutre en biais visible en haut-gauche),
+    //     droite x≈88% (avant le rideau qui débute vers x≈89-90%).
+    //   - ligne sol NON mesurée : jonction sol/mur occultée par canapé +
+    //     fauteuils + table basse sur toute la largeur → ESTIMATION.
+    const candidateModerneIt1 = PerspCalib(
+      ceilL: CalibPoint(xPct: 0.06, yPct: 0.028),
+      ceilR: CalibPoint(xPct: 0.88, yPct: 0.028),
+      floorL: CalibPoint(xPct: 0.06, yPct: 0.90), // ESTIMATION non mesurée
+      floorR: CalibPoint(xPct: 0.88, yPct: 0.90), // ESTIMATION non mesurée
+      wallTL: CalibPoint(xPct: 0.00, yPct: 0.02),
+      wallTR: CalibPoint(xPct: 1.00, yPct: 0.02),
+      wallBL: CalibPoint(xPct: 0.00, yPct: 0.95),
+      wallBR: CalibPoint(xPct: 1.00, yPct: 0.95),
+    );
+
+    await renderWireframeCandidate(
+      roomImage: roomImage,
+      imgDraw: imgDraw,
+      calib: candidateModerneIt1,
+      size: size,
+      outPath: '/tmp/diag_room_painter/wireframe_moderne_it1.png',
+      candidateLabel: 'MODERNE - ITERATION 1',
     );
   });
 }
