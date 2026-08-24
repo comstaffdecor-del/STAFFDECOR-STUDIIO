@@ -198,10 +198,10 @@ void main() {
           );
 
           final vpNum = pg.lineIntersect(
-            Offset(wall.ceilL.dx, wall.ceilL.dy),
-            Offset(wall.ceilR.dx, wall.ceilR.dy),
-            Offset(wall.floorL.dx, wall.floorL.dy),
-            Offset(wall.floorR.dx, wall.floorR.dy),
+            wall.ceilL,
+            wall.ceilR,
+            wall.floorL,
+            wall.floorR,
           );
           expect(vpNum, isNotNull,
               reason: 'theta=$thetaDeg° ne doit jamais être dégénéré pour '
@@ -250,10 +250,10 @@ void main() {
             thetaDeg: thetaDeg,
           );
           final vpNum = pg.lineIntersect(
-            Offset(wall.ceilL.dx, wall.ceilL.dy),
-            Offset(wall.ceilR.dx, wall.ceilR.dy),
-            Offset(wall.floorL.dx, wall.floorL.dy),
-            Offset(wall.floorR.dx, wall.floorR.dy),
+            wall.ceilL,
+            wall.ceilR,
+            wall.floorL,
+            wall.floorR,
           );
           expect((vpNum!.dy - cy).abs(), lessThan(1e-9),
               reason: 'theta=$thetaDeg° : vp.y doit être exactement cy à '
@@ -283,10 +283,10 @@ void main() {
             pitchDeg: pitchDeg,
           );
           final vpNum = pg.lineIntersect(
-            Offset(wall.ceilL.dx, wall.ceilL.dy),
-            Offset(wall.ceilR.dx, wall.ceilR.dy),
-            Offset(wall.floorL.dx, wall.floorL.dy),
-            Offset(wall.floorR.dx, wall.floorR.dy),
+            wall.ceilL,
+            wall.ceilR,
+            wall.floorL,
+            wall.floorR,
           );
           final expectedVpY = cy - focalPx * math.tan(pitchDeg * math.pi / 180.0);
           // ignore: avoid_print
@@ -294,7 +294,7 @@ void main() {
             '[point1-pitch] pitch=$pitchDeg° theta=$thetaDeg°  '
             'vp.y num=${vpNum!.dy}  attendu(cy-f*tan(pitch))=$expectedVpY',
           );
-          expect((vpNum!.dy - expectedVpY).abs(), lessThan(1e-6));
+          expect((vpNum.dy - expectedVpY).abs(), lessThan(1e-6));
         }
       },
     );
@@ -335,10 +335,10 @@ void main() {
         final fL = _jitter(wall.floorL, rng, sigma);
         final fR = _jitter(wall.floorR, rng, sigma);
         final vp = pg.lineIntersect(
-          Offset(cL.dx, cL.dy),
-          Offset(cR.dx, cR.dy),
-          Offset(fL.dx, fL.dy),
-          Offset(fR.dx, fR.dy),
+          cL,
+          cR,
+          fL,
+          fR,
         );
         if (vp == null) continue; // cas dégénéré déclenché par le bruit
         thetaHats.add(_reconstructThetaDeg(vp.dx, focalPx, cx));
@@ -537,10 +537,10 @@ void main() {
 
         final bitExact = wall.ceilL.dy == wall.ceilR.dy;
         final vp = pg.lineIntersect(
-          Offset(wall.ceilL.dx, wall.ceilL.dy),
-          Offset(wall.ceilR.dx, wall.ceilR.dy),
-          Offset(wall.floorL.dx, wall.floorL.dy),
-          Offset(wall.floorR.dx, wall.floorR.dy),
+          wall.ceilL,
+          wall.ceilR,
+          wall.floorL,
+          wall.floorR,
         );
         final usesFallback = vp == null;
         final vpFinal = vp != null
@@ -611,16 +611,13 @@ void main() {
         // caméra canonique regarde toujours vers -Z et sa normale de mur
         // est l'opposé exact de cet axe de visée.
         for (final thetaDeg in [0.0, 2.8, 10.0, 30.0]) {
-          final wall = buildSyntheticWall(
-            wallWidthM: wallWidthM,
-            wallHeightM: wallHeightM,
-            depthM: depthM,
-            focalPx: focalPx,
-            cx: cx,
-            cy: cy,
-            heightCamM: heightCamM,
-            thetaDeg: thetaDeg,
-          );
+          // Note : contrairement aux autres tests de ce groupe, celui-ci ne
+          // dépend PAS des coins projetés (wall.ceilL/etc.) — il documente
+          // un fait fixe de la caméra CANONIQUE de buildCalibratedScene,
+          // qui ne varie jamais avec la scène d'entrée. `thetaDeg` n'est
+          // donc conservé dans la boucle que pour l'affichage explicite
+          // "quel que soit theta" (0°, 2.8°, 10°, 30°) — pas parce qu'il
+          // influence le calcul ci-dessous.
 
           // Caméra canonique (position origine, regarde -Z) — exactement
           // la construction de buildCalibratedScene (calib_to_camera.dart
@@ -738,10 +735,10 @@ void main() {
             thetaDeg: thetaDeg,
           );
           final vp = pg.lineIntersect(
-            Offset(wall.ceilL.dx, wall.ceilL.dy),
-            Offset(wall.ceilR.dx, wall.ceilR.dy),
-            Offset(wall.floorL.dx, wall.floorL.dy),
-            Offset(wall.floorR.dx, wall.floorR.dy),
+            wall.ceilL,
+            wall.ceilR,
+            wall.floorL,
+            wall.floorR,
           );
           final vpFinal = vp != null
               ? Offset(vp.dx, vp.dy)
