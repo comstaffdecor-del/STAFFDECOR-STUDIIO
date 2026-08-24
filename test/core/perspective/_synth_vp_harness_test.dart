@@ -22,7 +22,6 @@
 library;
 
 import 'dart:math' as math;
-import 'dart:ui' show Offset;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vector_math/vector_math_64.dart';
@@ -30,12 +29,16 @@ import 'package:vector_math/vector_math_64.dart';
 import 'package:staff_decor_studio/core/geometry/camera.dart';
 import 'package:staff_decor_studio/core/perspective/persp_geometry.dart' as pg;
 
-// Note : `dart:ui` est importé ici UNIQUEMENT pour le type valeur `Offset`
-// (paire de doubles, aucune dépendance rendering/widget) — c'est le type
-// attendu par `pg.lineIntersect` (persp_geometry.dart), le solveur réel
-// qu'on veut exercer sans réinterprétation. `camera.dart`/`planes.dart`
-// restent, eux, appelés uniquement via leurs types `Vector2`/`Vector3`
-// (aucun `Offset` n'y est requis).
+// Note : le type `Offset` utilisé partout dans ce fichier (celui attendu par
+// `pg.lineIntersect`, persp_geometry.dart) vient de `dart:ui` — mais aucun
+// import explicite de `dart:ui` n'est nécessaire ici : `flutter_test.dart`
+// exporte transitivement `flutter/widgets.dart`, qui ré-exporte `dart:ui`.
+// Un `import 'dart:ui' show Offset;` explicite est donc rapporté "inutile"
+// par `flutter analyze` (unnecessary_import) — vérifié, pas juste toléré :
+// c'est un fait de réexport transitif, pas une info à ignorer par
+// complaisance. `camera.dart`/`planes.dart` restent, eux, appelés
+// uniquement via leurs types `Vector2`/`Vector3` (aucun `Offset` n'y est
+// requis).
 
 // ---------------------------------------------------------------------------
 // Générateur direct : boîte de pièce (W, H, d) + caméra sténopé (f, cx, cy,
@@ -409,8 +412,14 @@ void main() {
         print('theta(deg) | ' + targetChordsPx.map((c) => 'L~${c.toInt()}px').join(' | '));
 
         final kValues = <double>[];
+        // Matrice [indice theta][indice corde] -> sigma_max (null = ">3",
+        // traité comme +infini pour la vérification de monotonie
+        // ci-dessous : c'est bien "au moins aussi grand" que toute valeur
+        // finie, jamais plus petit).
+        final smaxMatrix = <List<double?>>[];
         for (final thetaDeg in thetasDeg) {
           final row = <String>[];
+          final smaxRow = <double?>[];
           for (final chordTarget in targetChordsPx) {
             // wallWidthM choisi pour que la corde à theta≈0 soit ≈ chordTarget
             // (corde exacte recalculée après coup, cf. wall.ceilL/ceilR).
@@ -433,12 +442,48 @@ void main() {
             final chordActual = _dist(wall.ceilL, wall.ceilR);
 
             row.add(smax != null ? smax.toStringAsFixed(3) : '>3');
+            smaxRow.add(smax);
             if (smax != null) {
               kValues.add(smax / (thetaDeg * chordActual));
             }
           }
+          smaxMatrix.add(smaxRow);
           // ignore: avoid_print
           print('${thetaDeg.toStringAsFixed(2).padLeft(10)} | ${row.join(' | ')}');
+        }
+
+        // Invariant du MODÈLE (pas de la photo) : sigma_max doit être
+        // monotone croissant à la fois en theta (corde fixée) et en corde
+        // (theta fixé) -- c'est une conséquence directe et attendue de la
+        // règle sigma_max ~ k*theta*L (plus l'angle ou la corde grandit,
+        // plus le signal domine le bruit, donc plus de bruit est tolérable
+        // avant ambiguïté). C'est une propriété structurelle du solveur
+        // qu'on peut asserter sans faire aucune hypothèse sur une photo
+        // réelle -- contrairement à la comparaison avec scandinave
+        // ci-dessous, qui elle dépend d'un sigma_placement non mesuré.
+        double effOrInf(double? v) => v ?? double.infinity;
+        for (var ti = 0; ti < thetasDeg.length; ti++) {
+          for (var ci = 1; ci < targetChordsPx.length; ci++) {
+            expect(
+              effOrInf(smaxMatrix[ti][ci]),
+              greaterThanOrEqualTo(effOrInf(smaxMatrix[ti][ci - 1])),
+              reason: 'monotonie attendue en corde (theta=${thetasDeg[ti]}° '
+                  'fixé) : sigma_max ne doit jamais décroître quand la '
+                  'corde augmente (L=${targetChordsPx[ci - 1]}px -> '
+                  '${targetChordsPx[ci]}px).',
+            );
+          }
+        }
+        for (var ci = 0; ci < targetChordsPx.length; ci++) {
+          for (var ti = 1; ti < thetasDeg.length; ti++) {
+            expect(
+              effOrInf(smaxMatrix[ti][ci]),
+              greaterThanOrEqualTo(effOrInf(smaxMatrix[ti - 1][ci])),
+              reason: 'monotonie attendue en theta (corde=${targetChordsPx[ci]}'
+                  'px fixée) : sigma_max ne doit jamais décroître quand '
+                  'theta augmente (${thetasDeg[ti - 1]}° -> ${thetasDeg[ti]}°).',
+            );
+          }
         }
 
         // La constante k découverte en Python (rule2.py) : sigma_max varie
@@ -448,6 +493,20 @@ void main() {
         // Python recopiée) retombe dans le même ordre de grandeur, sans
         // exiger une égalité stricte (méthodes de bissection légèrement
         // différentes, seeds différentes).
+        //
+        // IMPORTANT — portée de ce que sigma modélise ici : c'est un bruit
+        // gaussien i.i.d. AJOUTÉ INDÉPENDAMMENT à chacun des 4 points
+        // (ceilL/ceilR/floorL/floorR), modélisant une imprécision de
+        // PLACEMENT d'un point par ailleurs correctement identifié. Cela ne
+        // couvre PAS une erreur SYSTÉMATIQUE d'identification de cible
+        // (p.ex. pointer une tringle plutôt que la jonction plafond réelle) :
+        // une telle erreur n'est ni gaussienne, ni i.i.d., ni du même ordre
+        // de grandeur — elle biaise une coordonnée entière, dans une
+        // direction fixe, indépendamment de tout tirage aléatoire. sigma_max
+        // ci-dessous ne dit donc rien sur la robustesse du solveur face à ce
+        // second type d'erreur ; ne pas réappliquer cette règle telle quelle
+        // à une photo sans requalifier explicitement quelle erreur (bruit de
+        // placement vs erreur d'identification) est en jeu à ce moment-là.
         expect(kValues, isNotEmpty);
         final kMean = kValues.reduce((a, b) => a + b) / kValues.length;
         // ignore: avoid_print
@@ -463,11 +522,40 @@ void main() {
 
     test(
       'règle dérivée, appliquée rétrospectivement à scandinave : corde '
-      '228px, sigma de placement ~1px -> theta=0.3°-2.8° était-il '
-      'mesurable en principe ?',
+      '228px -> sigma_max(theta) rapporté pour theta=0.3° et 2.8° '
+      '(AUCUNE assertion de passage/échec sur cette comparaison — voir '
+      'note ci-dessous)',
       () {
+        // ATTENTION — pourquoi ce test n'assert RIEN sur scandinave :
+        //
+        // 1. sigma_placement (~1px) est une hypothèse NON MESURÉE, pas une
+        //    propriété du modèle. La coder en dur dans un expect() (dans
+        //    n'importe quel sens : greaterThan OU lessThan) fabrique
+        //    exactement le piège qu'on vient de mettre trois itérations à
+        //    identifier avec cy : une conclusion qui pivote entièrement sur
+        //    un paramètre libre non mesuré, mais cette fois masquée par un
+        //    test qui passe au vert — ce qui est pire, car un test vert ne
+        //    se relit pas.
+        //
+        // 2. Cette valeur est fragile dans les DEUX sens. Les 4 coins de
+        //    scandinave viennent d'un ajustement linéaire sur ~152 points
+        //    (resid_std = 0.205px au plafond) : l'incertitude STATISTIQUE
+        //    sur les extrémités est de l'ordre de quelques centièmes de
+        //    pixel, pas de 1px — à ce compte, 0.3° redevient mesurable.
+        //    Mais l'erreur RÉELLE sur scandinave (tringle dorée prise pour
+        //    la jonction plafond) était une erreur SYSTÉMATIQUE
+        //    d'identification de cible, de plusieurs pixels, sans rapport
+        //    avec un bruit gaussien i.i.d. Le sigma de ce harnais et le
+        //    sigma de scandinave ne mesurent PAS la même chose : les
+        //    comparer dans une assertion serait une confusion de
+        //    catégorie.
+        //
+        // Ce test se contente donc de RAPPORTER sigma_max(theta) pour les
+        // deux bornes disputées (0.3° et 2.8°) — l'interprétation
+        // (mesurable ou non, selon quelle hypothèse de sigma_placement on
+        // choisit d'admettre) a sa place dans le rapport à l'humain, pas
+        // dans une condition de passage du test.
         const chordScandinave = 228.0;
-        const sigmaPlacement = 1.0; // ordre du pixel, cf. brief
 
         for (final thetaDisputeDeg in [0.3, 2.8]) {
           final wallWidthM = chordScandinave * depthM / focalPx;
@@ -478,33 +566,21 @@ void main() {
           // ignore: avoid_print
           print(
             '[point2-scandinave] theta_dispute=$thetaDisputeDeg° '
-            'corde=$chordScandinave px  sigma_max=$smax px  '
-            'sigma_placement_reel~$sigmaPlacement px  '
-            '=> mesurable en principe ? '
-            '${smax != null && sigmaPlacement < smax}',
+            'corde=$chordScandinave px  sigma_max=$smax px '
+            '(rapporté seulement -- aucune comparaison à sigma_placement '
+            'ici : voir note dans le corps du test pour la raison).',
           );
-          // La prédiction du brief est que sigma_placement (~1px) DÉPASSE
-          // sigma_max pour cette plage — donc l'angle N'ÉTAIT PAS mesurable
-          // en principe. On vérifie cette prédiction, sans la forcer :
-          // si elle échoue, ce test échoue et le désaccord doit être
-          // rapporté (voir critère d'arrêt du brief).
+          // Seule propriété du MODÈLE (pas de la photo) qu'on assert ici :
+          // sigma_max doit être un nombre fini et non-null dans cette
+          // plage -- c'est une propriété de robustesse du solveur, pas une
+          // hypothèse sur scandinave.
           expect(
             smax,
             isNotNull,
             reason: 'smax ne doit pas être null (theta=$thetaDisputeDeg° '
-                'reste discernable même à 3px dans l\'absolu) pour que la '
-                'comparaison ait un sens.',
-          );
-          expect(
-            sigmaPlacement,
-            greaterThan(smax!),
-            reason:
-                'Prédiction du brief : à corde=228px, sigma_placement~1px '
-                'dépasse sigma_max pour theta=$thetaDisputeDeg° -> l\'angle '
-                'scandinave (0.3°-2.8°) n\'était PAS mesurable en principe '
-                'avec cette corde. Si ce test échoue, la prédiction est '
-                'fausse et doit être rapportée telle quelle (pas de '
-                'retour à la mesure sur photo).',
+                'reste discernable même à 3px dans l\'absolu, à corde '
+                '228px) -- propriété du solveur/modèle, indépendante de '
+                'toute hypothèse sur une photo réelle.',
           );
         }
       },
