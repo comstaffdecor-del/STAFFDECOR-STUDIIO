@@ -358,6 +358,81 @@ void main() {
       return sorted[loIdx] <= 0.0 && 0.0 <= sorted[hiIdx];
     }
 
+    /// Propagation analytique DÉTERMINISTE (aucun `math.Random`) de la
+    /// sensibilité de theta_hat à un bruit iid de sigma=1px sur chacune des
+    /// 8 coordonnées d'entrée (4 points x 2 axes) — reproduit exactement la
+    /// méthode Jacobienne pré-validée en Python (/tmp/synth_vp/rule2.py) :
+    /// 1) gradient de vp.x par rapport aux 8 coordonnées, par différences
+    ///    finies sur le VRAI `pg.lineIntersect` (pas une formule recopiée) ;
+    /// 2) norme de ce gradient = sigma(vp.x) par unité de sigma d'entrée ;
+    /// 3) propagation au premier ordre via d(theta)/d(vp.x) (dérivée de la
+    ///    forme fermée `atan(f/(cx-vpx))`) ;
+    /// 4) sigma_max = |theta| / (1.96 * sigma(theta) par unité de sigma).
+    ///
+    /// Sert de référence DÉTERMINISTE pour la monotonie ci-dessous — le
+    /// Monte Carlo par bissection (méthode existante, conservée telle
+    /// quelle plus bas) reste un contrôle croisé indépendant, rapporté par
+    /// debugPrint mais plus jamais la source de la monotonie assertée
+    /// (cf. note sur la marge insuffisante de la bissection à theta>=15°).
+    double _analyticalSigmaMax({
+      required double thetaDeg,
+      required double wallWidthM,
+    }) {
+      final wall = buildSyntheticWall(
+        wallWidthM: wallWidthM,
+        wallHeightM: wallHeightM,
+        depthM: depthM,
+        focalPx: focalPx,
+        cx: cx,
+        cy: cy,
+        heightCamM: heightCamM,
+        thetaDeg: thetaDeg,
+      );
+      const h = 1e-4;
+      final base = pg.lineIntersect(
+        wall.ceilL,
+        wall.ceilR,
+        wall.floorL,
+        wall.floorR,
+      )!;
+      final pts = [wall.ceilL, wall.ceilR, wall.floorL, wall.floorR];
+      var sumSq = 0.0;
+      for (var i = 0; i < 4; i++) {
+        for (var coord = 0; coord < 2; coord++) {
+          final perturbed = List<Offset>.from(pts);
+          final p = pts[i];
+          perturbed[i] =
+              coord == 0 ? Offset(p.dx + h, p.dy) : Offset(p.dx, p.dy + h);
+          final vp2 = pg.lineIntersect(
+            perturbed[0],
+            perturbed[1],
+            perturbed[2],
+            perturbed[3],
+          );
+          // Sur toute la plage testée (theta>=0.3°, chord>=150px), la
+          // perturbation h=1e-4px ne fait jamais franchir le seuil de
+          // dégénérescence -- si ça arrivait, mieux vaut planter ici que
+          // silencieusement ignorer une composante du gradient.
+          if (vp2 == null) {
+            throw StateError(
+              'lineIntersect dégénéré pendant la différence finie '
+              '(theta=$thetaDeg°) -- gradient indéfini, la propagation '
+              'analytique ne peut pas continuer.',
+            );
+          }
+          final grad = (vp2.dx - base.dx) / h;
+          sumSq += grad * grad;
+        }
+      }
+      final sigmaVpxPerSigma = math.sqrt(sumSq);
+      final dthetaDvpx = (focalPx /
+              (focalPx * focalPx + math.pow(cx - base.dx, 2).toDouble())) *
+          180.0 /
+          math.pi;
+      final sigmaThetaPerSigma = dthetaDvpx.abs() * sigmaVpxPerSigma;
+      return thetaDeg.abs() / (1.96 * sigmaThetaPerSigma);
+    }
+
     /// Bissection : trouve sigma_max au-delà duquel l'IC95% de theta_hat
     /// contient 0. Retourne `null` si même à sigma=3px l'angle reste
     /// discernable (jamais indiscernable dans la plage testée).
@@ -412,19 +487,35 @@ void main() {
         print('theta(deg) | ' + targetChordsPx.map((c) => 'L~${c.toInt()}px').join(' | '));
 
         final kValues = <double>[];
-        // Matrice [indice theta][indice corde] -> sigma_max (null = ">3",
-        // traité comme +infini pour la vérification de monotonie
-        // ci-dessous : c'est bien "au moins aussi grand" que toute valeur
-        // finie, jamais plus petit).
-        final smaxMatrix = <List<double?>>[];
+        // Deux matrices [indice theta][indice corde] -> sigma_max :
+        // - `smaxMcMatrix` : Monte Carlo par bissection (méthode existante,
+        //   dépend de tirages aléatoires, seed fixe -> déterministe d'une
+        //   exécution à l'autre, mais chaque cellule a une marge d'erreur
+        //   de bissection ~tol=0.01px ET une variance d'échantillonnage
+        //   propre à 500 tirages). Conservée pour le calcul de `k` (déjà
+        //   validé contre la référence Python) et rapportée en contrôle
+        //   croisé, mais N'EST PLUS la source de la monotonie assertée.
+        // - `smaxAnaMatrix` : propagation analytique par différences
+        //   finies sur `pg.lineIntersect` (déterministe par construction,
+        //   AUCUN tirage aléatoire) -- c'est elle qui porte l'assertion de
+        //   monotonie ci-dessous.
+        // (null = ">3px", traité comme +infini pour la comparaison : "au
+        // moins aussi grand" que toute valeur finie, jamais plus petit.)
+        final smaxMcMatrix = <List<double?>>[];
+        final smaxAnaMatrix = <List<double>>[];
         for (final thetaDeg in thetasDeg) {
           final row = <String>[];
-          final smaxRow = <double?>[];
+          final smaxMcRow = <double?>[];
+          final smaxAnaRow = <double>[];
           for (final chordTarget in targetChordsPx) {
             // wallWidthM choisi pour que la corde à theta≈0 soit ≈ chordTarget
             // (corde exacte recalculée après coup, cf. wall.ceilL/ceilR).
             final wallWidthM = chordTarget * depthM / focalPx;
-            final smax = _findSigmaMax(
+            final smaxMc = _findSigmaMax(
+              thetaDeg: thetaDeg,
+              wallWidthM: wallWidthM,
+            );
+            final smaxAna = _analyticalSigmaMax(
               thetaDeg: thetaDeg,
               wallWidthM: wallWidthM,
             );
@@ -441,50 +532,118 @@ void main() {
             );
             final chordActual = _dist(wall.ceilL, wall.ceilR);
 
-            row.add(smax != null ? smax.toStringAsFixed(3) : '>3');
-            smaxRow.add(smax);
-            if (smax != null) {
-              kValues.add(smax / (thetaDeg * chordActual));
+            row.add(smaxMc != null ? smaxMc.toStringAsFixed(3) : '>3');
+            smaxMcRow.add(smaxMc);
+            smaxAnaRow.add(smaxAna);
+            if (smaxMc != null) {
+              kValues.add(smaxMc / (thetaDeg * chordActual));
             }
           }
-          smaxMatrix.add(smaxRow);
+          smaxMcMatrix.add(smaxMcRow);
+          smaxAnaMatrix.add(smaxAnaRow);
           // ignore: avoid_print
           print('${thetaDeg.toStringAsFixed(2).padLeft(10)} | ${row.join(' | ')}');
         }
 
+        // Contrôle croisé (rapporté, non asserté) : où le Monte Carlo et
+        // l'analytique divergent-ils, et de combien ? Utile pour juger la
+        // qualité de l'approximation au premier ordre à grand theta/corde
+        // (où le "signal" domine largement et où 500 tirages/tol=0.01px
+        // peuvent avoir moins de résolution que l'analytique).
+        var maxRelDiff = 0.0;
+        for (var ti = 0; ti < thetasDeg.length; ti++) {
+          for (var ci = 0; ci < targetChordsPx.length; ci++) {
+            final mc = smaxMcMatrix[ti][ci];
+            if (mc == null) continue; // ">3px" côté MC, pas comparable ici
+            final ana = smaxAnaMatrix[ti][ci];
+            final relDiff = (mc - ana).abs() / ana;
+            if (relDiff > maxRelDiff) maxRelDiff = relDiff;
+          }
+        }
+        // ignore: avoid_print
+        print('[point2] écart relatif max Monte-Carlo vs analytique = '
+            '${(maxRelDiff * 100).toStringAsFixed(1)}% (contrôle croisé, '
+            'non assertée -- l\'assertion de monotonie porte sur '
+            'l\'analytique seul, cf. ci-dessous).');
+
         // Invariant du MODÈLE (pas de la photo) : sigma_max doit être
         // monotone croissant à la fois en theta (corde fixée) et en corde
-        // (theta fixé) -- c'est une conséquence directe et attendue de la
-        // règle sigma_max ~ k*theta*L (plus l'angle ou la corde grandit,
-        // plus le signal domine le bruit, donc plus de bruit est tolérable
-        // avant ambiguïté). C'est une propriété structurelle du solveur
-        // qu'on peut asserter sans faire aucune hypothèse sur une photo
-        // réelle -- contrairement à la comparaison avec scandinave
-        // ci-dessous, qui elle dépend d'un sigma_placement non mesuré.
-        double effOrInf(double? v) => v ?? double.infinity;
+        // (theta fixé) -- conséquence directe et attendue de la règle
+        // sigma_max ~ k*theta*L. Assertée sur la matrice ANALYTIQUE
+        // (déterministe par construction, aucun tirage aléatoire) plutôt
+        // que sur le Monte Carlo : la bissection a une tolérance de
+        // convergence (tol=0.01px) et une variance d'échantillonnage
+        // (500 tirages) du même ordre que l'écart entre certaines cellules
+        // adjacentes de la table ci-dessus (p.ex. theta=2.0°->2.8° à
+        // L~228px : 1.661 vs 2.329, mais theta=2.8°->3.0° au même L :
+        // 2.329 vs 2.499, un écart de 0.17px -- comparable à la résolution
+        // de la bissection). Asserter la monotonie sur ces tirages ferait
+        // dépendre le passage du test d'un pari sur le seed, pas d'une
+        // propriété garantie -- exactement le risque signalé : un test qui
+        // passe aujourd'hui et échoue un jour sans qu'aucun code n'ait
+        // changé, sans qu'on sache si c'est une régression.
+        //
+        // Décompte des cellules réellement contraintes : le traitement
+        // (valeur finie) vs (>3px, jamais atteint dans la plage testée)
+        // rend vacue toute comparaison entre deux cellules qui sont TOUTES
+        // LES DEUX >3px (p.ex. toute la ligne theta=5° au-delà de L~150px)
+        // -- ce n'est pas une erreur, mais le nombre de comparaisons
+        // effectivement discriminantes doit être connu, pas supposé égal
+        // au nombre total de comparaisons.
+        var nComparisons = 0;
+        var nVacuousBothInf = 0;
+        double effOrInfAna(double v) => v; // toujours fini (analytique)
         for (var ti = 0; ti < thetasDeg.length; ti++) {
           for (var ci = 1; ci < targetChordsPx.length; ci++) {
+            nComparisons++;
             expect(
-              effOrInf(smaxMatrix[ti][ci]),
-              greaterThanOrEqualTo(effOrInf(smaxMatrix[ti][ci - 1])),
+              effOrInfAna(smaxAnaMatrix[ti][ci]),
+              greaterThanOrEqualTo(effOrInfAna(smaxAnaMatrix[ti][ci - 1])),
               reason: 'monotonie attendue en corde (theta=${thetasDeg[ti]}° '
-                  'fixé) : sigma_max ne doit jamais décroître quand la '
-                  'corde augmente (L=${targetChordsPx[ci - 1]}px -> '
-                  '${targetChordsPx[ci]}px).',
+                  'fixé, valeurs ANALYTIQUES déterministes) : sigma_max ne '
+                  'doit jamais décroître quand la corde augmente '
+                  '(L=${targetChordsPx[ci - 1]}px -> ${targetChordsPx[ci]}px).',
             );
           }
         }
         for (var ci = 0; ci < targetChordsPx.length; ci++) {
           for (var ti = 1; ti < thetasDeg.length; ti++) {
+            nComparisons++;
             expect(
-              effOrInf(smaxMatrix[ti][ci]),
-              greaterThanOrEqualTo(effOrInf(smaxMatrix[ti - 1][ci])),
+              effOrInfAna(smaxAnaMatrix[ti][ci]),
+              greaterThanOrEqualTo(effOrInfAna(smaxAnaMatrix[ti - 1][ci])),
               reason: 'monotonie attendue en theta (corde=${targetChordsPx[ci]}'
-                  'px fixée) : sigma_max ne doit jamais décroître quand '
-                  'theta augmente (${thetasDeg[ti - 1]}° -> ${thetasDeg[ti]}°).',
+                  'px fixée, valeurs ANALYTIQUES déterministes) : sigma_max '
+                  'ne doit jamais décroître quand theta augmente '
+                  '(${thetasDeg[ti - 1]}° -> ${thetasDeg[ti]}°).',
             );
           }
         }
+        // Pour référence : combien de comparaisons Monte-Carlo auraient
+        // été vacues (les deux côtés ">3px") si on avait gardé le MC comme
+        // source -- affiché, pas asserté, uniquement pour quantifier ce
+        // que "17 tests passent" veut vraiment dire ici.
+        for (var ti = 0; ti < thetasDeg.length; ti++) {
+          for (var ci = 1; ci < targetChordsPx.length; ci++) {
+            if (smaxMcMatrix[ti][ci] == null && smaxMcMatrix[ti][ci - 1] == null) {
+              nVacuousBothInf++;
+            }
+          }
+        }
+        for (var ci = 0; ci < targetChordsPx.length; ci++) {
+          for (var ti = 1; ti < thetasDeg.length; ti++) {
+            if (smaxMcMatrix[ti][ci] == null && smaxMcMatrix[ti - 1][ci] == null) {
+              nVacuousBothInf++;
+            }
+          }
+        }
+        // ignore: avoid_print
+        print('[point2] monotonie : $nComparisons comparaisons assertées '
+            '(matrice analytique, toutes discriminantes car toujours '
+            'finies) ; pour référence, $nVacuousBothInf de ces mêmes paires '
+            'auraient été vacues côté Monte-Carlo (">3px" des deux côtés, '
+            'donc rien testé) -- c\'est précisément pourquoi la matrice '
+            'analytique est préférable ici : elle ne sature jamais.');
 
         // La constante k découverte en Python (rule2.py) : sigma_max varie
         // quasi-linéairement avec theta*chord sur toute la plage testée
@@ -512,11 +671,23 @@ void main() {
         // ignore: avoid_print
         print('[point2] k moyen (Dart) = ${kMean.toStringAsExponential(3)} '
             '(référence Python : 3.716e-03)');
-        expect(kMean, closeTo(3.716e-3, 3.716e-3 * 0.5),
-            reason: 'k doit rester du même ordre de grandeur que la valeur '
-                'Python pré-validée (tolérance large : 50%, cette table '
-                'sert à illustrer la règle, pas à la certifier au pourcent '
-                'près depuis Dart).');
+        // Tolérance resserrée à ±5% (dispersion Python mesurée : 0.18% sur
+        // 42 cellules) -- une bande à ±50% laisserait passer une
+        // régression qui triple la sensibilité au bruit sans qu'aucune
+        // alarme ne se déclenche : ça n'aurait plus de valeur de garde-
+        // fou. ±5% laisse encore une marge d'un facteur ~25 par rapport à
+        // la dispersion Python observée (donc reste loin de la
+        // flakiness), tout en étant assez serré pour détecter une vraie
+        // régression du solveur ou de la méthode de bissection. Si le Dart
+        // ne tient pas ±5% alors que le Python tient 0.18%, c'est en soi
+        // une information à creuser (bissection, seed, tolérance de
+        // convergence) -- pas une raison d'élargir la bande.
+        expect(kMean, closeTo(3.716e-3, 3.716e-3 * 0.05),
+            reason: 'k doit rester proche (±5%) de la valeur Python '
+                'pré-validée (dispersion Python mesurée : 0.18% sur 42 '
+                'cellules) -- si cet écart est franchi, creuser la '
+                'méthode de bissection (tol, seed, nTrials) avant '
+                'd\'élargir la tolérance.');
       },
     );
 
