@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:staff_decor_studio/core/perspective/calib_canvas.dart';
+import 'package:staff_decor_studio/core/perspective/cornice_plinth_painter.dart';
 import 'package:staff_decor_studio/core/perspective/room_painter.dart';
 import 'package:staff_decor_studio/core/perspective/vanishing_point.dart';
 import 'package:staff_decor_studio/models/persp_calib.dart';
@@ -314,5 +315,117 @@ void main() {
       outPath: '/tmp/diag_room_painter/wireframe_scandinave_it1.png',
       candidateLabel: 'SCANDINAVE - ITERATION 1',
     );
+  });
+
+  test('banc d\'essai (non commité) : scandinave.jpg — itération 2 (rendu solveur réel, non tautologique)', () async {
+    // ⚠️ Ce test ne re-dessine PAS de lignes connectant les points saisis
+    // (ce que faisait le rendu wireframe de l'itération 1, tautologique :
+    // relier ceilL→ceilR ne peut que confirmer là où on les a placés).
+    // Il invoque ICI les VRAIES fonctions du solveur —
+    // `paintCorniceSet`/`paintPlintheSet` (lib/core/perspective/
+    // cornice_plinth_painter.dart, NON modifié, seulement importé et
+    // appelé) — qui utilisent `vp.toward()`/`vp.frac()` pour calculer la
+    // convergence perspective des faces plafond/sol. C'est la première
+    // fois dans tout ce banc que le solveur réel produit un résultat qui
+    // POURRAIT diverger visiblement de la photo (bande qui pars en
+    // éventail) plutôt que de simplement re-confirmer les points saisis.
+    final projectRoot = Directory.current.path;
+    final photoPath = '$projectRoot/assets/demo_scenes/scandinave.jpg';
+    final bytes = await File(photoPath).readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final roomImage = frame.image;
+
+    const size = Size(1400.0, 975.0);
+    const imgDraw = ImgDraw(dx: 0.0, dy: 90.83, dw: 1400.0, dh: 793.33, scale: 0.729167);
+
+    // Mêmes 8 points que l'itération 1 (candidateScandinaveIt1 est une
+    // const locale au closure du bloc de test précédent, donc hors de
+    // portée ici : redéfinie à l'identique — AUCUNE valeur ne change,
+    // seule la portée Dart l'exige). Ce test ne change donc AUCUNE
+    // valeur de calibration, il change uniquement ce qui est rendu à
+    // partir d'elles (le vrai solveur, pas des lignes reliant les points).
+    const calib = PerspCalib(
+      ceilL: CalibPoint(xPct: 0.830, yPct: 0.0265),
+      ceilR: CalibPoint(xPct: 0.993, yPct: 0.0335),
+      floorL: CalibPoint(xPct: 0.830, yPct: 0.8365),
+      floorR: CalibPoint(xPct: 0.993, yPct: 0.8345),
+      wallTL: CalibPoint(xPct: 0.00, yPct: 0.047), // ESTIMATION non mesurée
+      wallTR: CalibPoint(xPct: 1.00, yPct: 0.034), // ESTIMATION non mesurée
+      wallBL: CalibPoint(xPct: 0.00, yPct: 0.891), // ESTIMATION non mesurée
+      wallBR: CalibPoint(xPct: 1.00, yPct: 0.834), // ESTIMATION non mesurée
+    );
+
+    Directory('/tmp/diag_room_painter').createSync(recursive: true);
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), Paint()..color = const Color(0xFFFFFFFF));
+
+    // Photo en fond (sans produits) — mêmes points d'entrée que
+    // renderWireframeCandidate, pour rester comparable à l'itération 1.
+    final noProductPainter = RoomPainter(
+      roomImage: roomImage,
+      imgDraw: imgDraw,
+      calib: calib,
+      selectedProducts: const [],
+      prodPositions: const {},
+      metresHauteur: 2.5,
+    );
+    noProductPainter.paint(canvas, size);
+
+    final cp = CalibCanvasPoints.fromCalib(calib, imgDraw: imgDraw, w: size.width, h: size.height);
+    final vp = VanishingPoint.compute(fTL: cp.ceilL, fTR: cp.ceilR, fBL: cp.floorL, fBR: cp.floorR);
+
+    // Ligne d'horizon demandée explicitement (y = vp.dy, sur toute la
+    // largeur du canevas) — trace visuellement où le solveur place la
+    // hauteur de la caméra, superposée à la photo.
+    canvas.drawLine(
+      Offset(0, vp.vp.dy),
+      Offset(size.width, vp.vp.dy),
+      Paint()
+        ..color = const Color(0xFFFF00FF)
+        ..strokeWidth = 2,
+    );
+
+    // Corniche et plinthe DÉRIVÉES par le vrai solveur (paintCorniceSet /
+    // paintPlintheSet), épaisseurs par défaut (mêmes coefficients que le
+    // produit réel, pH réel de cette calibration). wallTL/wallTR/wallBL/
+    // wallBR = mêmes points (estimés, non mesurés) que l'itération 1 —
+    // aucune nouvelle donnée introduite, seul le rendu change.
+    final thCornice = StripThickness.corniceDefault(vp.pH);
+    final thPlinthe = StripThickness.plintheDefault(vp.pH);
+    paintCorniceSet(
+      canvas,
+      vp,
+      fTL: cp.ceilL,
+      fTR: cp.ceilR,
+      wallTL: cp.wallTL,
+      wallTR: cp.wallTR,
+      th: thCornice,
+      ratio: 1.0,
+    );
+    paintPlintheSet(
+      canvas,
+      vp,
+      fBL: cp.floorL,
+      fBR: cp.floorR,
+      wallBL: cp.wallBL,
+      wallBR: cp.wallBR,
+      th: thPlinthe,
+      ratio: 1.0,
+    );
+
+    drawLabel(canvas, 'SCANDINAVE - ITERATION 2 (solveur reel)', Offset(20, size.height - 34), const Color(0xFF000000));
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.width.round(), size.height.round());
+    final outBytes = await encodePng(image);
+    const outPath = '/tmp/diag_room_painter/wireframe_scandinave_it2_solveur.png';
+    File(outPath).writeAsBytesSync(outBytes);
+    // ignore: avoid_print
+    print('Ecrit (SCANDINAVE IT2 SOLVEUR REEL): $outPath (${outBytes.length} octets)');
+    // ignore: avoid_print
+    print('  vp=(${vp.vp.dx.toStringAsFixed(1)},${vp.vp.dy.toStringAsFixed(1)})  pH=${vp.pH.toStringAsFixed(1)}');
   });
 }
