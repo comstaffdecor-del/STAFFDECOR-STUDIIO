@@ -1,0 +1,66 @@
+{
+  "sku": "PLIN10",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "PLIN10.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      100.9773,
+      0.0
+    ],
+    [
+      101.9773,
+      -12.4597
+    ],
+    [
+      0.0,
+      -12.4597
+    ],
+    [
+      24.7465,
+      -2.266
+    ],
+    [
+      25.9806,
+      -2.266
+    ],
+    [
+      28.3474,
+      0.0
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [],
+    "auto": false
+  },
+  "face_pose_plafond": {
+    "indices": [
+      5,
+      0
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 101.977,
+    "h": 12.46
+  },
+  "hauteur_mur_mm": 0,
+  "projection_plafond_mm": 72.63,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 1500.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

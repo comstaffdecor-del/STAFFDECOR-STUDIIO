@@ -1,0 +1,93 @@
+{
+  "sku": "D562",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D562.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      50.1925,
+      -198.768
+    ],
+    [
+      33.6925,
+      -198.768
+    ],
+    [
+      33.6925,
+      -181.768
+    ],
+    [
+      16.4425,
+      -181.768
+    ],
+    [
+      16.4425,
+      -165.268
+    ],
+    [
+      0.0,
+      -164.7542
+    ],
+    [
+      0.0,
+      0.0
+    ],
+    [
+      9.8926,
+      0.0
+    ],
+    [
+      9.8926,
+      -139.8706
+    ],
+    [
+      33.8741,
+      -170.1544
+    ],
+    [
+      47.496,
+      -170.1544
+    ],
+    [
+      50.1925,
+      -177.252
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      5,
+      6
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      6,
+      7
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 50.193,
+    "h": 198.768
+  },
+  "hauteur_mur_mm": 164.754,
+  "projection_plafond_mm": 9.893,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

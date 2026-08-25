@@ -1,0 +1,89 @@
+{
+  "sku": "D576",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D576.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      24.4047,
+      -17.0
+    ],
+    [
+      14.5151,
+      -40.3665
+    ],
+    [
+      14.5151,
+      -145.1783
+    ],
+    [
+      -13.1887,
+      -218.7442
+    ],
+    [
+      -26.0,
+      -219.5708
+    ],
+    [
+      -27.0,
+      -188.5708
+    ],
+    [
+      -16.6049,
+      -188.559
+    ],
+    [
+      -16.0,
+      -149.0708
+    ],
+    [
+      0.0,
+      -149.0708
+    ],
+    [
+      0.0,
+      0.0
+    ],
+    [
+      24.4047,
+      0.0
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      8,
+      9
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      9,
+      10
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 51.405,
+    "h": 219.571
+  },
+  "hauteur_mur_mm": 149.071,
+  "projection_plafond_mm": 24.405,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

@@ -1,0 +1,133 @@
+{
+  "sku": "D631",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D631.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      0.0,
+      -108.9441
+    ],
+    [
+      0.0,
+      -93.9441
+    ],
+    [
+      15.0,
+      -93.9441
+    ],
+    [
+      15.7028,
+      -84.4699
+    ],
+    [
+      24.2151,
+      -81.2592
+    ],
+    [
+      32.3069,
+      -77.1012
+    ],
+    [
+      39.8732,
+      -72.0496
+    ],
+    [
+      46.8158,
+      -66.1702
+    ],
+    [
+      53.0445,
+      -59.5391
+    ],
+    [
+      58.4785,
+      -52.2426
+    ],
+    [
+      63.0473,
+      -44.3754
+    ],
+    [
+      66.6914,
+      -36.0394
+    ],
+    [
+      69.3637,
+      -27.3431
+    ],
+    [
+      71.0294,
+      -18.3992
+    ],
+    [
+      71.6669,
+      -9.3239
+    ],
+    [
+      85.6669,
+      -9.3239
+    ],
+    [
+      86.4924,
+      0.0
+    ],
+    [
+      98.0248,
+      0.0
+    ],
+    [
+      96.9391,
+      -18.0083
+    ],
+    [
+      42.2578,
+      -88.09
+    ],
+    [
+      25.3495,
+      -96.1303
+    ],
+    [
+      14.6893,
+      -108.9441
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      0,
+      1
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      16,
+      17
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 98.025,
+    "h": 108.944
+  },
+  "hauteur_mur_mm": 15.0,
+  "projection_plafond_mm": 11.532,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

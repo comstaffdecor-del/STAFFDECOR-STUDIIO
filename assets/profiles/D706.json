@@ -1,0 +1,77 @@
+{
+  "sku": "D706",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D706.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      0.0,
+      -58.5451
+    ],
+    [
+      33.1983,
+      -26.3107
+    ],
+    [
+      33.1983,
+      0.0
+    ],
+    [
+      50.737,
+      0.0
+    ],
+    [
+      50.737,
+      -28.8622
+    ],
+    [
+      10.5531,
+      -67.8669
+    ],
+    [
+      10.5531,
+      -77.8669
+    ],
+    [
+      0.0,
+      -77.8669
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      7,
+      0
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      2,
+      3
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 50.737,
+    "h": 77.867
+  },
+  "hauteur_mur_mm": 19.322,
+  "projection_plafond_mm": 17.539,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

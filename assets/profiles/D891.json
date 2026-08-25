@@ -1,0 +1,101 @@
+{
+  "sku": "D891",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D891.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      50.0,
+      -79.0
+    ],
+    [
+      0.0,
+      -79.0
+    ],
+    [
+      0.0,
+      0.0
+    ],
+    [
+      22.0,
+      0.0
+    ],
+    [
+      22.0,
+      -61.0
+    ],
+    [
+      61.0,
+      -61.0
+    ],
+    [
+      78.7904,
+      -233.2715
+    ],
+    [
+      117.0993,
+      -234.8677
+    ],
+    [
+      117.0993,
+      -282.8677
+    ],
+    [
+      196.0993,
+      -282.8677
+    ],
+    [
+      196.0993,
+      -298.8677
+    ],
+    [
+      100.0993,
+      -298.8677
+    ],
+    [
+      100.0993,
+      -248.8677
+    ],
+    [
+      50.0,
+      -248.8677
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      1,
+      2
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      2,
+      3
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 196.099,
+    "h": 298.868
+  },
+  "hauteur_mur_mm": 79.0,
+  "projection_plafond_mm": 22.0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

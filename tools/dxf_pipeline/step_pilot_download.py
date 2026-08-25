@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 """
-step_pilot_download.py — Téléchargement du LOT PILOTE STEP, et rien d'autre.
+step_pilot_download.py — Téléchargement du LOT PILOTE STEP (généralisé),
+et rien d'autre en dehors du périmètre PILOT_SKUS ci-dessous.
 
-Périmètre strict (imposé) : les fichiers .stp/.step des 3 SKU choisis
-pour le pilote step2profile.py — D718, D705, D720. Ces 3 SKU ont été
-sélectionnés parmi 86 candidats éligibles (intersection triple :
-famille=='Corniches' dans catalogue_data_refs.csv ∩ step==1 dans
-suivi.csv ∩ fichier .stp/.step réellement présent dans le crawl GED
-ged_diff_par_extension.csv), triés par taille de fichier ascendante —
-D718 (12.52 Ko), D705 (12.65 Ko), D720 (13.28 Ko) sont les 3 plus
-petits, donc les plus rapides/sûrs pour un premier pilote. Les 3 sont
-spot-vérifiés cohérents dans classification_t1_t4.csv (famille=Corniches,
-type=T1_PROFIL_EXTRUDE, a_step=True, format_exploitable=True) et
-suivi.csv (statut_gestion=ACTIF, step=True).
+Périmètre initial (historique, conservé en commentaire pour mémoire) :
+les 3 SKU D718/D705/D720 du pilote step2profile.py, choisis parmi 86
+candidats éligibles (famille=='Corniches' ∩ step==1 ∩ .stp/.step réel
+dans ged_diff_par_extension.csv), triés par taille ascendante.
+
+PILOT_SKUS est désormais élargi (brief Piste A, 2e passe) : 10 corniches
+supplémentaires (les 10 plus petites .stp après D705/D718/D720, hors
+celles déjà sur disque) + les 10 plinthes exploitables de
+classification_t1_t4.csv. ALLOWED_EXTS est élargi à {stp, step, stl} :
+pour un SKU donné, .stp/.step est préféré (voie déjà prouvée par
+step2profile.py) et .stl n'est retenu qu'à défaut de .stp/.step
+(select_pilot_rows applique cette priorité par SKU, ce n'est pas un
+simple filtre d'extension plat — voir la fonction).
 
 Source de vérité pour les download_url : ged_diff_par_extension.csv
 (crawl GED réel, commit 2d5d3e9) — PAS manifest.csv (qui ne couvre que
@@ -38,13 +41,24 @@ from ged_fetch import load_credentials, login, GedAccessError, USER_AGENT
 HERE = Path(__file__).parent
 GED_DIFF_PATH = HERE / "ged_diff_par_extension.csv"
 STEP_DIR = Path("/home/user/flutter_app/assets/step")
+STL_DIR = Path("/home/user/flutter_app/assets/solids")
 
-# --- Périmètre strict du lot pilote STEP ---------------------------------
-# 3 SKU choisis explicitement (voir docstring) parmi les 86 candidats
-# éligibles. Comparaison insensible à la casse contre la colonne 'sku' de
+# --- Périmètre du lot (élargi, brief Piste A 2e passe) -------------------
+# Comparaison insensible à la casse contre la colonne 'sku' de
 # ged_diff_par_extension.csv, mais EXACTE (pas de sous-chaîne/regex).
-PILOT_SKUS = {"d718", "d705", "d720"}
-ALLOWED_EXTS = {"stp", "step"}
+# 3 pilotes historiques déjà sur disque + 10 corniches .stp supplémentaires
+# (les 10 plus petites hors pilotes, cf. rapport) + 10 plinthes exploitables.
+PILOT_SKUS = {
+    # historique (déjà présents, idempotence les ignorera)
+    "d718", "d705", "d720",
+    # 10 corniches supplémentaires, triées par taille .stp ascendante
+    "d706", "d709", "d620", "d562", "d748",
+    "d576", "d614", "d631", "d555", "d891",
+    # 10 plinthes exploitables (classification_t1_t4.csv, famille=Plinthes)
+    "plin08", "plin08m", "plin10", "plin10m", "plin12",
+    "plin15", "plin20", "plin38", "tal26", "tal41",
+}
+ALLOWED_EXTS = {"stp", "step", "stl"}
 THROTTLE_SECONDS = 0.3
 
 
@@ -54,11 +68,14 @@ def load_ged_diff_rows():
 
 
 def select_pilot_rows(rows):
-    """Filtre strict : SKU exact (insensible casse) dans PILOT_SKUS, ext
-    dans ALLOWED_EXTS. Retourne aussi la liste des SKU demandés qui n'ont
-    produit AUCUNE ligne sélectionnée (transparence, pas de silence)."""
-    selected = []
-    matched_skus = set()
+    """Filtre par SKU exact (insensible casse) dans PILOT_SKUS, ext dans
+    ALLOWED_EXTS, PUIS priorité par SKU : .stp/.step retenu si présent,
+    .stl retenu SEULEMENT si aucun .stp/.step n'existe pour ce SKU (voie
+    STEP jugée plus sûre/déjà prouvée — brief Piste A 2e passe). Jamais
+    les deux formats pour un même SKU dans ce lot. Retourne aussi la
+    liste des SKU demandés sans aucun candidat (transparence, pas de
+    silence)."""
+    candidates_by_sku = {}
     for row in rows:
         sku_lower = row["sku"].strip().lower()
         if sku_lower not in PILOT_SKUS:
@@ -66,7 +83,16 @@ def select_pilot_rows(rows):
         ext_lower = row["ext"].strip().lower()
         if ext_lower not in ALLOWED_EXTS:
             continue
-        selected.append(row)
+        candidates_by_sku.setdefault(sku_lower, []).append(row)
+
+    selected = []
+    matched_skus = set()
+    for sku_lower, cand_rows in candidates_by_sku.items():
+        stp_rows = [r for r in cand_rows if r["ext"].strip().lower() in ("stp", "step")]
+        chosen = stp_rows if stp_rows else cand_rows  # .stl seulement si pas de .stp/.step
+        # S'il existe plusieurs lignes .stp/.step pour le même SKU (rare),
+        # on les garde toutes plutôt que de choisir arbitrairement.
+        selected.extend(chosen)
         matched_skus.add(sku_lower)
 
     missing_skus = sorted(PILOT_SKUS - matched_skus)
@@ -74,7 +100,13 @@ def select_pilot_rows(rows):
 
 
 def dest_path_for(row):
-    return STEP_DIR / row["filename"]
+    ext_lower = row["ext"].strip().lower()
+    if ext_lower in ("stp", "step"):
+        return STEP_DIR / row["filename"]
+    elif ext_lower == "stl":
+        return STL_DIR / row["filename"]
+    else:
+        return None  # extension inattendue (ne devrait pas arriver via ALLOWED_EXTS), ignoré explicitement
 
 
 def check_only():
@@ -114,6 +146,7 @@ def download():
         print(f"⚠️  SKU demandés sans candidat éligible: {missing_skus}")
 
     STEP_DIR.mkdir(parents=True, exist_ok=True)
+    STL_DIR.mkdir(parents=True, exist_ok=True)
 
     session = requests.Session()
     session.headers.update({"User-Agent": USER_AGENT})
@@ -130,6 +163,9 @@ def download():
 
     for row in selected:
         dest = dest_path_for(row)
+        if dest is None:
+            print(f"  [SKIP] extension inattendue pour {row['filename']!r}, ignoré.")
+            continue
 
         if dest.exists() and dest.stat().st_size > 0:
             print(f"  [IDEMPOTENT] {dest.name} déjà présent ({dest.stat().st_size} octets), non retéléchargé.")

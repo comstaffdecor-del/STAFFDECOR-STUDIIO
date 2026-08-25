@@ -1,0 +1,109 @@
+{
+  "sku": "D555",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D555.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      13.8607,
+      -26.9979
+    ],
+    [
+      12.4086,
+      -17.4271
+    ],
+    [
+      0.0,
+      -0.222
+    ],
+    [
+      0.0,
+      5.278
+    ],
+    [
+      6.9304,
+      4.75
+    ],
+    [
+      6.9304,
+      0.0
+    ],
+    [
+      9.9304,
+      0.0
+    ],
+    [
+      11.729,
+      -5.1836
+    ],
+    [
+      13.4909,
+      -8.8089
+    ],
+    [
+      16.0542,
+      -11.9195
+    ],
+    [
+      19.2757,
+      -14.342
+    ],
+    [
+      22.9757,
+      -15.9409
+    ],
+    [
+      26.8015,
+      -17.0805
+    ],
+    [
+      27.9316,
+      -21.2553
+    ],
+    [
+      31.6816,
+      -21.2553
+    ],
+    [
+      33.1107,
+      -26.9979
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      2,
+      3
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      5,
+      6
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 33.111,
+    "h": 32.276
+  },
+  "hauteur_mur_mm": 5.5,
+  "projection_plafond_mm": 3.0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 1500.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

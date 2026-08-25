@@ -1,0 +1,55 @@
+{
+  "sku": "PLIN12",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "PLIN12.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      1.0,
+      -10.7454
+    ],
+    [
+      0.0,
+      0.0
+    ],
+    [
+      124.9691,
+      -0.0907
+    ],
+    [
+      97.7021,
+      -8.4165
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [],
+    "auto": false
+  },
+  "face_pose_plafond": {
+    "indices": [],
+    "auto": false
+  },
+  "bbox_mm": {
+    "w": 124.969,
+    "h": 10.745
+  },
+  "hauteur_mur_mm": 0,
+  "projection_plafond_mm": 0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 1500.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

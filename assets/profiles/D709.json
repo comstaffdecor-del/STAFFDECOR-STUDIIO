@@ -1,0 +1,85 @@
+{
+  "sku": "D709",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D709.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      80.344,
+      -74.1435
+    ],
+    [
+      46.0,
+      -117.3712
+    ],
+    [
+      0.0,
+      -117.3712
+    ],
+    [
+      0.0,
+      -103.3712
+    ],
+    [
+      41.3668,
+      -103.3712
+    ],
+    [
+      67.9477,
+      -70.3741
+    ],
+    [
+      67.9477,
+      -29.3741
+    ],
+    [
+      51.842,
+      -22.1852
+    ],
+    [
+      51.842,
+      0.0
+    ],
+    [
+      80.344,
+      0.0
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      2,
+      3
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      8,
+      9
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 80.344,
+    "h": 117.371
+  },
+  "hauteur_mur_mm": 14.0,
+  "projection_plafond_mm": 28.502,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

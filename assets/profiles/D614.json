@@ -1,0 +1,121 @@
+{
+  "sku": "D614",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D614.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      52.8634,
+      -89.3852
+    ],
+    [
+      52.8634,
+      -113.2593
+    ],
+    [
+      46.8169,
+      -112.5735
+    ],
+    [
+      44.9245,
+      -104.2834
+    ],
+    [
+      42.0711,
+      -96.2732
+    ],
+    [
+      38.2961,
+      -88.6538
+    ],
+    [
+      33.6518,
+      -81.5308
+    ],
+    [
+      28.2027,
+      -75.0029
+    ],
+    [
+      15.6863,
+      -61.169
+    ],
+    [
+      11.6369,
+      -55.6577
+    ],
+    [
+      8.5507,
+      -49.5547
+    ],
+    [
+      6.5121,
+      -43.0266
+    ],
+    [
+      5.5766,
+      -36.2519
+    ],
+    [
+      5.25,
+      -30.2608
+    ],
+    [
+      0.0,
+      -30.2608
+    ],
+    [
+      0.0,
+      -25.7835
+    ],
+    [
+      -8.9483,
+      -25.7835
+    ],
+    [
+      -9.5261,
+      0.0
+    ],
+    [
+      0.0034,
+      0.0
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      14,
+      15
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      17,
+      18
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 62.389,
+    "h": 113.259
+  },
+  "hauteur_mur_mm": 4.477,
+  "projection_plafond_mm": 9.529,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}
