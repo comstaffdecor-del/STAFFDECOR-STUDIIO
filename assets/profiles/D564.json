@@ -1,0 +1,102 @@
+{
+  "sku": "D564",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D564.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      41.1386,
+      0.0
+    ],
+    [
+      41.1386,
+      -64.7416
+    ],
+    [
+      21.2843,
+      -111.2753
+    ],
+    [
+      14.1822,
+      -155.0716
+    ],
+    [
+      0.0,
+      -194.1264
+    ],
+    [
+      0.0,
+      -212.6264
+    ],
+    [
+      -26.9001,
+      -261.2817
+    ],
+    [
+      -53.2121,
+      -262.7517
+    ],
+    [
+      -52.3302,
+      -240.9964
+    ],
+    [
+      -24.9801,
+      -236.0775
+    ],
+    [
+      -20.99,
+      -156.6238
+    ],
+    [
+      2.9502,
+      -152.1133
+    ],
+    [
+      6.0423,
+      -76.9764
+    ],
+    [
+      24.8989,
+      -73.2051
+    ],
+    [
+      28.8457,
+      -0.7606
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      4,
+      5
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [],
+    "auto": false
+  },
+  "bbox_mm": {
+    "w": 94.351,
+    "h": 262.752
+  },
+  "hauteur_mur_mm": 18.5,
+  "projection_plafond_mm": 0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

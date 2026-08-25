@@ -1,0 +1,31 @@
+sku,statut_batch,returncode,elapsed_s,message
+D106,TRAITE,0,26.2,
+D110,TRAITE,0,33.8,
+D113,TRAITE,0,2.3,
+D113M,TRAITE,0,2.2,
+D114,TRAITE,0,25.0,
+D114M,TRAITE,0,17.4,
+D116,ERREUR_TIMEOUT,,241.9,Timeout > 90s -- processus tué (groupe complet).
+D117,TRAITE,0,21.9,
+D505,TRAITE,0,30.0,
+D515,ERREUR_TIMEOUT,,90.1,Timeout > 90s -- processus tué (groupe complet).
+D520,TRAITE,0,24.5,
+D545,ERREUR_TIMEOUT,,90.1,Timeout > 90s -- processus tué (groupe complet).
+D550,TRAITE,0,20.3,
+D560,TRAITE,0,27.8,
+D561,ERREUR_TIMEOUT,,90.1,Timeout > 90s -- processus tué (groupe complet).
+D563,TRAITE,0,2.3,
+D564,TRAITE,0,15.4,
+D565,TRAITE,0,13.6,
+D567,TRAITE,0,2.2,
+D568,TRAITE,0,2.2,
+D569,ERREUR_TIMEOUT,,90.1,Timeout > 90s -- processus tué (groupe complet).
+D577,TRAITE,0,19.0,
+D578,ERREUR_TIMEOUT,,90.0,Timeout > 90s -- processus tué (groupe complet).
+D579,TRAITE,0,2.3,
+D601,TRAITE,0,2.4,
+D604,TRAITE,0,27.9,
+D605,TRAITE,0,2.2,
+D606,TRAITE,0,2.4,
+D607,TRAITE,0,19.3,
+D608,TRAITE,0,32.1,

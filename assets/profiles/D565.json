@@ -1,0 +1,86 @@
+{
+  "sku": "D565",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D565.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      -76.5669
+    ],
+    [
+      -39.2827,
+      -205.3946
+    ],
+    [
+      -63.8655,
+      -206.1549
+    ],
+    [
+      -63.2319,
+      -190.5689
+    ],
+    [
+      -40.93,
+      -184.9934
+    ],
+    [
+      -41.7769,
+      -128.6345
+    ],
+    [
+      -26.2043,
+      -124.074
+    ],
+    [
+      -27.0942,
+      -67.4564
+    ],
+    [
+      -12.8564,
+      -63.5633
+    ],
+    [
+      -13.7462,
+      -4.0537
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      0,
+      1
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [],
+    "auto": false
+  },
+  "bbox_mm": {
+    "w": 63.865,
+    "h": 206.155
+  },
+  "hauteur_mur_mm": 76.567,
+  "projection_plafond_mm": 0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

@@ -1,0 +1,121 @@
+{
+  "sku": "D577",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D577.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      40.1267,
+      36.346
+    ],
+    [
+      12.3588,
+      0.0
+    ],
+    [
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      21.5
+    ],
+    [
+      17.3853,
+      26.4891
+    ],
+    [
+      17.3853,
+      47.9891
+    ],
+    [
+      32.8161,
+      52.2303
+    ],
+    [
+      32.8161,
+      162.5123
+    ],
+    [
+      51.3272,
+      167.074
+    ],
+    [
+      51.3272,
+      189.574
+    ],
+    [
+      67.6987,
+      193.6536
+    ],
+    [
+      67.6987,
+      215.6536
+    ],
+    [
+      81.2134,
+      217.57
+    ],
+    [
+      82.4952,
+      192.4469
+    ],
+    [
+      49.8095,
+      143.2261
+    ],
+    [
+      48.5133,
+      60.5124
+    ],
+    [
+      47.8953,
+      54.0443
+    ],
+    [
+      46.2598,
+      47.756
+    ],
+    [
+      43.6483,
+      41.8064
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      2,
+      3
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      1,
+      2
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 82.495,
+    "h": 217.57
+  },
+  "hauteur_mur_mm": 21.5,
+  "projection_plafond_mm": 12.359,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}
