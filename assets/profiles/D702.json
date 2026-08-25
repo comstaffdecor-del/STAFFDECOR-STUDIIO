@@ -1,0 +1,37 @@
+{
+  "sku": "D702",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D702.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "header",
+    "methode": "section_step"
+  },
+  "profil_mm": [],
+  "face_pose_mur": {
+    "indices": [],
+    "auto": false
+  },
+  "face_pose_plafond": {
+    "indices": [],
+    "auto": false
+  },
+  "bbox_mm": {
+    "w": 0,
+    "h": 0
+  },
+  "hauteur_mur_mm": 0,
+  "projection_plafond_mm": 0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null
+  },
+  "longueur_barre_mm": null,
+  "longueur_barre_mm_origine": null,
+  "prix_ml": null,
+  "statut": "ERREUR_SELECTION",
+  "version_schema": 1
+}
