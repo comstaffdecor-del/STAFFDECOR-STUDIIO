@@ -8,32 +8,58 @@ sku,correspondance_sku,designation,cote_catalogue_champ,cote_catalogue_mm,cote_m
 1145c,casse_differente,"Cimaise en 1,50 ml",longueur_barre_mm,1500.0,longueur_barre_mm,1500.0,0.0,VALIDE,False
 1202,exact,"Moulure en 1,50 ml",longueur_barre_mm,1500.0,,,,AUCUNE_GEOMETRIE_MESUREE,False
 20-54,normalisee,1/2 colonne Ø 14 H. 200 cm + 30 cm,hauteur_mm,2000.0,,,,LONGUEUR_PRESUMEE,True
-Corniche - D899 (2),AUCUNE,,,,,,,SKU_INTROUVABLE_DANS_CATALOGUE,False
-Corniche - D899 (3),AUCUNE,,,,,,,SKU_INTROUVABLE_DANS_CATALOGUE,False
-Corniche - D899,AUCUNE,,,,,,,SKU_INTROUVABLE_DANS_CATALOGUE,False
-Corniches - D631,AUCUNE,,,,,,,SKU_INTROUVABLE_DANS_CATALOGUE,False
+D106,exact,Profil équerre lumineuse avec joint cre,,,,,,AUCUNE_COTE_CATALOGUE,False
+D110,exact,"Profil eclairage indirect en 2 ml - 13,5 x",longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D114,exact,Profil éclairage indirect en 2 ml - 20 x 1,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D114M,exact,Profil éclairage indirect en 2 ml - 15 x 1,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D117,exact,Profil éclairage indirect en 2 ml - 25 x 1,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D505,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D520,exact,"Corniche en 1,75 ml",longueur_barre_mm,1750.0,longueur_barre_mm,2000.0,14.29,ALERTE,False
+D550,exact,"Corniche en 1,50 ml",longueur_barre_mm,1500.0,longueur_barre_mm,2000.0,33.33,ALERTE,False
 D555,exact,"Corniche en 1,50 ml",longueur_barre_mm,1500.0,longueur_barre_mm,1500.0,0.0,VALIDE,False
+D560,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
 D562,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D564,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D565,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
 D576,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D577,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D604,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D607,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D608,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D609,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D610,exact,"Corniche en 1,75 ml",longueur_barre_mm,1750.0,longueur_barre_mm,1750.0,0.0,VALIDE,False
 D614,exact,"Corniche en 1,75 ml",longueur_barre_mm,1750.0,longueur_barre_mm,2000.0,14.29,ALERTE,False
+D616,exact,"Corniche en 1,75 ml",longueur_barre_mm,1750.0,longueur_barre_mm,2000.0,14.29,ALERTE,False
 D620,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D621,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D622,exact,"Corniche en 1,75 ml",longueur_barre_mm,1750.0,longueur_barre_mm,1750.0,0.0,VALIDE,False
+D626,exact,"Corniche en 1,75 ml",longueur_barre_mm,1750.0,longueur_barre_mm,2000.0,14.29,ALERTE,False
+D630,exact,"Corniche en 1,75 ml",longueur_barre_mm,1750.0,longueur_barre_mm,1750.0,0.0,VALIDE,False
 D631,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D650,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D651,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D652,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D703,exact,"Corniche en 1,75 ml",longueur_barre_mm,1750.0,longueur_barre_mm,1750.0,0.0,VALIDE,False
+D704,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
 D705,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
 D706,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D708,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
 D709,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D710,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D712,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D717,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
 D718,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
 D720,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
 D748,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D830,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D835,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D886,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D888,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
 D891,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
-D898,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,,,,AUCUNE_GEOMETRIE_MESUREE,False
-PLIN08,exact,"Plinthe 8 cm en 1,50 ml",longueur_barre_mm,1500.0,,,,AUCUNE_GEOMETRIE_MESUREE,False
-PLIN08M,exact,"Plinthe moderne 8 cm en 1,50 ml",longueur_barre_mm,1500.0,,,,AUCUNE_GEOMETRIE_MESUREE,False
+D896,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
+D901,exact,Corniche en 2 ml,longueur_barre_mm,2000.0,longueur_barre_mm,2000.0,0.0,VALIDE,False
 PLIN10,exact,"Plinthe 10 cm en 1,50 ml",longueur_barre_mm,1500.0,longueur_barre_mm,1500.0,0.0,VALIDE,False
-PLIN10M,exact,"Plinthe moderne 10 cm en 1,50 ml",longueur_barre_mm,1500.0,,,,AUCUNE_GEOMETRIE_MESUREE,False
 PLIN12,exact,"Plinthe 12 cm en 1,50 ml",longueur_barre_mm,1500.0,longueur_barre_mm,1500.0,0.0,VALIDE,False
 PLIN15,exact,"Plinthe 15 cm en 1,50 ml",longueur_barre_mm,1500.0,longueur_barre_mm,1500.0,0.0,VALIDE,False
 PLIN20,exact,"Plinthe 20,5 cm en 1,50 ml",longueur_barre_mm,1500.0,longueur_barre_mm,1500.0,0.0,VALIDE,False
-Parements - CL39 et PLINCL12.PC,AUCUNE,,,,,,,SKU_INTROUVABLE_DANS_CATALOGUE,False
-Rosaces - M303 (2),AUCUNE,,,,,,,SKU_INTROUVABLE_DANS_CATALOGUE,False
-Rosaces - M303 (3),AUCUNE,,,,,,,SKU_INTROUVABLE_DANS_CATALOGUE,False
-Rosaces - M303,AUCUNE,,,,,,,SKU_INTROUVABLE_DANS_CATALOGUE,False
+TAL26,exact,Talon pour PLIN25.PC.SP (sur comma,,,,,,AUCUNE_COTE_CATALOGUE,False
