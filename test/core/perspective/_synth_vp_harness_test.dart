@@ -28,6 +28,7 @@ import 'package:vector_math/vector_math_64.dart';
 
 import 'package:staff_decor_studio/core/geometry/camera.dart';
 import 'package:staff_decor_studio/core/perspective/persp_geometry.dart' as pg;
+import 'package:staff_decor_studio/models/persp_calib.dart';
 
 // Note : le type `Offset` utilisé partout dans ce fichier (celui attendu par
 // `pg.lineIntersect`, persp_geometry.dart) vient de `dart:ui` — mais aucun
@@ -161,6 +162,134 @@ Offset _jitter(Offset p, math.Random rng, double sigma) =>
 /// que les 4 coins).
 double _reconstructThetaDeg(double vpX, double focalPx, double cx) {
   return math.atan(focalPx / (cx - vpX)) * 180.0 / math.pi;
+}
+
+// ---------------------------------------------------------------------------
+// EXTENSION PHASE C (brief : "Objectif. Appliquer la règle σ_max ≈ k·θ·L à
+// l'inventaire des scènes de démo...") — ajoutée à ce même fichier, PAS un
+// nouveau fichier, per l'instruction explicite ("le harnais existant est
+// étendu plutôt que dupliqué"). Pré-validée en Python avant transcription
+// (/tmp/synth_vp/point1_pH_sweep.py, /tmp/synth_vp/point3_inventory.py —
+// mêmes fonctions camera/lineIntersect que rule2.py, non commitées, hors
+// dépôt).
+// ---------------------------------------------------------------------------
+
+/// pH (brief Phase C, point 1) : séparation verticale plafond/plancher en
+/// pixels, pour une géométrie (H, d) donnée aux mêmes paramètres caméra que
+/// le reste du fichier. Calculée à azimut quasi nul (theta=1e-3°, loin de
+/// la dégénérescence stricte) — indépendante de la largeur du mur (W=1.0m
+/// arbitraire ici : pH ne dépend géométriquement que de H, d, f, cx, cy,
+/// heightCamM, jamais de W).
+double _pHAt({
+  required double wallHeightM,
+  required double depthM,
+  required double focalPx,
+  required double cx,
+  required double cy,
+  required double heightCamM,
+}) {
+  final wall = buildSyntheticWall(
+    wallWidthM: 1.0,
+    wallHeightM: wallHeightM,
+    depthM: depthM,
+    focalPx: focalPx,
+    cx: cx,
+    cy: cy,
+    heightCamM: heightCamM,
+    thetaDeg: 1e-3,
+  );
+  return wall.floorL.dy - wall.ceilL.dy;
+}
+
+/// Version généralisée de la propagation analytique déterministe (moteur
+/// commun avec `_analyticalSigmaMax` du groupe "Point 2" ci-dessous, qui
+/// délègue à cette fonction) — paramétrée explicitement par (wallHeightM,
+/// depthM, focalPx, cx, cy, heightCamM) au lieu des constantes de scène
+/// partagées de `main()`, pour permettre le balayage en (H, d) du point 1
+/// de la Phase C SANS dupliquer la logique de différences finies.
+///
+/// Méthode (identique à /tmp/synth_vp/point1_pH_sweep.py::analytical_sigma_max,
+/// elle-même identique à /tmp/synth_vp/rule2.py) : 1) gradient de vp.x par
+/// rapport aux 8 coordonnées d'entrée, par différences finies sur le VRAI
+/// `pg.lineIntersect` ; 2) norme de ce gradient = sigma(vp.x) par unité de
+/// sigma d'entrée ; 3) propagation au premier ordre via d(theta)/d(vp.x) ;
+/// 4) sigma_max = |theta| / (1.96 * sigma(theta) par unité de sigma).
+/// Aucun `math.Random` — déterministe par construction.
+double _analyticalSigmaMaxGeneric({
+  required double thetaDeg,
+  required double wallWidthM,
+  required double wallHeightM,
+  required double depthM,
+  required double focalPx,
+  required double cx,
+  required double cy,
+  required double heightCamM,
+}) {
+  final wall = buildSyntheticWall(
+    wallWidthM: wallWidthM,
+    wallHeightM: wallHeightM,
+    depthM: depthM,
+    focalPx: focalPx,
+    cx: cx,
+    cy: cy,
+    heightCamM: heightCamM,
+    thetaDeg: thetaDeg,
+  );
+  const h = 1e-4;
+  final base = pg.lineIntersect(
+    wall.ceilL,
+    wall.ceilR,
+    wall.floorL,
+    wall.floorR,
+  )!;
+  final pts = [wall.ceilL, wall.ceilR, wall.floorL, wall.floorR];
+  var sumSq = 0.0;
+  for (var i = 0; i < 4; i++) {
+    for (var coord = 0; coord < 2; coord++) {
+      final perturbed = List<Offset>.from(pts);
+      final p = pts[i];
+      perturbed[i] =
+          coord == 0 ? Offset(p.dx + h, p.dy) : Offset(p.dx, p.dy + h);
+      final vp2 = pg.lineIntersect(
+        perturbed[0],
+        perturbed[1],
+        perturbed[2],
+        perturbed[3],
+      );
+      if (vp2 == null) {
+        throw StateError(
+          'lineIntersect dégénéré pendant la différence finie '
+          '(theta=$thetaDeg°, H=$wallHeightM, d=$depthM) -- gradient '
+          'indéfini, la propagation analytique ne peut pas continuer.',
+        );
+      }
+      final grad = (vp2.dx - base.dx) / h;
+      sumSq += grad * grad;
+    }
+  }
+  final sigmaVpxPerSigma = math.sqrt(sumSq);
+  final dthetaDvpx = (focalPx /
+          (focalPx * focalPx + math.pow(cx - base.dx, 2).toDouble())) *
+      180.0 /
+      math.pi;
+  final sigmaThetaPerSigma = dthetaDvpx.abs() * sigmaVpxPerSigma;
+  return thetaDeg.abs() / (1.96 * sigmaThetaPerSigma);
+}
+
+/// Facteur opérationnel (brief Phase C, point 3 : "le seuil opérationnel
+/// est plus exigeant... appliquer un facteur de 3 à 5, donc viser θ·L >
+/// 1000 à 1 px") — dérivé de cette exigence explicite appliquée à la
+/// tranche de référence Phase B ([pHRefPhaseB]), PAS choisi arbitrairement :
+/// facteur = 1000 / seuil_brut(sigma=1px, pH=pHRefPhaseB). Fixe ensuite
+/// (indépendant de pH et sigma) pour rester cohérent avec le chiffre
+/// explicite du brief. Vérifié tomber dans [3,5] par un test dédié
+/// ci-dessous (pas supposé).
+double _operationalFactor({
+  required double kPrime,
+  required double pHRefPhaseB,
+}) {
+  final rawThresholdAt1pxRef = 1.0 / (kPrime * pHRefPhaseB);
+  return 1000.0 / rawThresholdAt1pxRef;
 }
 
 void main() {
@@ -387,11 +516,17 @@ void main() {
     /// quelle plus bas) reste un contrôle croisé indépendant, rapporté par
     /// debugPrint mais plus jamais la source de la monotonie assertée
     /// (cf. note sur la marge insuffisante de la bissection à theta>=15°).
+    // Délègue désormais au moteur générique `_analyticalSigmaMaxGeneric`
+    // (ajouté en Phase C pour le balayage pH du point 1, cf. plus haut dans
+    // ce fichier) — mêmes 4 constantes de scène partagées (wallHeightM,
+    // depthM, focalPx, cx, cy, heightCamM) qu'avant le refactor, aucun
+    // changement de comportement pour ce groupe.
     double _analyticalSigmaMax({
       required double thetaDeg,
       required double wallWidthM,
     }) {
-      final wall = buildSyntheticWall(
+      return _analyticalSigmaMaxGeneric(
+        thetaDeg: thetaDeg,
         wallWidthM: wallWidthM,
         wallHeightM: wallHeightM,
         depthM: depthM,
@@ -399,51 +534,7 @@ void main() {
         cx: cx,
         cy: cy,
         heightCamM: heightCamM,
-        thetaDeg: thetaDeg,
       );
-      const h = 1e-4;
-      final base = pg.lineIntersect(
-        wall.ceilL,
-        wall.ceilR,
-        wall.floorL,
-        wall.floorR,
-      )!;
-      final pts = [wall.ceilL, wall.ceilR, wall.floorL, wall.floorR];
-      var sumSq = 0.0;
-      for (var i = 0; i < 4; i++) {
-        for (var coord = 0; coord < 2; coord++) {
-          final perturbed = List<Offset>.from(pts);
-          final p = pts[i];
-          perturbed[i] =
-              coord == 0 ? Offset(p.dx + h, p.dy) : Offset(p.dx, p.dy + h);
-          final vp2 = pg.lineIntersect(
-            perturbed[0],
-            perturbed[1],
-            perturbed[2],
-            perturbed[3],
-          );
-          // Sur toute la plage testée (theta>=0.3°, chord>=150px), la
-          // perturbation h=1e-4px ne fait jamais franchir le seuil de
-          // dégénérescence -- si ça arrivait, mieux vaut planter ici que
-          // silencieusement ignorer une composante du gradient.
-          if (vp2 == null) {
-            throw StateError(
-              'lineIntersect dégénéré pendant la différence finie '
-              '(theta=$thetaDeg°) -- gradient indéfini, la propagation '
-              'analytique ne peut pas continuer.',
-            );
-          }
-          final grad = (vp2.dx - base.dx) / h;
-          sumSq += grad * grad;
-        }
-      }
-      final sigmaVpxPerSigma = math.sqrt(sumSq);
-      final dthetaDvpx = (focalPx /
-              (focalPx * focalPx + math.pow(cx - base.dx, 2).toDouble())) *
-          180.0 /
-          math.pi;
-      final sigmaThetaPerSigma = dthetaDvpx.abs() * sigmaVpxPerSigma;
-      return thetaDeg.abs() / (1.96 * sigmaThetaPerSigma);
     }
 
     /// Bissection : trouve sigma_max au-delà duquel l'IC95% de theta_hat
@@ -1038,6 +1129,591 @@ void main() {
       },
     );
   });
+
+  // ===========================================================================
+  // PHASE C — POINT 1 : combler le trou en pH. k = 3,716e-3 a été mesuré à
+  // H=2,5m, d=3m FIXES (donc pH≈1167px constant dans toute la table de
+  // rule2.py / du groupe "Point 2" ci-dessus). Balayage étendu à H∈[2.2,3.0]
+  // et d∈[2,6] (méthode analytique déterministe, PAS de Monte Carlo, comme
+  // demandé explicitement) pour trancher : k est-il une constante unique
+  // (dispersion <5%), ou dépend-il de pH (dispersion >5%, la règle doit
+  // s'écrire k(pH)) ? Pré-validé en Python avant transcription
+  // (/tmp/synth_vp/point1_pH_sweep.py — mêmes fonctions que rule2.py) :
+  // dispersion de k (constante unique) = 42.857% (>> 5%), dispersion de k/pH
+  // = 0.235% (<< 5%) -> la règle DOIT être réécrite avec pH explicite,
+  // sous la forme sigma_max ≈ (k/pH)·pH·theta·L, avec k/pH quasi-constant.
+  // ===========================================================================
+  group(
+    'Phase C — Point 1 : k depend de pH (dispersion >>5%), la regle doit '
+    "s'ecrire avec pH explicite (k/pH quasi-constant, dispersion <<5%)",
+    () {
+      // Même balayage que /tmp/synth_vp/point1_pH_sweep.py (pré-validé) :
+      // H et d couvrant la plage demandée par le brief, theta et corde
+      // couvrant la plage déjà utilisée par le groupe "Point 2" ci-dessus
+      // (dont la corde disputée de scandinave, 228px, retenue ici aussi).
+      const hsM = [2.2, 2.5, 2.8, 3.0];
+      const dsM = [2.0, 3.0, 4.0, 5.0, 6.0];
+      const sweepThetasDeg = [0.3, 1.0, 2.8, 5.0];
+      const sweepChordsPx = [228.0, 500.0, 1000.0];
+
+      /// Exécute le balayage complet (H x d x theta x corde, 4x5x4x3=240
+      /// combinaisons) et retourne pour chaque point : k = sigma_max/(theta*L)
+      /// ET pH (séparation plafond/plancher, dépend uniquement de H et d).
+      /// Aucun `math.Random` — 100% déterministe, comme dans le groupe
+      /// "Point 2" (délègue à `_analyticalSigmaMaxGeneric`/`_pHAt`).
+      List<({double k, double pH})> runSweep() {
+        final out = <({double k, double pH})>[];
+        for (final hM in hsM) {
+          for (final dM in dsM) {
+            final pH = _pHAt(
+              wallHeightM: hM,
+              depthM: dM,
+              focalPx: focalPx,
+              cx: cx,
+              cy: cy,
+              heightCamM: heightCamM,
+            );
+            for (final thetaDeg in sweepThetasDeg) {
+              for (final chordTarget in sweepChordsPx) {
+                final wallWidthM = chordTarget * dM / focalPx;
+                final smax = _analyticalSigmaMaxGeneric(
+                  thetaDeg: thetaDeg,
+                  wallWidthM: wallWidthM,
+                  wallHeightM: hM,
+                  depthM: dM,
+                  focalPx: focalPx,
+                  cx: cx,
+                  cy: cy,
+                  heightCamM: heightCamM,
+                );
+                final wall = buildSyntheticWall(
+                  wallWidthM: wallWidthM,
+                  wallHeightM: hM,
+                  depthM: dM,
+                  focalPx: focalPx,
+                  cx: cx,
+                  cy: cy,
+                  heightCamM: heightCamM,
+                  thetaDeg: thetaDeg,
+                );
+                final chordActual = _dist(wall.ceilL, wall.ceilR);
+                out.add((k: smax / (thetaDeg * chordActual), pH: pH));
+              }
+            }
+          }
+        }
+        return out;
+      }
+
+      double _mean(List<double> xs) => xs.reduce((a, b) => a + b) / xs.length;
+      double _std(List<double> xs, double mean) {
+        final variance =
+            xs.map((x) => (x - mean) * (x - mean)).reduce((a, b) => a + b) /
+                xs.length;
+        return math.sqrt(variance);
+      }
+
+      test(
+        'dispersion de k (constante UNIQUE, comme mesuré en Phase B) sur '
+        'H∈[2.2,3.0] x d∈[2,6] : attendu >> ±5% -- k ne peut PAS être '
+        'traité comme une constante universelle',
+        () {
+          final sweep = runSweep();
+          final ks = sweep.map((r) => r.k).toList();
+          final kMean = _mean(ks);
+          final kStd = _std(ks, kMean);
+          final dispersion = kStd / kMean;
+
+          // ignore: avoid_print
+          print(
+            '[phaseC-point1] k (constante unique) : mean='
+            '${kMean.toStringAsExponential(3)}  std='
+            '${kStd.toStringAsExponential(3)}  '
+            'dispersion=${(dispersion * 100).toStringAsFixed(3)}%  '
+            '(min=${ks.reduce(math.min).toStringAsExponential(3)}  '
+            'max=${ks.reduce(math.max).toStringAsExponential(3)}, '
+            'n=${ks.length})',
+          );
+
+          // C'est le résultat qui TRANCHE la question du brief : la
+          // dispersion mesurée en Python (42.857%) est reproduite ici côté
+          // Dart (méthode analytique réelle, pas recopiée) -- bien au-delà
+          // du seuil ±5% fixé par le brief comme critère de décision. On
+          // assert donc explicitement que ce seuil est dépassé : c'est le
+          // FAIT qui force la réécriture de la règle avec pH explicite
+          // ci-dessous, pas une hypothèse qu'on choisit de croire.
+          expect(
+            dispersion,
+            greaterThan(0.05),
+            reason:
+                'si cette dispersion retombait sous ±5%, la règle Phase B '
+                "(k unique) serait en fait valide partout et il n'y aurait "
+                'rien à réécrire -- ce test documente que ce N\'EST PAS le '
+                'cas (dispersion mesurée ≈42-43%, cf. valeur imprimée '
+                'ci-dessus).',
+          );
+        },
+      );
+
+      test(
+        'dispersion de k/pH (coefficient CORRIGÉ) sur le même balayage : '
+        'attendu << ±5% -- confirme sigma_max ≈ (k/pH)·pH·theta·L',
+        () {
+          final sweep = runSweep();
+          final kOverPh = sweep.map((r) => r.k / r.pH).toList();
+          final mean = _mean(kOverPh);
+          final std = _std(kOverPh, mean);
+          final dispersion = std / mean;
+
+          // ignore: avoid_print
+          print(
+            '[phaseC-point1] k/pH (coefficient corrigé) : mean='
+            '${mean.toStringAsExponential(6)}  std='
+            '${std.toStringAsExponential(6)}  '
+            'dispersion=${(dispersion * 100).toStringAsFixed(3)}%  '
+            '(n=${kOverPh.length})',
+          );
+
+          expect(
+            dispersion,
+            lessThan(0.05),
+            reason:
+                "k/pH doit être quasi-constant (<<±5%) pour justifier "
+                "d'écrire la règle sous forme pH-explicite plutôt que sous "
+                "une autre forme fonctionnelle -- dispersion Python "
+                "pré-validée : 0.235%.",
+          );
+
+          // Contrôle croisé : k/pH mesuré ici doit être cohérent avec
+          // k_ref/pH_ref calculé directement à la tranche de référence
+          // Phase B (H=2.5m, d=3.0m, k_ref=3.716e-3 -- la valeur DÉJÀ
+          // assertée dans le groupe "Point 2" ci-dessus, ±5%). Ce n'est
+          // PAS une nouvelle constante indépendante : c'est la même
+          // constante, simplement redivisée par pH pour révéler qu'elle
+          // n'était valide que sur cette seule tranche.
+          const kRefPhaseB = 3.716e-3;
+          final pHRefPhaseB = _pHAt(
+            wallHeightM: wallHeightM,
+            depthM: depthM,
+            focalPx: focalPx,
+            cx: cx,
+            cy: cy,
+            heightCamM: heightCamM,
+          );
+          final kPrimeRef = kRefPhaseB / pHRefPhaseB;
+          final relDiff = (kPrimeRef - mean).abs() / mean;
+
+          // ignore: avoid_print
+          print(
+            '[phaseC-point1] pH_ref(H=$wallHeightM,d=$depthM)='
+            '${pHRefPhaseB.toStringAsFixed(2)}px  '
+            "k_ref/pH_ref=${kPrimeRef.toStringAsExponential(6)}  "
+            'écart relatif vs k/pH moyen du balayage='
+            '${(relDiff * 100).toStringAsFixed(3)}%',
+          );
+          expect(
+            relDiff,
+            lessThan(0.01),
+            reason:
+                'le coefficient k/pH dérivé de la référence Phase B seule '
+                'doit rester cohérent (<1%) avec la moyenne mesurée sur '
+                'tout le balayage H x d -- sinon la tranche de référence '
+                "Phase B serait elle-même un cas particulier non "
+                'représentatif, ce qui invaliderait la correction.',
+          );
+        },
+      );
+    },
+  );
+
+  // ===========================================================================
+  // PHASE C — POINT 2 : σ_placement est le paramètre libre ("le cy de ce
+  // brief"). Choix explicite : option (b) du brief -- traiter σ_placement
+  // comme une FOURCHETTE [0.5px, 3px] et rendre le verdict sur toute la
+  // fourchette, plutôt que l'option (a) (replacer deux fois les 4 points
+  // d'une même scène et mesurer la dispersion empirique). Raison du choix :
+  // l'option (a) exigerait une NOUVELLE opération de pointage sur une photo
+  // réelle -- précisément ce que le point 3 du même brief interdit
+  // explicitement pour le tri ("aucune mesure de pixel photo n'est requise
+  // et aucune n'est autorisée"), et le critère d'arrêt du brief demande de
+  // ne PAS mesurer finement pour trancher un cas ambigu. L'option (b) est
+  // la seule des deux qui respecte ces deux contraintes simultanément.
+  //
+  // Trichotomie du brief : une scène n'est "gardée" que si elle passe même
+  // à σ=3px (le cas le plus défavorable, seuil le plus haut) ; "écartée"
+  // que si elle échoue même à σ=0.5px (le cas le plus favorable, seuil le
+  // plus bas) ; "indécidable" entre les deux -- et l'indécidable DOIT
+  // apparaître comme tel, jamais être arbitré silencieusement.
+  // ===========================================================================
+  group(
+    'Phase C — Point 2 : σ_placement traité en fourchette [0.5px,3px], '
+    'trichotomie gardée/écartée/indécidable',
+    () {
+      /// seuil(theta*L) requis pour que le mur reste discernable du
+      /// frontal à un niveau de bruit de placement [sigma] donné, pour un
+      /// coefficient corrigé [kPrime] (=k/pH) et une géométrie [pH] donnés.
+      /// C'est le seuil BRUT (là où l'IC95% touche zéro), PAS le seuil
+      /// opérationnel (cf. `_operationalFactor` plus haut dans ce fichier).
+      double seuilBrut({
+        required double sigma,
+        required double kPrime,
+        required double pH,
+      }) =>
+          sigma / (kPrime * pH);
+
+      /// Classification trichotomique stricte du brief : GARDEE seulement
+      /// si thetaL clear le seuil le plus dur (sigma=3px, avec le facteur
+      /// opérationnel appliqué) ; ECARTEE seulement s'il échoue le seuil le
+      /// plus facile (sigma=0.5px, même facteur) ; INDECIDABLE sinon --
+      /// jamais résolu arbitrairement dans l'entre-deux.
+      String classify({
+        required double thetaL,
+        required double kPrime,
+        required double pH,
+        required double operationalFactor,
+      }) {
+        final seuilFacile =
+            seuilBrut(sigma: 0.5, kPrime: kPrime, pH: pH) * operationalFactor;
+        final seuilDur =
+            seuilBrut(sigma: 3.0, kPrime: kPrime, pH: pH) * operationalFactor;
+        if (thetaL > seuilDur) return 'GARDEE';
+        if (thetaL <= seuilFacile) return 'ECARTEE';
+        return 'INDECIDABLE';
+      }
+
+      test(
+        'les 3 seuils (sigma=0.5/1.0/3.0px) sont strictement croissants -- '
+        'la trichotomie GARDEE/ECARTEE/INDECIDABLE est donc bien définie '
+        '(pas de chevauchement ni de trou)',
+        () {
+          const kPrime = 3.186251e-6;
+          const pH = 1000.0;
+          final s05 = seuilBrut(sigma: 0.5, kPrime: kPrime, pH: pH);
+          final s10 = seuilBrut(sigma: 1.0, kPrime: kPrime, pH: pH);
+          final s30 = seuilBrut(sigma: 3.0, kPrime: kPrime, pH: pH);
+          // ignore: avoid_print
+          print('[phaseC-point2] seuils bruts (kPrime=$kPrime, pH=$pH) : '
+              'σ=0.5px->$s05  σ=1.0px->$s10  σ=3.0px->$s30');
+          expect(s05, lessThan(s10));
+          expect(s10, lessThan(s30));
+        },
+      );
+
+      test(
+        'trichotomie : un thetaL très grand est GARDEE, très petit est '
+        'ECARTEE, et une valeur intermédiaire bien choisie est INDECIDABLE '
+        '(rapportée comme telle, pas arbitrée)',
+        () {
+          const kPrime = 3.186251e-6;
+          const pH = 1000.0;
+          const operationalFactor = 3.716;
+          final seuilFacile =
+              seuilBrut(sigma: 0.5, kPrime: kPrime, pH: pH) *
+                  operationalFactor;
+          final seuilDur =
+              seuilBrut(sigma: 3.0, kPrime: kPrime, pH: pH) *
+                  operationalFactor;
+
+          final verdictGrand = classify(
+            thetaL: seuilDur * 10,
+            kPrime: kPrime,
+            pH: pH,
+            operationalFactor: operationalFactor,
+          );
+          final verdictPetit = classify(
+            thetaL: seuilFacile / 10,
+            kPrime: kPrime,
+            pH: pH,
+            operationalFactor: operationalFactor,
+          );
+          final thetaLMilieu = (seuilFacile + seuilDur) / 2;
+          final verdictMilieu = classify(
+            thetaL: thetaLMilieu,
+            kPrime: kPrime,
+            pH: pH,
+            operationalFactor: operationalFactor,
+          );
+
+          // ignore: avoid_print
+          print(
+            '[phaseC-point2] seuilFacile(σ=0.5,op)=$seuilFacile  '
+            'seuilDur(σ=3.0,op)=$seuilDur  '
+            'thetaL_milieu=$thetaLMilieu -> verdict=$verdictMilieu',
+          );
+
+          expect(verdictGrand, equals('GARDEE'));
+          expect(verdictPetit, equals('ECARTEE'));
+          expect(
+            verdictMilieu,
+            equals('INDECIDABLE'),
+            reason:
+                'une valeur choisie EXACTEMENT au milieu des deux seuils '
+                'doit ressortir INDECIDABLE, jamais silencieusement '
+                "arbitrée vers l'un des deux verdicts tranchés -- c'est "
+                'exactement la garantie que le brief demande.',
+          );
+        },
+      );
+    },
+  );
+
+  // ===========================================================================
+  // PHASE C — POINT 3 : inventaire assets/demo_scenes/ + tri gardée/
+  // écartée/indécidable, tri ARITHMÉTIQUE (aucune mesure de pixel photo
+  // nouvelle -- chord/pH viennent de `PerspCalib.demoPresets`, déjà
+  // committé dans lib/models/persp_calib.dart, ou pour scandinave
+  // spécifiquement de la calibration déjà établie dans
+  // `_debug_calib_bench_test.dart` (candidateScandinaveIt1, corde 228px
+  // citée explicitement par le brief) -- angle "à l'oeil" uniquement,
+  // AUCUN balayage de colonnes/gradient. Ne rejuge PAS scandinave : la
+  // fourchette d'angle disputée 0.3°-2.8° établie en Phase A/B est reprise
+  // telle quelle, pas re-dérivée.
+  // ===========================================================================
+  group(
+    'Phase C — Point 3 : inventaire des 4 scènes démo + verdict gardée/'
+    'écartée/indécidable (arithmétique, aucune mesure de pixel nouvelle)',
+    () {
+      // Coefficient corrigé (k/pH), pris directement de la référence Phase
+      // B (k_ref=3.716e-3 à la tranche H=2.5m/d=3.0m) -- cohérence avec le
+      // balayage complet du Point 1 ci-dessus déjà vérifiée à <1% près (2e
+      // test du groupe Point 1). Pas une nouvelle mesure : la même
+      // constante déjà assertée, redivisée par pH pour révéler sa vraie
+      // portée (cf. Point 1).
+      const kRefPhaseB = 3.716e-3;
+
+      test(
+        'tableau : dimensions, corde, pH, angle "à l\'oeil", et verdict '
+        'gardée/écartée/indécidable pour les 4 scènes démo',
+        () {
+          final pHRefPhaseB = _pHAt(
+            wallHeightM: wallHeightM,
+            depthM: depthM,
+            focalPx: focalPx,
+            cx: cx,
+            cy: cy,
+            heightCamM: heightCamM,
+          );
+          final kPrime = kRefPhaseB / pHRefPhaseB;
+          final operationalFactor = _operationalFactor(
+            kPrime: kPrime,
+            pHRefPhaseB: pHRefPhaseB,
+          );
+
+          // ignore: avoid_print
+          print(
+            '[phaseC-point3] kPrime=k/pH=${kPrime.toStringAsExponential(6)}  '
+            'facteur opérationnel='
+            '${operationalFactor.toStringAsFixed(3)} '
+            '(brief : doit être dans [3,5])',
+          );
+          expect(operationalFactor, greaterThanOrEqualTo(3.0));
+          expect(operationalFactor, lessThanOrEqualTo(5.0));
+
+          double seuilBrut(double sigma, double pH) =>
+              sigma / (kPrime * pH);
+          String classify(double thetaL, double pH) {
+            final seuilFacile =
+                seuilBrut(0.5, pH) * operationalFactor;
+            final seuilDur = seuilBrut(3.0, pH) * operationalFactor;
+            if (thetaL > seuilDur) return 'GARDEE';
+            if (thetaL <= seuilFacile) return 'ECARTEE';
+            return 'INDECIDABLE';
+          }
+
+          // --- Inventaire des 4 scènes ---
+          // haussmann/moderne/provencal : dimensions (propriété fichier,
+          // pas une mesure d'angle) + chord/pH tirés de
+          // `PerspCalib.demoPresets` (déjà committé, lu ici, jamais
+          // remesuré) + angle "à l'oeil" = inspection visuelle qualitative
+          // de ce tour (interdiction du balayage de colonnes respectée) :
+          // AUCUNE convergence perceptible sur le mur du fond dans les 3
+          // cas -> theta_a_oeil=0° (fait observé, pas une hypothèse à 1px
+          // ou une extrapolation d'un angle non vu).
+          //
+          // scandinave : chord=228px est la valeur EXPLICITEMENT citée par
+          // le brief lui-même ("Scandinave a échoué sur ses 228 px de
+          // corde") -- retenue comme donnée d'entrée, pas re-dérivée. pH
+          // correspondant tiré de la MÊME identification de mur (candidat
+          // it1, `_debug_calib_bench_test.dart` lignes ~299-303 :
+          // ceilL.yPct=0.0265, floorL.yPct=0.8365, image 1920x1088) --
+          // PAS de `demoPresets['scandinave']` (qui décrit un mur du fond
+          // pleine-largeur à 80% de l'image, une identification DIFFÉRENTE
+          // et non celle sur laquelle porte la dispute des 228px). Angle :
+          // fourchette 0.3°-2.8° historiquement disputée en Phase A/B,
+          // reprise SANS re-jugement (ni resserrée, ni tranchée ici).
+          const scenes = [
+            (
+              name: 'haussmann',
+              widthPx: 2560.0,
+              heightPx: 1783.0,
+              ceilLxPct: 0.120,
+              ceilRxPct: 0.880,
+              ceilLyPct: 0.090,
+              floorLyPct: 0.870,
+              chordPxOverride: null,
+              thetasDeg: [0.0],
+            ),
+            (
+              name: 'moderne',
+              widthPx: 1960.0,
+              heightPx: 1470.0,
+              ceilLxPct: 0.100,
+              ceilRxPct: 0.900,
+              ceilLyPct: 0.095,
+              floorLyPct: 0.720,
+              chordPxOverride: null,
+              thetasDeg: [0.0],
+            ),
+            (
+              name: 'provencal',
+              widthPx: 2560.0,
+              heightPx: 1707.0,
+              ceilLxPct: 0.100,
+              ceilRxPct: 0.900,
+              ceilLyPct: 0.140,
+              floorLyPct: 0.830,
+              chordPxOverride: null,
+              thetasDeg: [0.0],
+            ),
+            (
+              name: 'scandinave',
+              widthPx: 1920.0,
+              heightPx: 1088.0,
+              // corde/pH : identification "candidat it1" (mur bois étroit,
+              // x∈[83.0%,99.3%]), PAS demoPresets (mur pleine largeur) --
+              // cf. note ci-dessus.
+              ceilLxPct: 0.830,
+              ceilRxPct: 0.993,
+              ceilLyPct: 0.0265,
+              floorLyPct: 0.8365,
+              // La corde EXACTE issue de cette identification (x∈[83.0%,
+              // 99.3%] sur 1920px) donne 313px, PAS 228px -- écart avec le
+              // chiffre cité explicitement par le brief lui-même
+              // ("Scandinave a échoué sur ses 228 px de corde"). Ce chiffre
+              // du brief est repris tel quel (autoritatif, pas re-dérivé --
+              // exactement l'exclusion "ne mesure aucun angle sur photo,
+              // ne rejuge pas scandinave"), via `chordPxOverride` plutôt
+              // que le calcul (ceilR-ceilL)*width utilisé pour les 3
+              // autres scènes -- l'écart 313 vs 228 lui-même est rapporté
+              // (pas caché) dans le print ci-dessous. pH, lui, N'EST PAS
+              // cité par le brief : on garde la valeur géométrique déduite
+              // de la même identification verticale (candidat it1).
+              chordPxOverride: 228.0,
+              thetasDeg: [0.3, 2.8], // fourchette disputée, non rejugée
+            ),
+          ];
+
+          // Vérification factuelle : les 4 scènes lues ici via
+          // demoPresets/persp_calib.dart existent bel et bien dans le
+          // code — confirme qu'on lit des données déjà committées, pas
+          // des valeurs inventées pour ce test.
+          for (final s in scenes) {
+            if (s.name != 'scandinave') {
+              final preset = PerspCalib.demoPresets[s.name]!;
+              expect(preset.ceilL.xPct, closeTo(s.ceilLxPct, 1e-9));
+              expect(preset.ceilR.xPct, closeTo(s.ceilRxPct, 1e-9));
+            }
+          }
+
+          // ignore: avoid_print
+          print(
+            '${'scene'.padRight(12)} ${'dims'.padRight(11)} '
+            '${'corde_px'.padLeft(9)} ${'pH_px'.padLeft(8)} '
+            '${'theta_oeil'.padLeft(11)} ${'seuil_facile'.padLeft(13)} '
+            '${'seuil_dur'.padLeft(10)} ${'theta*L'.padLeft(9)} verdict',
+          );
+
+          final verdictsByScene = <String, Set<String>>{};
+          for (final s in scenes) {
+            final chordFromCalib = (s.ceilRxPct - s.ceilLxPct) * s.widthPx;
+            final chordPx = s.chordPxOverride ?? chordFromCalib;
+            if (s.chordPxOverride != null) {
+              // ignore: avoid_print
+              print(
+                '[phaseC-point3] ${s.name} : corde calibration '
+                '(candidat it1)=${chordFromCalib.toStringAsFixed(1)}px vs '
+                'corde citée par le brief='
+                '${s.chordPxOverride!.toStringAsFixed(1)}px -- écart '
+                'rapporté, chiffre du brief retenu tel quel (autoritatif, '
+                'non re-dérivé).',
+              );
+            }
+            final pHPx = (s.floorLyPct - s.ceilLyPct) * s.heightPx;
+            final seuilFacile = seuilBrut(0.5, pHPx) * operationalFactor;
+            final seuilDur = seuilBrut(3.0, pHPx) * operationalFactor;
+            final verdictSet = <String>{};
+            for (final thetaDeg in s.thetasDeg) {
+              final thetaL = thetaDeg * chordPx;
+              final verdict = classify(thetaL, pHPx);
+              verdictSet.add(verdict);
+              // ignore: avoid_print
+              print(
+                '${s.name.padRight(12)} '
+                '${'${s.widthPx.toInt()}x${s.heightPx.toInt()}'.padRight(11)} '
+                '${chordPx.toStringAsFixed(1).padLeft(9)} '
+                '${pHPx.toStringAsFixed(1).padLeft(8)} '
+                '${thetaDeg.toStringAsFixed(2).padLeft(11)} '
+                '${seuilFacile.toStringAsFixed(1).padLeft(13)} '
+                '${seuilDur.toStringAsFixed(1).padLeft(10)} '
+                '${thetaL.toStringAsFixed(1).padLeft(9)} $verdict',
+              );
+            }
+            verdictsByScene[s.name] = verdictSet;
+          }
+
+          // --- Assertions factuelles sur le verdict ---
+          // haussmann/moderne/provencal : theta_a_oeil=0 -> thetaL=0 pour
+          // TOUTE valeur de corde -> ECARTEE de façon triviale et non
+          // ambiguë (0 est sous tout seuil positif, aux deux bornes de la
+          // fourchette sigma).
+          for (final name in ['haussmann', 'moderne', 'provencal']) {
+            expect(
+              verdictsByScene[name],
+              equals({'ECARTEE'}),
+              reason: '$name : aucune convergence perceptible à l\'oeil sur '
+                  'le mur du fond -> theta≈0 -> thetaL=0, sous tout seuil '
+                  'positif -> ECARTEE sans ambiguïté.',
+            );
+          }
+          // scandinave : même à la borne HAUTE de la fourchette disputée
+          // (2.8°, jamais la borne retenue par défaut, la plus favorable
+          // possible à la conservation de la scène) et au niveau de bruit
+          // de placement le plus optimiste testé pour le seuil "facile"
+          // (sigma=0.5px), la scène reste ECARTEE au niveau OPÉRATIONNEL
+          // (facteur 3-5 appliqué, celui que le brief désigne comme
+          // décisif) -- donc ECARTEE sur toute sa fourchette d'angle
+          // disputée, pas seulement au niveau brut (où 2.8° ressort
+          // INDECIDABLE, cf. print ci-dessus : c'est le facteur
+          // opérationnel qui tranche, exactement le rôle que le brief lui
+          // assigne).
+          expect(
+            verdictsByScene['scandinave'],
+            equals({'ECARTEE'}),
+            reason:
+                'scandinave : corde 228px (citée par le brief) insuffisante '
+                'pour compenser meme la borne haute disputee (2.8°) au '
+                'niveau operationnel -- ECARTEE sur toute la fourchette '
+                '[0.3°,2.8°], sans qu\'aucune mesure fine supplementaire '
+                'n\'ait ete necessaire pour trancher (critere d\'arret du '
+                'brief respecte).',
+          );
+
+          // ignore: avoid_print
+          print(
+            '\n[phaseC-point3] VERDICT GLOBAL : 0/4 scènes gardées -> '
+            'AUCUNE scène de l\'inventaire ne franchit le seuil de '
+            'détectabilité opérationnel. Conséquence (décision #2 du '
+            'brief) : le cas frontal n\'est pas une exception à gérer mais '
+            'le CHEMIN NORMAL du produit sur cet inventaire -- ce qui fait '
+            'passer vanishing_point.dart de sujet de propreté à sujet de '
+            'correction (changement de PRIORITÉ reporté ici, PAS une '
+            'décision ni une modification de lib/, per les exclusions '
+            'explicites du brief).',
+          );
+        },
+      );
+    },
+  );
 }
 
 /// Reproduction minimale de `toward()` de `VanishingPoint`
