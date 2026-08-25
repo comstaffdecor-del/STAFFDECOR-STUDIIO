@@ -1,0 +1,129 @@
+{
+  "sku": "D114M",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D114M.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      148.9957,
+      -13.0
+    ],
+    [
+      149.9957,
+      0.0
+    ],
+    [
+      189.9957,
+      0.0
+    ],
+    [
+      189.9957,
+      -106.9703
+    ],
+    [
+      187.9957,
+      -111.9792
+    ],
+    [
+      187.9957,
+      -146.9834
+    ],
+    [
+      137.4983,
+      -147.05
+    ],
+    [
+      132.5091,
+      -150.0
+    ],
+    [
+      0.0,
+      -150.0
+    ],
+    [
+      0.0,
+      -135.0
+    ],
+    [
+      151.9927,
+      -132.0
+    ],
+    [
+      151.9927,
+      -130.0
+    ],
+    [
+      169.9957,
+      -127.6076
+    ],
+    [
+      171.9082,
+      -127.2041
+    ],
+    [
+      173.526,
+      -126.1073
+    ],
+    [
+      174.6088,
+      -124.48
+    ],
+    [
+      174.9957,
+      -122.564
+    ],
+    [
+      174.9957,
+      -20.2727
+    ],
+    [
+      174.4118,
+      -17.9279
+    ],
+    [
+      172.7965,
+      -16.1307
+    ],
+    [
+      170.527,
+      -15.301
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      8,
+      9
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      1,
+      2
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 189.996,
+    "h": 150.0
+  },
+  "hauteur_mur_mm": 15.0,
+  "projection_plafond_mm": 40.0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

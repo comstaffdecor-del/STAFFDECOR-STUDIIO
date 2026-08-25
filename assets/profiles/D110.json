@@ -1,0 +1,113 @@
+{
+  "sku": "D110",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D110.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      0.0,
+      42.0089
+    ],
+    [
+      26.5,
+      40.0089
+    ],
+    [
+      26.5,
+      27.0013
+    ],
+    [
+      19.5,
+      25.0013
+    ],
+    [
+      19.5,
+      17.0041
+    ],
+    [
+      26.5,
+      15.0041
+    ],
+    [
+      45.0,
+      13.0041
+    ],
+    [
+      45.0,
+      0.0
+    ],
+    [
+      55.0,
+      0.0
+    ],
+    [
+      57.0,
+      -38.9847
+    ],
+    [
+      58.0,
+      -40.0
+    ],
+    [
+      58.0,
+      -92.9999
+    ],
+    [
+      48.0,
+      -92.9999
+    ],
+    [
+      41.0,
+      -22.9999
+    ],
+    [
+      23.0,
+      -22.9999
+    ],
+    [
+      22.0,
+      -29.9999
+    ],
+    [
+      0.0,
+      -29.9999
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      16,
+      0
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      7,
+      8
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 58.0,
+    "h": 135.009
+  },
+  "hauteur_mur_mm": 72.009,
+  "projection_plafond_mm": 10.0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

@@ -58,6 +58,42 @@ PILOT_SKUS = {
     "plin08", "plin08m", "plin10", "plin10m", "plin12",
     "plin15", "plin20", "plin38", "tal26", "tal41",
 }
+
+# --- Périmètre BATCH CORNICHES (Piste A, 3e passe) ------------------------
+# Les 79 SKU corniches restants (classification_t1_t4.csv, famille=
+# 'Corniches', format_exploitable=True) qui possèdent au moins un candidat
+# .stp/.step réel dans ged_diff_par_extension.csv et ne sont PAS déjà sur
+# disque (13 déjà présents depuis les passes précédentes : d555, d562,
+# d576, d614, d620, d631, d705, d706, d709, d718, d720, d748, d891).
+# Recoupement effectué le jour du run (classification_t1_t4.csv x
+# ged_diff_par_extension.csv) : sur les 165 corniches exploitables, 92 ont
+# un .stp/.step réel (13 déjà téléchargées + ces 79) ; 51 sont stl-only
+# (hors périmètre de ce batch, qui est .stp/.step UNIQUEMENT sur décision
+# explicite) ; 22 n'ont AUCUN candidat dans aucun format (ni stp/step ni
+# stl) -- signalé, jamais silencieux, voir rapport de batch.
+BATCH_CORNICHES_SKUS = {
+    "d106", "d110", "d113", "d113m", "d114", "d114m", "d116", "d117",
+    "d505", "d515", "d520", "d545", "d550", "d560", "d561", "d563",
+    "d564", "d565", "d567", "d568", "d569", "d577", "d578", "d579",
+    "d601", "d604", "d605", "d606", "d607", "d608", "d609", "d610",
+    "d611", "d612", "d615", "d616", "d617", "d621", "d622", "d624",
+    "d625", "d626", "d628", "d629", "d630", "d632", "d633", "d650",
+    "d651", "d652", "d653", "d656", "d657", "d702", "d703", "d704",
+    "d707", "d708", "d710", "d712", "d715", "d717", "d749", "d801",
+    "d802", "d814", "d815", "d820", "d830", "d835", "d840", "d880",
+    "d886", "d887", "d888", "d892", "d896", "d898", "d901",
+}
+
+# SKU corniches exploitables SANS AUCUN candidat de téléchargement dans
+# ged_diff_par_extension.csv (ni stp/step ni stl) -- à rapporter comme
+# "non téléchargeable en l'état", jamais à deviner une source. Liste figée
+# au moment du recoupement (à revérifier si ged_diff_par_extension.csv est
+# régénéré).
+BATCH_CORNICHES_SANS_CANDIDAT = {
+    "d101", "d102", "d103", "d104", "d107", "d108", "d118", "d510",
+    "d556", "d570", "d574", "d575", "d580", "d713", "d845", "d846",
+    "d880a", "d894", "d903", "ebp0430", "us0740", "us1040",
+}
 ALLOWED_EXTS = {"stp", "step", "stl"}
 THROTTLE_SECONDS = 0.3
 
@@ -67,21 +103,24 @@ def load_ged_diff_rows():
         return list(csv.DictReader(f))
 
 
-def select_pilot_rows(rows):
-    """Filtre par SKU exact (insensible casse) dans PILOT_SKUS, ext dans
-    ALLOWED_EXTS, PUIS priorité par SKU : .stp/.step retenu si présent,
-    .stl retenu SEULEMENT si aucun .stp/.step n'existe pour ce SKU (voie
-    STEP jugée plus sûre/déjà prouvée — brief Piste A 2e passe). Jamais
-    les deux formats pour un même SKU dans ce lot. Retourne aussi la
-    liste des SKU demandés sans aucun candidat (transparence, pas de
-    silence)."""
+def select_pilot_rows(rows, wanted_skus=None, exts_allowed=None):
+    """Filtre par SKU exact (insensible casse) dans `wanted_skus` (par
+    défaut PILOT_SKUS, pour compatibilité historique), ext dans
+    `exts_allowed` (par défaut ALLOWED_EXTS), PUIS priorité par SKU :
+    .stp/.step retenu si présent, .stl retenu SEULEMENT si aucun
+    .stp/.step n'existe pour ce SKU (voie STEP jugée plus sûre/déjà
+    prouvée — brief Piste A 2e passe). Jamais les deux formats pour un
+    même SKU dans ce lot. Retourne aussi la liste des SKU demandés sans
+    aucun candidat (transparence, pas de silence)."""
+    wanted = wanted_skus if wanted_skus is not None else PILOT_SKUS
+    exts = exts_allowed if exts_allowed is not None else ALLOWED_EXTS
     candidates_by_sku = {}
     for row in rows:
         sku_lower = row["sku"].strip().lower()
-        if sku_lower not in PILOT_SKUS:
+        if sku_lower not in wanted:
             continue
         ext_lower = row["ext"].strip().lower()
-        if ext_lower not in ALLOWED_EXTS:
+        if ext_lower not in exts:
             continue
         candidates_by_sku.setdefault(sku_lower, []).append(row)
 
@@ -95,7 +134,7 @@ def select_pilot_rows(rows):
         selected.extend(chosen)
         matched_skus.add(sku_lower)
 
-    missing_skus = sorted(PILOT_SKUS - matched_skus)
+    missing_skus = sorted(wanted - matched_skus)
     return selected, missing_skus
 
 
@@ -109,18 +148,20 @@ def dest_path_for(row):
         return None  # extension inattendue (ne devrait pas arriver via ALLOWED_EXTS), ignoré explicitement
 
 
-def check_only():
+def check_only(wanted_skus=None, exts_allowed=None, label="LOT PILOTE STEP"):
+    wanted = wanted_skus if wanted_skus is not None else PILOT_SKUS
+    exts = exts_allowed if exts_allowed is not None else ALLOWED_EXTS
     rows = load_ged_diff_rows()
-    selected, missing_skus = select_pilot_rows(rows)
+    selected, missing_skus = select_pilot_rows(rows, wanted, exts)
 
-    print(f"=== LOT PILOTE STEP — simulation (--check-only, aucun réseau) ===")
-    print(f"SKU demandés: {sorted(PILOT_SKUS)}")
-    print(f"Filtre: ext in {ALLOWED_EXTS}\n")
+    print(f"=== {label} — simulation (--check-only, aucun réseau) ===")
+    print(f"SKU demandés: {sorted(wanted)}")
+    print(f"Filtre: ext in {exts}\n")
 
     if missing_skus:
         print(f"⚠️  SKU demandés SANS AUCUN candidat éligible (absents de "
               f"ged_diff_par_extension.csv sous cette forme exacte, ou sans "
-              f"fichier .stp/.step) : {missing_skus}\n")
+              f"fichier dans les extensions demandées) : {missing_skus}\n")
 
     for row in selected:
         dest = dest_path_for(row)
@@ -132,7 +173,9 @@ def check_only():
     return selected, missing_skus
 
 
-def download():
+def download(wanted_skus=None, exts_allowed=None):
+    wanted = wanted_skus if wanted_skus is not None else PILOT_SKUS
+    exts = exts_allowed if exts_allowed is not None else ALLOWED_EXTS
     try:
         base_url, email, password = load_credentials()
     except GedAccessError as e:
@@ -140,7 +183,7 @@ def download():
         sys.exit(1)
 
     rows = load_ged_diff_rows()
-    selected, missing_skus = select_pilot_rows(rows)
+    selected, missing_skus = select_pilot_rows(rows, wanted, exts)
 
     if missing_skus:
         print(f"⚠️  SKU demandés sans candidat éligible: {missing_skus}")
@@ -214,13 +257,27 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check-only", action="store_true", help="Simulation, aucun réseau.")
     parser.add_argument("--download", action="store_true", help="Téléchargement réel, idempotent.")
+    parser.add_argument(
+        "--batch-corniches", action="store_true",
+        help=(
+            "Utilise BATCH_CORNICHES_SKUS (79 corniches restantes, Piste A "
+            "3e passe) au lieu de PILOT_SKUS, et restreint aux extensions "
+            ".stp/.step UNIQUEMENT (jamais .stl dans ce batch, décision "
+            "explicite)."
+        ),
+    )
     args = parser.parse_args()
 
+    if args.batch_corniches:
+        wanted, exts, label = BATCH_CORNICHES_SKUS, {"stp", "step"}, "BATCH CORNICHES (79 restantes)"
+    else:
+        wanted, exts, label = PILOT_SKUS, ALLOWED_EXTS, "LOT PILOTE STEP"
+
     if args.check_only:
-        check_only()
+        check_only(wanted, exts, label)
         return
     if args.download:
-        download()
+        download(wanted, exts)
         return
     print("ERREUR: fournir --check-only ou --download", file=sys.stderr)
     sys.exit(1)

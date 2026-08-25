@@ -1,0 +1,97 @@
+{
+  "sku": "D106",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D106.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      0.1593,
+      -0.0228
+    ],
+    [
+      0.0,
+      0.0228
+    ],
+    [
+      0.0,
+      64.6876
+    ],
+    [
+      15.0,
+      63.6876
+    ],
+    [
+      15.0,
+      15.6876
+    ],
+    [
+      50.0,
+      14.6876
+    ],
+    [
+      50.0,
+      -285.3124
+    ],
+    [
+      0.0,
+      -285.3124
+    ],
+    [
+      0.0,
+      -270.2868
+    ],
+    [
+      35.0604,
+      -260.2691
+    ],
+    [
+      35.0,
+      -250.3124
+    ],
+    [
+      35.0,
+      -10.0133
+    ],
+    [
+      0.1594,
+      -0.0589
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      1,
+      2
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      0,
+      1
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 50.0,
+    "h": 350.0
+  },
+  "hauteur_mur_mm": 64.665,
+  "projection_plafond_mm": 0.159,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}
