@@ -1,0 +1,54 @@
+{
+  "sku": "PLIN15",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "PLIN15.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      149.6933,
+      0.0
+    ],
+    [
+      148.6934,
+      -16.5713
+    ],
+    [
+      0.0,
+      0.0
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [],
+    "auto": false
+  },
+  "face_pose_plafond": {
+    "indices": [
+      2,
+      0
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 149.693,
+    "h": 16.571
+  },
+  "hauteur_mur_mm": 0,
+  "projection_plafond_mm": 149.693,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 1500.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}
