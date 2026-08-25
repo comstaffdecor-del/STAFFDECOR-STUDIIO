@@ -1705,122 +1705,137 @@ void main() {
   );
 
   // ===========================================================================
-  // PHASE C — POINT 3 (REFAIT une seconde fois cette session, suite au
-  // second retour utilisateur) : inventaire assets/demo_scenes/ + tri
+  // PHASE C — POINT 3 (REFAIT une troisième fois cette session, suite au
+  // troisième retour utilisateur) : inventaire assets/demo_scenes/ + tri
   // gardée/écartée/indécidable, tri ARITHMÉTIQUE (aucune mesure de pixel
   // photo nouvelle).
   //
-  // Ce qui a changé par rapport à la version précédente de ce même groupe
-  // (chaque point correspond à un problème décisif signalé par
-  // l'utilisateur SUR CETTE VERSION-LÀ, déjà elle-même une reprise) :
+  // Ce qui a changé par rapport à la version précédente (2e passe) de ce
+  // même groupe (chaque point correspond à un problème décisif signalé par
+  // l'utilisateur SUR CETTE VERSION-LÀ) :
   //
-  // 1) L'ENVELOPPE D'ARRONDI EST DÉSORMAIS PORTÉE SYMÉTRIQUEMENT SUR LES 4
-  //    SCÈNES, PAS SEULEMENT SUR LES 2 QUI CONFORTAIENT LA CONCLUSION.
-  //    haussmann et provencal/moderne sont TOUTES committées à la même
-  //    précision (3 décimales sur yPct) ; scandinave (candidat it1) est à
-  //    4 décimales. La version précédente appliquait le pire-cas
-  //    ±0.0005 UNIQUEMENT à moderne/provencal (parce qu'elles étaient déjà
-  //    dégénérées au nominal) et traitait haussmann/scandinave comme des
-  //    points exacts -- alors que haussmann, à la même précision de
-  //    stockage, a un vp.x = 303820 issu d'un écart de pentes construit
-  //    sur 5 et 10 ULP (dy_ceil=-8.915px sur 5 ULP=0.005, dy_floor=
-  //    -17.830px sur 10 ULP=0.010, delta_m=-0.004582), donc tout aussi
-  //    sensible à l'arrondi committé que moderne/provencal. Corrigé : les
-  //    4 scènes reçoivent maintenant le MÊME traitement -- 16 combinaisons
-  //    de signe (±un demi-ULP sur chacun des 4 y : ceilL, ceilR, floorL,
-  //    floorR), chacune passée dans le VRAI `pg.lineIntersect`, puis
-  //    sigma_max calculé pour chaque candidat non dégénéré. Le résultat
-  //    publié est un INTERVALLE [min,max], jamais un point unique.
+  // 1) ±0.5 ULP ÉTAIT UN PLANCHER, PAS L'INCERTITUDE -- LE PRENDRE POUR
+  //    L'INCERTITUDE ÉTAIT LA MÊME ERREUR QUE LA PRÉCÉDENTE, RETOURNÉE.
+  //    `persp_calib.dart` (commentaire de provenance, lignes ~78-92) dit
+  //    explicitement que les 8 points ont été relevés à la main sur des
+  //    grilles de repérage 1%/5%/10% superposées aux photos. Sur
+  //    haussmann, 1% de 1783px = 17.8px -- soit DIX FOIS plus grossier que
+  //    la précision d'ÉCRITURE (3 décimales, ULP≈0.89px) que la version
+  //    précédente prenait pour l'enveloppe. L'interpolation à l'oeil dans
+  //    une cellule de grille de 17.8px vaut plausiblement plusieurs
+  //    pixels, pas 0.89. ±0.5 ULP reste calculé (cf. point 2) mais
+  //    seulement comme PLANCHER documenté, jamais comme l'enveloppe
+  //    utilisée pour classer.
   //
-  // 2) MODERNE/PROVENCAL RECLASSÉES ÉCARTÉE (FERME), PAS INDÉCIDABLE. La
-  //    borne pire-cas de la version précédente (sigma_max ≤ 0.753px et
-  //    0.874px) avait déjà été calculée et publiée -- mais la conclusion
-  //    n'en avait pas été tirée : ces deux bornes sont sous seuilFacile
-  //    (1.858px) pour TOUTE donnée compatible avec l'arrondi committé, et
-  //    la règle de classification dit explicitement que sigma_max ≤
-  //    seuilFacile ⇒ ÉCARTÉE. "theta n'est pas déterminable" (vrai) et "la
-  //    scène n'est pas classable" (faux ici, car classée pareil sur tout
-  //    l'intervalle admissible) sont deux énoncés distincts qui avaient
-  //    été confondus -- corrigé : le VERDICT dépend de l'INTERVALLE de
-  //    sigma_max, pas du fait que theta lui-même soit ponctuel.
+  // 2) σ_placement REPARAMÉTRISE DIRECTEMENT L'ENVELOPPE (au lieu de l'ULP
+  //    d'écriture) -- σ_placement joue deux rôles dans le brief : (a) la
+  //    perturbation appliquée aux 4 y de calibration, (b) la grandeur dont
+  //    la fourchette [0.5,3]px définit les seuils. La version précédente
+  //    découplait ces deux rôles (ULP pour (a), [0.5,3]px pour (b) seuls
+  //    les seuils) -- artificiel. Corrigé : l'enveloppe est désormais un
+  //    BALAYAGE DENSE de σ_placement lui-même sur [0.5,3]px (201 points),
+  //    chaque valeur balayée générant les mêmes 16 combinaisons de signe
+  //    sur les 4 y, chacune passée dans le VRAI `pg.lineIntersect`. Le
+  //    [lo,hi] publié est le min/max GLOBAL sur tout le balayage, pas sur
+  //    les deux bornes seules -- un balayage à 26 points (script Python
+  //    `point3_dense_sweep_check.py`) avait montré que les deux bornes
+  //    seules SOUS-ESTIMENT l'intervalle réel pour haussmann/scandinave :
+  //    une valeur intermédiaire de σ_placement (là où la perturbation sur
+  //    Δm croise zéro) produit un |C| bien plus extrême qu'aux deux
+  //    bornes. Le plancher ULP/√12 (point 1) est calculé et IMPRIMÉ par
+  //    scène, mais jamais utilisé pour construire l'enveloppe.
   //
-  // 3) HAUSSMANN RESTE INDÉCIDABLE, MAIS POUR UNE CAUSE IDENTIFIÉE ET
-  //    DIFFÉRENTE DE SCANDINAVE. L'intervalle pire-cas haussmann
-  //    ([~1.37,~3.20]px, cf. ci-dessous) chevauche seuilFacile=1.858px --
-  //    ce n'est PAS un point à 2.29px avec ±40% implicite non publié
-  //    (l'erreur signalée sur la version précédente), c'est un intervalle
-  //    explicite dont la borne basse est sous le seuil et la borne haute
-  //    au-dessus. La cause profonde est identifiée : la précision de
-  //    stockage à 3 décimales de `demoPresets`, pas σ_placement ni f ni la
-  //    corde -- une quantification de 0.5-0.9px qui, par
-  //    ULP/√12≈0.144-0.26px (ou ±0.5 ULP≈0.25-0.45px pire-cas), impose un
-  //    plancher sur l'incertitude AVANT toute erreur humaine de pointage.
+  // 3) CONSÉQUENCE NUMÉRIQUE : MODERNE/PROVENCAL NE SONT PLUS ÉCARTÉE
+  //    FERME. Sous ±0.5 ULP seul, leur borne haute (~0.75-0.87px) restait
+  //    sous seuilFacile=1.858px. Sous σ_placement=3px (borne haute déjà
+  //    déclarée dans la fourchette du brief), l'enveloppe est ~4x plus
+  //    large (3/0.735≈4.08) et leur borne haute monte à ~3.07px --
+  //    AU-DESSUS de seuilFacile. L'ÉCARTÉE ferme ne survit pas à une
+  //    enveloppe réaliste : moderne/provencal repassent INDÉCIDABLE.
   //
-  // 4) SCANDINAVE (candidat it1, 4 décimales, ±0.054px de quantification)
-  //    reste indécidable pour une raison DIFFÉRENTE : son intervalle
-  //    ([~2.40,~2.50]px) est étroit (±1.1%) et tombe intégralement dans la
-  //    fourchette opérationnelle [seuilFacile,seuilDur] -- ce n'est pas un
-  //    problème de précision de stockage (l'enveloppe est fine), c'est la
-  //    fourchette σ_placement=[0.5,3]px elle-même qui rend ce sigma_max
-  //    non tranchable. haussmann et scandinave sont donc "indécidable"
-  //    pour deux raisons disjointes, qui ne se réparent pas de la même
-  //    façon (l'une en resserrant la précision de stockage des presets --
-  //    hors mandat de cette session --, l'autre en resserrant σ_placement
-  //    par une mesure empirique de pointage -- explicitement exclue par le
-  //    critère d'arrêt du brief).
+  // 4) HAUSSMANN ET SCANDINAVE : LE SIGNAL D'OBLIQUITÉ TIENT SOUS LE BRUIT
+  //    DE L'INSTRUMENT DE CALIBRATION, PAS SOUS UNE PRÉCISION DE STOCKAGE.
+  //    Pour haussmann, le différentiel de pente (Δm=-0.004582) qui porte
+  //    tout le signal d'obliquité tient dans 8.915px de différentiel
+  //    (dy_plancher-dy_plafond) sur une corde de 1945.6px. À
+  //    σ_placement=3px, la perturbation sur Δm (±4×3/1945.6=±0.006167)
+  //    EXCÈDE ce Δm nominal -- l'intervalle admissible de Δm traverse
+  //    zéro, |C| devient localement non borné (au sens des 16 candidats
+  //    discrets, qui s'en approchent sans jamais l'atteindre exactement,
+  //    cf. seuil eps=0.001 de `lineIntersect`), et sigma_max explose vers
+  //    le haut (borne haute ~5.36px, au-dessus de seuilFacile ET
+  //    approchant seuilDur=11.148px sans l'atteindre) tandis que sa borne
+  //    basse s'effondre près de zéro. Même mécanisme pour scandinave
+  //    (Δm=-0.031288, perturbation à σ=3px=±0.038344, traverse également
+  //    zéro). Ce n'est pas "indécidable par précision de stockage", c'est
+  //    "le signal est sous le bruit de l'instrument de calibration" (la
+  //    grille 1%/5%/10%, cf. point 1) -- haussmann et scandinave sont
+  //    désormais indécidables pour la MÊME raison structurelle que
+  //    moderne/provencal (enveloppe réaliste trop large pour trancher),
+  //    pas pour une raison distincte comme le prétendait la version
+  //    précédente.
   //
-  // 5) LA BORNE BASSE DE σ_placement=[0.5,3]px N'EST PAS CENTRÉE SUR
-  //    L'INCONNU : ELLE EST DÉJÀ SOUS LA QUANTIFICATION DES PRESETS.
-  //    Un demi-ULP sur yPct à 3 décimales vaut, en pixels image,
-  //    0.5×0.001×heightPx -- soit 0.89px sur haussmann (heightPx=1783),
-  //    0.735px sur moderne, 0.85px sur provencal -- tous DÉJÀ au-dessus ou
-  //    à hauteur de la borne basse 0.5px de la fourchette actuelle. Ce
-  //    plancher ULP/√12≈0.5px existe même en l'absence de toute erreur de
-  //    pointage humain -- il vient de l'écriture des presets, pas de la
-  //    photo. Constat rapporté ici, PAS appliqué (resserrer σ_placement
-  //    reviendrait à changer une convention établie au point 2, hors
-  //    portée de cette correction).
+  // 5) SCANDINAVE : ENVELOPPE MARQUÉE "NON QUANTIFIABLE", PAS ±1.1%. La
+  //    version précédente citait une enveloppe étroite (±1.1%) dérivée de
+  //    la précision d'écriture à 4 décimales de l'identification
+  //    "candidat it1" -- mais c'est précisément la scène dont la Phase B a
+  //    établi que la ligne de jonction plafond/mur avait été confondue
+  //    avec une tringle à rideau dorée (erreur SYSTÉMATIQUE connue,
+  //    pluri-pixel, PAS une erreur de placement aléatoire). Appliquer
+  //    seulement l'enveloppe de précision de stockage à la seule scène
+  //    dont on connaît l'erreur systématique aurait réintroduit l'asymétrie
+  //    déjà corrigée par une autre porte. Scandinave reçoit donc le MÊME
+  //    balayage σ_placement que les 3 autres scènes (nécessaire pour la
+  //    classification), mais son intervalle numérique est explicitement
+  //    annoté "enveloppe non quantifiable" -- l'incertitude réelle inclut
+  //    un terme systématique connu que ce calcul arithmétique ne capture
+  //    pas, donc l'intervalle publié est un PLANCHER, pas une borne fiable.
   //
-  // 6) f RESTE UN PARAMÈTRE LIBRE (aucun EXIF dans les 4 JPG démo, vérifié
-  //    via PIL) -- inchangé depuis la version précédente : la formule
-  //    sigma_max = κ·pH·L·(180/π)/|cx-vp.x| ne contient PAS f explicitement
-  //    (stable à <0.2% sur f/W∈[0.4,2.0]), donc aucun besoin de le
-  //    borner ; c'est ce qui permet d'exprimer tout via |C|=|cx-vp.x|
-  //    (géométrie pixel pure) plutôt que via theta seul seul (hypothèse
-  //    optique) -- "ce mur est-il distinguable du frontal" devient une
-  //    question purement géométrique.
+  // 6) LA TAUTOLOGIE ET LES DEUX EXPECT D'ÉTIQUETTE RESTANTS SONT RETIRÉS.
+  //    `expect(verdictsByScene['haussmann'], equals(classifyOnSigmaMaxRange(
+  //    sigmaLo, sigmaHi)))` réappliquait la fonction de classification aux
+  //    MÊMES arguments qui avaient servi 3 lignes plus haut à construire
+  //    `verdictsByScene['haussmann']` -- zéro pouvoir discriminant, même
+  //    famille que les cellules Monte-Carlo vides déjà signalées.
+  //    `expect(verdictsByScene['moderne'/'provencal'], equals('ECARTEE'))`
+  //    ne figeaient l'étiquette que du côté "ferme" -- l'asymétrie
+  //    précédente (figer seulement ce qui confortait la conclusion)
+  //    réapparaissait, cette fois du côté inverse. Les trois retirés :
+  //    seules des bornes NUMÉRIQUES (indépendantes de toute étiquette) et
+  //    la monotonie générique de `classifyOnSigmaMax`/`classifyOnSigmaMaxRange`
+  //    (test dédié ci-dessous, inchangé) sont assertées. Les étiquettes de
+  //    verdict par scène restent imprimées, jamais assertées comme figées.
   //
-  // 7) CITATION DE COHÉRENCE κ CORRIGÉE (retour utilisateur, correction de
-  //    citation). Le commentaire du groupe Point 1 ci-dessus (juste avant
-  //    `_kappaAt`) cite maintenant explicitement DEUX chiffres distincts
-  //    (0.0012% Python sur une comparaison moyenne-tranche vs
-  //    moyenne-balayage, 0.1782% Dart sur une comparaison point vs
-  //    moyenne-balayage), au lieu de citer le premier comme s'il était le
-  //    second.
+  // 7) f RESTE UN PARAMÈTRE LIBRE, CITATION κ INCHANGÉES depuis la version
+  //    précédente (non remises en cause par ce retour) : sigma_max ≈
+  //    κ·pH·L·(180/π)/|C| ne contient pas f explicitement (stable à
+  //    <0.2% sur f/W∈[0.4,2.0]) ; κ cohérent à 0.0012% (Python,
+  //    tranche-vs-balayage) / 0.1782% (Dart, point-vs-balayage) avec la
+  //    référence Phase B, deux chiffres distincts, cf. commentaire du
+  //    groupe Point 1 ci-dessus.
   //
-  // 8) LES ASSERTIONS NE FIGENT PLUS D'ÉTIQUETTE DE VERDICT PAR SCÈNE.
-  //    `expect(verdictsByScene['haussmann'], equals('INDECIDABLE'))`
-  //    dépendait de deux conventions non mesurées (σ_placement=[0.5,3]px,
-  //    facteur opérationnel=3.716) : resserrer l'une ou l'autre bascule le
-  //    verdict sans changement de code utile, cassant le test sans raison
-  //    de fond. Corrigé : on asserte désormais (a) les bornes numériques
-  //    de l'intervalle sigma_max par scène (ne dépendent QUE de κ et des
-  //    pixels committés, pas des conventions), et (b) la monotonie de
-  //    `classifyOnSigmaMax` comme fonction générique (ECARTEE sous
-  //    seuilFacile, GARDEE au-dessus de seuilDur, quel que soit leur
-  //    niveau exact) -- les ÉTIQUETTES de verdict par scène sont
-  //    imprimées, jamais assertées comme figées.
-  //
-  // 9) CONCLUSION "0/4 -> chemin normal -> vanishing_point.dart en
-  //    correction" TOUJOURS RETIRÉE (cf. version précédente). Le constat
-  //    Phase B point 3 (wallNormal=-camera.forward figeant l'angle
-  //    plafond/mur à 90° pour tout theta réel) reste valable et suffisant
-  //    en soi, SANS cette béquille.
+  // 8) CONCLUSION : 4/4 INDÉCIDABLE, 0/4 ÉCARTÉE, 0/4 GARDÉE sous
+  //    l'enveloppe σ_placement-paramétrée. Ce n'est PAS un échec du tri :
+  //    l'instrument n'est limité ni par la corde, ni par f, ni par
+  //    l'angle, mais par la provenance de la calibration -- des points
+  //    relevés sur une grille à 1% ne peuvent pas trancher des
+  //    différentiels de quelques pixels. La règle sigma_max reste valide
+  //    et utilisable sur des scènes dont les points viennent d'une source
+  //    plus fine que ce qu'on veut mesurer (le harnais synthétique,
+  //    Phase A/B), pas sur les 4 presets démo. Sous le critère d'arrêt du
+  //    brief, 4 scènes non classables sans mesure fine sont 4 scènes
+  //    écartées du rôle de validation du solveur -- rôle déjà repris par
+  //    le harnais synthétique -- les photos de démo gardant leur rôle
+  //    ergonomique. Aucune escalade de priorité sur `vanishing_point.dart`
+  //    n'est proposée à partir de ce résultat. Le constat Phase B point 3
+  //    (wallNormal=-camera.forward figeant l'angle plafond/mur à 90° pour
+  //    tout theta réel) reste valable et suffisant en soi, indépendamment
+  //    de ce tri.
   // ===========================================================================
   group(
-    'Phase C — Point 3 (refait, 2e passe) : enveloppe d\'arrondi symétrique '
-    'sur les 4 scènes, sigma_max en intervalle, verdict gardée/écartée/'
-    'indécidable',
+    'Phase C — Point 3 (refait, 3e passe) : enveloppe paramétrée en '
+    'σ_placement (balayage dense), sigma_max en intervalle aux deux bornes '
+    '0.5/3px, verdict gardée/écartée/indécidable',
     () {
       // κ=k·f/pH (cf. groupe Point 1 ci-dessus) -- PAS k/pH seul (montré
       // instable sur l'axe f/W). Comme sigma_max = κ·pH·theta·L/f et que
@@ -1944,21 +1959,27 @@ void main() {
       );
 
       test(
-        'tableau : dimensions, corde, pH, enveloppe d\'arrondi (±0.5 ULP '
-        'sur les 4 y de calibration, appliquée SYMÉTRIQUEMENT aux 4 '
-        'scènes), sigma_max en INTERVALLE, verdict',
+        'tableau : dimensions, corde, pH, enveloppe paramétrée en '
+        'σ_placement (balayage dense [0.5,3]px, 16 combinaisons de signe '
+        'par valeur balayée), sigma_max en INTERVALLE (bornes globales), '
+        'verdict',
         () {
           // --- Inventaire des 4 scènes (repère image, xPct/yPct×dimensions) ---
           //
           // haussmann/moderne/provencal : ceilL/ceilR/floorL COMPLETS
           // (x ET y) lus depuis `PerspCalib.demoPresets`, committés à 3
-          // décimales (yDecimals=3).
+          // décimales (yDecimals=3, utilisé UNIQUEMENT pour le plancher
+          // ULP/√12 documenté ci-dessous -- PLUS pour construire
+          // l'enveloppe elle-même, cf. point 1/2 du commentaire de groupe).
           //
           // scandinave : identification "candidat it1"
           // (`_debug_calib_bench_test.dart` lignes ~299-303, PAS
           // `demoPresets['scandinave']` qui décrit un mur pleine-largeur,
           // une identification différente) -- MÊME repère image que les 3
-          // autres, committée à 4 décimales (yDecimals=4).
+          // autres, committée à 4 décimales (yDecimals=4) ; marquée
+          // `envelopeQuantifiable: false` -- cf. point 5 du commentaire de
+          // groupe (erreur systématique Phase B, pas seulement une
+          // question de précision de stockage).
           const scenes = [
             (
               name: 'haussmann',
@@ -1971,6 +1992,7 @@ void main() {
               floorLyPct: 0.870,
               floorRyPct: 0.860,
               yDecimals: 3,
+              envelopeQuantifiable: true,
             ),
             (
               name: 'moderne',
@@ -1983,6 +2005,7 @@ void main() {
               floorLyPct: 0.720,
               floorRyPct: 0.720,
               yDecimals: 3,
+              envelopeQuantifiable: true,
             ),
             (
               name: 'provencal',
@@ -1995,6 +2018,7 @@ void main() {
               floorLyPct: 0.830,
               floorRyPct: 0.830,
               yDecimals: 3,
+              envelopeQuantifiable: true,
             ),
             (
               name: 'scandinave',
@@ -2007,6 +2031,7 @@ void main() {
               floorLyPct: 0.8365,
               floorRyPct: 0.8345,
               yDecimals: 4,
+              envelopeQuantifiable: false,
             ),
           ];
 
@@ -2023,16 +2048,33 @@ void main() {
             expect(preset.ceilR.yPct, closeTo(s.ceilRyPct, 1e-9));
           }
 
+          // Balayage dense de σ_placement lui-même sur la fourchette
+          // [0.5,3]px du brief -- 201 points, pré-validé en Python
+          // (`point3_dense_sweep_fine.py`/`point3_dense_sweep_check.py`,
+          // convergence vérifiée entre N=121/161/201/501, cf. commentaire
+          // de groupe point 2). Les DEUX bornes seules (0.5px, 3px)
+          // sous-estiment l'intervalle réel pour haussmann/scandinave --
+          // le balayage est nécessaire, pas cosmétique. Construit ci-dessous
+          // (pas const : dépend d'une division en virgule flottante).
+
           // ignore: avoid_print
           print(
             '${'scene'.padRight(12)} ${'L_px'.padLeft(8)} '
             '${'pH_px'.padLeft(8)} ${'|C| range'.padLeft(20)} '
-            '${'sigma_max range (px)'.padLeft(20)}  verdict',
+            '${'sigma_max range (px)'.padLeft(22)} '
+            '${'ULP/√12 plancher'.padLeft(18)}  verdict',
           );
 
           final sigmaLoByScene = <String, double>{};
           final sigmaHiByScene = <String, double>{};
           final verdictsByScene = <String, String>{};
+
+          const sweepPoints = 201;
+          final sigmaSweep = List<double>.generate(
+            sweepPoints,
+            (i) => sigmaPlacementLoPx +
+                (sigmaPlacementHiPx - sigmaPlacementLoPx) * i / (sweepPoints - 1),
+          );
 
           for (final s in scenes) {
             final w = s.widthPx, h = s.heightPx;
@@ -2045,38 +2087,52 @@ void main() {
             final chordPx = _dist(ceilL0, ceilR0);
             final pHPx = floorL0.dy - ceilL0.dy;
 
-            // Enveloppe d'arrondi pire-cas : ±0.5 ULP (demi-unité-dans-la-
-            // dernière-décimale committée) sur CHACUN des 4 y de
-            // calibration, appliquée SYMÉTRIQUEMENT à TOUTES les scènes
-            // (pas seulement celles déjà dégénérées au nominal) -- 16
-            // combinaisons de signe, chacune passée dans le VRAI
-            // `pg.lineIntersect` (jamais une reconstruction fermée).
-            final halfUlpFrac = 0.5 * math.pow(10, -s.yDecimals);
-            final halfUlpPx = halfUlpFrac * h;
-            final absCCandidates = <double>[];
-            for (var bits = 0; bits < 16; bits++) {
-              final sCl = (bits & 1) == 0 ? -1.0 : 1.0;
-              final sCr = (bits & 2) == 0 ? -1.0 : 1.0;
-              final sFl = (bits & 4) == 0 ? -1.0 : 1.0;
-              final sFr = (bits & 8) == 0 ? -1.0 : 1.0;
-              final ceilL =
-                  ceilL0 + Offset(0.0, sCl * halfUlpPx);
-              final ceilR =
-                  ceilR0 + Offset(0.0, sCr * halfUlpPx);
-              final floorL =
-                  floorL0 + Offset(0.0, sFl * halfUlpPx);
-              final floorR =
-                  floorR0 + Offset(0.0, sFr * halfUlpPx);
-              final vpCandidate =
-                  pg.lineIntersect(ceilL, ceilR, floorL, floorR);
-              if (vpCandidate != null) {
-                absCCandidates.add((cxImg - vpCandidate.dx).abs());
+            // Plancher ULP/√12 : documenté UNIQUEMENT (jamais utilisé pour
+            // construire l'enveloppe ci-dessous) -- demi-unité-dans-la-
+            // dernière-décimale committée, divisée par √12 (écart-type
+            // d'une loi uniforme sur [-0.5,0.5] ULP). Rapporte la
+            // précision d'ÉCRITURE des presets -- PAS la précision de
+            // l'instrument de calibration (grille 1%/5%/10%, bien plus
+            // grossière, cf. point 1 du commentaire de groupe).
+            final ulpFloorPx =
+                0.5 * math.pow(10, -s.yDecimals) * h / math.sqrt(12);
+
+            // Enveloppe RE-PARAMÉTRÉE : σ_placement lui-même (balayé
+            // densement sur [0.5,3]px), PAS un ULP dérivé de la précision
+            // d'écriture. Pour CHAQUE valeur balayée de σ_placement, les
+            // mêmes 16 combinaisons de signe sur les 4 y de calibration
+            // sont passées dans le VRAI `pg.lineIntersect` -- le [lo,hi]
+            // publié est le min/max GLOBAL sur TOUT le balayage (pas
+            // seulement aux deux bornes 0.5/3px, insuffisantes pour
+            // haussmann/scandinave, cf. commentaire de groupe point 2).
+            var cMinGlobal = double.infinity;
+            var cMaxGlobal = 0.0;
+            var anyNonDegenerate = false;
+            for (final sigmaPx in sigmaSweep) {
+              for (var bits = 0; bits < 16; bits++) {
+                final sCl = (bits & 1) == 0 ? -1.0 : 1.0;
+                final sCr = (bits & 2) == 0 ? -1.0 : 1.0;
+                final sFl = (bits & 4) == 0 ? -1.0 : 1.0;
+                final sFr = (bits & 8) == 0 ? -1.0 : 1.0;
+                final ceilL = ceilL0 + Offset(0.0, sCl * sigmaPx);
+                final ceilR = ceilR0 + Offset(0.0, sCr * sigmaPx);
+                final floorL = floorL0 + Offset(0.0, sFl * sigmaPx);
+                final floorR = floorR0 + Offset(0.0, sFr * sigmaPx);
+                final vpCandidate =
+                    pg.lineIntersect(ceilL, ceilR, floorL, floorR);
+                if (vpCandidate != null) {
+                  anyNonDegenerate = true;
+                  final absC = (cxImg - vpCandidate.dx).abs();
+                  if (absC < cMinGlobal) cMinGlobal = absC;
+                  if (absC > cMaxGlobal) cMaxGlobal = absC;
+                }
               }
             }
 
             // Intersection au point NOMINAL (non perturbé) -- rapportée à
             // titre informatif (theta ponctuel), mais la CLASSIFICATION
-            // ci-dessous porte sur l'enveloppe, jamais sur ce seul point.
+            // ci-dessous porte sur l'enveloppe balayée, jamais sur ce seul
+            // point.
             final vpNominal =
                 pg.lineIntersect(ceilL0, ceilR0, floorL0, floorR0);
             final thetaNominalStr = vpNominal == null
@@ -2084,33 +2140,39 @@ void main() {
                 : _thetaDegFromVpx(vpNominal.dx, focalPx, cxImg)
                     .toStringAsFixed(4);
 
-            if (absCCandidates.isEmpty) {
-              // Dégénéré même sous TOUTE l'enveloppe d'arrondi -- aucune
-              // scène de l'inventaire ne tombe dans ce cas cette session,
-              // mais le chemin est traité explicitement plutôt que de
-              // planter ou de supposer un theta.
+            if (!anyNonDegenerate) {
+              // Dégénéré sous TOUT le balayage -- aucune scène de
+              // l'inventaire ne tombe dans ce cas cette session, mais le
+              // chemin est traité explicitement plutôt que de planter ou
+              // de supposer un theta.
               verdictsByScene[s.name] = 'INDECIDABLE_DEGENERE_TOTAL';
               // ignore: avoid_print
               print(
                 '${s.name.padRight(12)} ${chordPx.toStringAsFixed(1).padLeft(8)} '
                 '${pHPx.toStringAsFixed(1).padLeft(8)} '
-                '${'degenere (enveloppe)'.padLeft(20)} ${'--'.padLeft(20)}  '
+                '${'degenere (balayage)'.padLeft(20)} ${'--'.padLeft(22)} '
+                '${ulpFloorPx.toStringAsFixed(4).padLeft(18)}  '
                 'INDECIDABLE_DEGENERE_TOTAL (aucun candidat non dégénéré '
-                'sous ±0.5 ULP)',
+                'sous tout le balayage σ_placement)',
               );
               continue;
             }
 
-            // sigma_max f-indépendant : κ·pH·L·(180/π)/|C| -- calculé pour
-            // CHAQUE candidat |C| de l'enveloppe, puis borné en [lo,hi].
-            // |C| grand -> sigma_max petit (dénominateur), donc lo/hi de
-            // sigma_max correspondent à hi/lo de |C| respectivement.
-            final cMin = absCCandidates.reduce(math.min);
-            final cMax = absCCandidates.reduce(math.max);
-            final sigmaMaxLoPx =
-                kappaRefPhaseB * pHPx * chordPx * (180.0 / math.pi) / cMax;
-            final sigmaMaxHiPx =
-                kappaRefPhaseB * pHPx * chordPx * (180.0 / math.pi) / cMin;
+            // sigma_max f-indépendant : κ·pH·L·(180/π)/|C| -- |C| grand ->
+            // sigma_max petit (dénominateur), donc lo/hi de sigma_max
+            // correspondent à hi/lo de |C| respectivement (bornes
+            // GLOBALES sur tout le balayage σ_placement, pas seulement
+            // aux deux extrémités 0.5px/3px).
+            final sigmaMaxLoPx = kappaRefPhaseB *
+                pHPx *
+                chordPx *
+                (180.0 / math.pi) /
+                cMaxGlobal;
+            final sigmaMaxHiPx = kappaRefPhaseB *
+                pHPx *
+                chordPx *
+                (180.0 / math.pi) /
+                cMinGlobal;
 
             sigmaLoByScene[s.name] = sigmaMaxLoPx;
             sigmaHiByScene[s.name] = sigmaMaxHiPx;
@@ -2119,105 +2181,130 @@ void main() {
                 classifyOnSigmaMaxRange(sigmaMaxLoPx, sigmaMaxHiPx);
             verdictsByScene[s.name] = verdict;
 
+            final quantifiableTag =
+                s.envelopeQuantifiable ? '' : ' [NON QUANTIFIABLE]';
+
             // ignore: avoid_print
             print(
               '${s.name.padRight(12)} ${chordPx.toStringAsFixed(1).padLeft(8)} '
               '${pHPx.toStringAsFixed(1).padLeft(8)} '
-              '${'[${cMin.toStringAsFixed(0)},${cMax.toStringAsFixed(0)}]'.padLeft(20)} '
-              '${'[${sigmaMaxLoPx.toStringAsFixed(3)},${sigmaMaxHiPx.toStringAsFixed(3)}]'.padLeft(20)}  '
-              '$verdict (nominal theta=$thetaNominalStr°)',
+              '${'[${cMinGlobal.toStringAsFixed(0)},${cMaxGlobal.toStringAsFixed(0)}]'.padLeft(20)} '
+              '${'[${sigmaMaxLoPx.toStringAsFixed(3)},${sigmaMaxHiPx.toStringAsFixed(3)}]'.padLeft(22)} '
+              '${ulpFloorPx.toStringAsFixed(4).padLeft(18)}  '
+              '$verdict$quantifiableTag (nominal theta=$thetaNominalStr°)',
             );
           }
 
-          // --- Assertions : bornes NUMÉRIQUES de l'intervalle sigma_max
-          // (ne dépendent QUE de κ et des pixels committés, PAS de
-          // σ_placement ni du facteur opérationnel -- donc PAS fragiles à
-          // un resserrement ultérieur de la fourchette [0.5,3]px, comme le
-          // faisaient les `expect(verdictsByScene[...], equals(...))` de
-          // la version précédente). Les ÉTIQUETTES de verdict, elles, ne
-          // sont qu'imprimées ci-dessus, jamais assertées comme figées.
+          // --- Assertions : bornes NUMÉRIQUES GLOBALES de l'intervalle
+          // sigma_max (issues du balayage σ_placement dense, PAS des
+          // deux bornes seules) -- aucune étiquette de verdict n'est
+          // assertée comme figée (retour utilisateur : la tautologie sur
+          // haussmann et les deux `equals('ECARTEE')` sur
+          // moderne/provencal sont retirés). Seule la monotonie GENÉRIQUE
+          // de `classifyOnSigmaMax`/`classifyOnSigmaMaxRange` (test dédié
+          // ci-dessus) reste assertée sur les étiquettes.
           expect(
             sigmaLoByScene['haussmann'],
-            inClosedOpenRange(1.0, 2.0),
+            lessThan(0.5),
             reason:
-                'haussmann : borne basse de l\'enveloppe pire-cas doit '
-                'rester sous seuilFacile actuel (1.858px) -- valeur '
-                'attendue ≈1.37px (5/10 ULP sur les pentes plafond/plancher '
-                'à 3 décimales).',
+                'haussmann : sous balayage dense de σ_placement, la borne '
+                'basse GLOBALE de sigma_max s\'effondre près de zéro '
+                '(Δm nominal=-0.004582 traversé par la perturbation à '
+                'σ_placement≈2.2-3px) -- signature du signal d\'obliquité '
+                'sous le bruit de l\'instrument de calibration, pas un '
+                'simple effet de précision de stockage.',
           );
           expect(
             sigmaHiByScene['haussmann'],
-            inClosedOpenRange(2.5, 3.5),
+            greaterThan(seuilFacilePx),
             reason:
-                'haussmann : borne haute de l\'enveloppe pire-cas doit '
-                'rester au-dessus de seuilFacile actuel -- valeur attendue '
-                '≈3.20px.',
-          );
-          expect(
-            verdictsByScene['haussmann'],
-            equals(
-              classifyOnSigmaMaxRange(
-                sigmaLoByScene['haussmann']!,
-                sigmaHiByScene['haussmann']!,
-              ),
-            ),
-            reason:
-                'le verdict imprimé doit être exactement celui recalculé '
-                'par la fonction de classification générique à partir des '
-                'bornes de l\'intervalle -- pas une étiquette fixée à part.',
+                'haussmann : la borne haute GLOBALE de sigma_max '
+                '(≈5.36px sous balayage dense) dépasse largement '
+                'seuilFacile -- l\'enveloppe réaliste ne permet plus de '
+                'trancher.',
           );
 
           expect(
             sigmaHiByScene['moderne'],
-            lessThan(seuilFacilePx),
+            greaterThan(seuilFacilePx),
             reason:
-                'moderne : la borne HAUTE de l\'enveloppe pire-cas '
-                '(≈0.75px) doit rester sous seuilFacile pour TOUTE donnée '
-                'compatible avec l\'arrondi committé -- condition de la '
-                'règle "sigma_max <= seuilFacile => ECARTEE" appliquée à '
-                'l\'intervalle entier, pas seulement à un point.',
+                'moderne : sous balayage dense (σ_placement jusqu\'à 3px), '
+                'la borne HAUTE de sigma_max (≈3.07px) dépasse '
+                'désormais seuilFacile (1.858px) -- l\'ÉCARTEE ferme de la '
+                'reprise précédente (basée sur ±0.5 ULP seul, ≈0.75px) ne '
+                'survit pas à une enveloppe σ_placement réaliste.',
           );
           expect(
             sigmaHiByScene['provencal'],
-            lessThan(seuilFacilePx),
-            reason:
-                'provencal : même condition que moderne -- borne haute '
-                '(≈0.87px) sous seuilFacile pour tout l\'intervalle '
-                'admissible.',
-          );
-          expect(verdictsByScene['moderne'], equals('ECARTEE'));
-          expect(verdictsByScene['provencal'], equals('ECARTEE'));
-
-          expect(
-            sigmaLoByScene['scandinave'],
             greaterThan(seuilFacilePx),
             reason:
-                'scandinave : borne basse de l\'enveloppe pire-cas doit '
-                'rester AU-DESSUS de seuilFacile (contrairement à '
-                'haussmann) -- son enveloppe est étroite (4 décimales de '
-                'précision, ±1.1%), donc son indécidabilité vient de la '
-                'fourchette σ_placement elle-même, pas de la précision de '
-                'stockage.',
+                'provencal : même constat que moderne -- borne haute '
+                '≈3.07px, au-dessus de seuilFacile sous balayage dense.',
           );
+
+          expect(
+            sigmaHiByScene['scandinave'],
+            greaterThan(seuilFacilePx),
+            reason:
+                'scandinave : sous balayage dense, la borne haute GLOBALE '
+                '(≈5.27px) dépasse seuilFacile -- ET l\'enveloppe est de '
+                'toute façon marquée non quantifiable (erreur systématique '
+                'Phase B, jonction confondue avec une tringle à rideau) : '
+                'ce nombre est un plancher, pas une borne fiable.',
+          );
+          expect(
+            scenes.firstWhere((s) => s.name == 'scandinave').envelopeQuantifiable,
+            isFalse,
+            reason:
+                'scandinave doit rester marquée non quantifiable -- pas '
+                'une enveloppe numérique à ±1.1% comme dans la reprise '
+                'précédente, qui ignorait l\'erreur systématique connue de '
+                'Phase B.',
+          );
+
+          // Toutes les bornes hautes excèdent seuilFacile ET aucune borne
+          // basse n\'atteint seuilDur : les 4 scènes sont INDÉCIDABLE sous
+          // l\'enveloppe réaliste -- vérifié explicitement plutôt
+          // qu\'asserté par étiquette.
+          for (final name in ['haussmann', 'moderne', 'provencal', 'scandinave']) {
+            expect(
+              sigmaLoByScene[name],
+              lessThan(seuilDurPx),
+              reason: '$name : borne basse doit rester sous seuilDur pour '
+                  'que le verdict ne soit pas GARDEE ferme.',
+            );
+          }
 
           // ignore: avoid_print
           print(
-            '\n[phaseC-point3] VERDICT GLOBAL (2e reprise) : 2/4 ECARTEE '
-            '(moderne, provencal -- enveloppe pire-cas entièrement sous '
-            'seuilFacile), 2/4 INDECIDABLE (haussmann -- pour cause de '
-            'précision de stockage des presets, enveloppe chevauchant '
-            'seuilFacile ; scandinave -- pour cause de σ_placement, '
-            'enveloppe étroite mais entièrement dans la fourchette '
-            'opérationnelle). Ce sont deux causes DIFFÉRENTES qui ne se '
-            'réparent PAS de la même façon : haussmann nécessiterait de '
-            're-committer les presets avec plus de décimales (mandat sur '
-            'les données, séparé, PAS sur le code) ; scandinave '
-            'nécessiterait de resserrer σ_placement (mandat sur la '
-            'fourchette elle-même, également séparé). 0/4 GARDEE.\n'
+            '\n[phaseC-point3] VERDICT GLOBAL (3e reprise, enveloppe '
+            'σ_placement balayée densement) : '
+            '${verdictsByScene.values.where((v) => v == 'INDECIDABLE').length}'
+            '/4 INDECIDABLE, '
+            '${verdictsByScene.values.where((v) => v == 'ECARTEE').length}'
+            '/4 ECARTEE, '
+            '${verdictsByScene.values.where((v) => v == 'GARDEE').length}'
+            '/4 GARDEE. Sous une enveloppe réaliste (σ_placement balayé sur '
+            '[0.5,3]px, pas seulement ±0.5 ULP d\'écriture), les 4 scènes '
+            'deviennent indécidables. Ce n\'est pas un échec du tri : '
+            'l\'instrument n\'est limité ni par la corde, ni par f, ni par '
+            'l\'angle, mais par la PROVENANCE de la calibration -- des '
+            'points relevés sur une grille de repérage à 1% (17.8px de '
+            'cellule sur haussmann) ne peuvent pas trancher des '
+            'différentiels de quelques pixels (8.9px sur haussmann). La '
+            'règle sigma_max reste valide et utilisable -- sur des scènes '
+            'dont les points viennent d\'une source plus fine que ce '
+            'qu\'on veut mesurer (le harnais synthétique, Phase A/B), pas '
+            'sur les 4 presets démo committés à la main sur grille '
+            '1%/5%/10%. Sous le critère d\'arrêt du brief, 4 scènes non '
+            'classables sans mesure fine sont 4 scènes écartées du rôle de '
+            'validation du solveur -- rôle déjà repris par le harnais '
+            'synthétique -- les photos de démo gardant leur rôle '
+            'ergonomique.\n'
             '\n'
-            '[phaseC-point3] Conclusion (rappel, déjà retirée à la reprise '
-            'précédente) : "0/4 gardée -> le frontal est le chemin normal '
-            '-> vanishing_point.dart passe en priorité correction" reste '
+            '[phaseC-point3] Conclusion (rappel, retirée depuis la 1re '
+            'reprise) : "0/4 gardée -> le frontal est le chemin normal -> '
+            'vanishing_point.dart passe en priorité correction" reste '
             'retirée -- elle reposait sur un theta_à_l\'oeil=0 non mesuré. '
             'Le constat Phase B point 3 (wallNormal=-camera.forward '
             'figeant l\'angle plafond/mur à 90° pour tout theta réel) reste '
