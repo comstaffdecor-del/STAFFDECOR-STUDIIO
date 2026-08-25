@@ -1,0 +1,101 @@
+{
+  "sku": "TAL26",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "TAL26 plan.step",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      0.0,
+      0.0
+    ],
+    [
+      50.0,
+      0.0
+    ],
+    [
+      50.0,
+      -100.0
+    ],
+    [
+      42.9503,
+      -99.7046
+    ],
+    [
+      36.018,
+      -98.3895
+    ],
+    [
+      29.3499,
+      -96.0824
+    ],
+    [
+      23.0871,
+      -92.8322
+    ],
+    [
+      17.3622,
+      -88.7077
+    ],
+    [
+      12.2963,
+      -83.7962
+    ],
+    [
+      7.9967,
+      -78.2016
+    ],
+    [
+      4.5544,
+      -72.0423
+    ],
+    [
+      2.0422,
+      -65.4487
+    ],
+    [
+      0.5133,
+      -58.5604
+    ],
+    [
+      0.0,
+      -51.5232
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      13,
+      0
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      0,
+      1
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 50.0,
+    "h": 100.0
+  },
+  "hauteur_mur_mm": 51.523,
+  "projection_plafond_mm": 50.0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 265.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}
