@@ -326,7 +326,23 @@ double _thetaDegFromVpx(double vpX, double focalPx, double cx) {
 /// varie de 29.089% quand on balaye f/W∈[0.55,1.1] et W∈{1920,1960,2560}
 /// (donnée non attendue, découverte cette session) — MAIS κ = k·f/pH est
 /// stable à 0.239% sur exactement le même balayage (H×d×W×f/W = 2880
-/// points), et cohérent à 0.0012% avec la tranche de référence Phase B.
+/// points). Cohérence avec la référence Phase B : selon la méthode de
+/// comparaison, DEUX chiffres différents, ni interchangeables ni l'un
+/// "meilleur" que l'autre — à citer chacun avec sa méthode, pas l'un pour
+/// l'autre :
+///   - Python (/tmp/synth_vp/point1_kf_over_pH.py) : moyenne de κ sur la
+///     TRANCHE H=2.5/d=3.0/W=1920/f=1400 (n=12, theta et corde variant),
+///     comparée à la moyenne du balayage complet (n=2880) → écart 0.0012%
+///     (`Relative diff` imprimé par le script).
+///   - Dart (ci-dessous, test dédié) : κ_ref = `_kappaAt` évalué à un SEUL
+///     point (theta=1.0°, wallWidthM=3.0, tranche Phase B), comparé à la
+///     même moyenne de balayage (n=2880) → écart 0.1782% (imprimé par ce
+///     test sous `[phaseC-point1-fW] κ_ref(...)`). Plus grand que le
+///     0.0012% Python car c'est un point contre une moyenne-tranche, pas
+///     une moyenne-tranche contre une moyenne-tranche — même conclusion
+///     qualitative (κ cohérent, écart <1%), mais PAS le même chiffre, et
+///     le brouillon précédent de ce commentaire citait le 0.0012% Python à
+///     la place du 0.1782% réellement imprimé par ce test Dart : corrigé.
 /// C'est κ (pas k/pH) le coefficient réellement invariant : la focale
 /// n'était pas un axe supplémentaire de variation du coefficient, elle
 /// avait simplement été mal isolée (elle se glisse dans pH ET dans le
@@ -1689,80 +1705,132 @@ void main() {
   );
 
   // ===========================================================================
-  // PHASE C — POINT 3 (REFAIT cette session, suite au retour utilisateur) :
-  // inventaire assets/demo_scenes/ + tri gardée/écartée/indécidable, tri
-  // ARITHMÉTIQUE (aucune mesure de pixel photo nouvelle).
+  // PHASE C — POINT 3 (REFAIT une seconde fois cette session, suite au
+  // second retour utilisateur) : inventaire assets/demo_scenes/ + tri
+  // gardée/écartée/indécidable, tri ARITHMÉTIQUE (aucune mesure de pixel
+  // photo nouvelle).
   //
-  // Ce qui a changé par rapport à la version précédente, et pourquoi
+  // Ce qui a changé par rapport à la version précédente de ce même groupe
   // (chaque point correspond à un problème décisif signalé par
-  // l'utilisateur) :
+  // l'utilisateur SUR CETTE VERSION-LÀ, déjà elle-même une reprise) :
   //
-  // 1) REPÈRE UNIQUE DÉCLARÉ : ESPACE IMAGE. Tout (corde, pH, σ_placement)
-  //    est mesuré/déclaré en pixels de l'image SOURCE (celle dont
-  //    `demoPresets` donne les xPct/yPct), jamais en pixels d'un canvas
-  //    d'affichage letterboxé. C'est ce qui résout l'écart 228 (affichage,
-  //    `imgDraw(dw:1400)` sur une source 1920px, scale=0.729167) vs 313
-  //    (image) : 313.0×0.729167=228.2 -- LA MÊME donnée, pas un
-  //    désaccord. On utilise donc 313px (espace image) pour scandinave,
-  //    plus le pH image-space correspondant (881.3px) -- jamais les deux
-  //    dans des repères différents comme la version précédente le faisait.
+  // 1) L'ENVELOPPE D'ARRONDI EST DÉSORMAIS PORTÉE SYMÉTRIQUEMENT SUR LES 4
+  //    SCÈNES, PAS SEULEMENT SUR LES 2 QUI CONFORTAIENT LA CONCLUSION.
+  //    haussmann et provencal/moderne sont TOUTES committées à la même
+  //    précision (3 décimales sur yPct) ; scandinave (candidat it1) est à
+  //    4 décimales. La version précédente appliquait le pire-cas
+  //    ±0.0005 UNIQUEMENT à moderne/provencal (parce qu'elles étaient déjà
+  //    dégénérées au nominal) et traitait haussmann/scandinave comme des
+  //    points exacts -- alors que haussmann, à la même précision de
+  //    stockage, a un vp.x = 303820 issu d'un écart de pentes construit
+  //    sur 5 et 10 ULP (dy_ceil=-8.915px sur 5 ULP=0.005, dy_floor=
+  //    -17.830px sur 10 ULP=0.010, delta_m=-0.004582), donc tout aussi
+  //    sensible à l'arrondi committé que moderne/provencal. Corrigé : les
+  //    4 scènes reçoivent maintenant le MÊME traitement -- 16 combinaisons
+  //    de signe (±un demi-ULP sur chacun des 4 y : ceilL, ceilR, floorL,
+  //    floorR), chacune passée dans le VRAI `pg.lineIntersect`, puis
+  //    sigma_max calculé pour chaque candidat non dégénéré. Le résultat
+  //    publié est un INTERVALLE [min,max], jamais un point unique.
   //
-  // 2) THETA DÉRIVÉ DES PRESETS, PAS "À L'OEIL". `PerspCalib.demoPresets`
-  //    contient déjà `ceilL.yPct` ET `ceilR.yPct` (pas seulement les x,
-  //    lus/assertés seuls dans la version précédente) -- leur différence
-  //    donne la pente de la ligne de plafond, donc vp.x (via le VRAI
-  //    `pg.lineIntersect`), donc theta. C'est de l'arithmétique sur
-  //    données déjà committées, permise par le brief, et strictement plus
-  //    solide qu'un jugement visuel qu'aucun oeil ne peut certifier sous
-  //    0.2° (cf. les propres seuils angulaires minimaux de ce tri).
+  // 2) MODERNE/PROVENCAL RECLASSÉES ÉCARTÉE (FERME), PAS INDÉCIDABLE. La
+  //    borne pire-cas de la version précédente (sigma_max ≤ 0.753px et
+  //    0.874px) avait déjà été calculée et publiée -- mais la conclusion
+  //    n'en avait pas été tirée : ces deux bornes sont sous seuilFacile
+  //    (1.858px) pour TOUTE donnée compatible avec l'arrondi committé, et
+  //    la règle de classification dit explicitement que sigma_max ≤
+  //    seuilFacile ⇒ ÉCARTÉE. "theta n'est pas déterminable" (vrai) et "la
+  //    scène n'est pas classable" (faux ici, car classée pareil sur tout
+  //    l'intervalle admissible) sont deux énoncés distincts qui avaient
+  //    été confondus -- corrigé : le VERDICT dépend de l'INTERVALLE de
+  //    sigma_max, pas du fait que theta lui-même soit ponctuel.
   //
-  // 3) f RESTE UN PARAMÈTRE LIBRE (aucun EXIF dans les 4 JPG démo,
-  //    vérifié via PIL cette session) -- mais la formule utilisée ici,
-  //    sigma_max = κ·pH·L·(180/π)/|cx-vp.x|, ne contient PAS f
-  //    explicitement (vérifié analytiquement stable à <0.2% sur
-  //    f/W∈[0.4,2.0], bien plus large que la plage réaliste [0.55,1.1]) :
-  //    theta et f s'annulent mutuellement dans le produit theta·L au
-  //    premier ordre, dès qu'on exprime tout via C=cx-vp.x plutôt que via
-  //    theta seul. Ceci répond au point secondaire #1 du retour
-  //    utilisateur SANS qu'il faille borner ou deviner f.
+  // 3) HAUSSMANN RESTE INDÉCIDABLE, MAIS POUR UNE CAUSE IDENTIFIÉE ET
+  //    DIFFÉRENTE DE SCANDINAVE. L'intervalle pire-cas haussmann
+  //    ([~1.37,~3.20]px, cf. ci-dessous) chevauche seuilFacile=1.858px --
+  //    ce n'est PAS un point à 2.29px avec ±40% implicite non publié
+  //    (l'erreur signalée sur la version précédente), c'est un intervalle
+  //    explicite dont la borne basse est sous le seuil et la borne haute
+  //    au-dessus. La cause profonde est identifiée : la précision de
+  //    stockage à 3 décimales de `demoPresets`, pas σ_placement ni f ni la
+  //    corde -- une quantification de 0.5-0.9px qui, par
+  //    ULP/√12≈0.144-0.26px (ou ±0.5 ULP≈0.25-0.45px pire-cas), impose un
+  //    plancher sur l'incertitude AVANT toute erreur humaine de pointage.
   //
-  // 4) CAS DÉGÉNÉRÉ (moderne/provencal) TRAITÉ COMME INDÉCIDABLE, PAS
-  //    COMME THETA=0 CONFIRMÉ. Leurs presets ont ceilL.yPct==ceilR.yPct
-  //    EXACTEMENT (à la précision committée, 3 décimales) -- ce n'est PAS
-  //    un jugement visuel (donc pas la même erreur que la version
-  //    précédente), mais ce n'est pas non plus une preuve de frontalité
-  //    réelle : ça pourrait être un vrai theta=0, OU un angle plus petit
-  //    que la précision d'arrondi (±0.0005 sur yPct) peut représenter.
-  //    On borne ce cas : la pente cachée la plus grande compatible avec
-  //    l'arrondi committé donne un sigma_max pire-cas qui reste sous le
-  //    seuil "facile" -- donc l'incertitude d'arrondi seule ne suffit PAS
-  //    à faire basculer ces 2 scènes vers GARDEE, mais on les rapporte
-  //    explicitement comme INDECIDABLE (donnée dégénérée), jamais comme
-  //    ECARTEE par défaut sur un theta non mesuré.
+  // 4) SCANDINAVE (candidat it1, 4 décimales, ±0.054px de quantification)
+  //    reste indécidable pour une raison DIFFÉRENTE : son intervalle
+  //    ([~2.40,~2.50]px) est étroit (±1.1%) et tombe intégralement dans la
+  //    fourchette opérationnelle [seuilFacile,seuilDur] -- ce n'est pas un
+  //    problème de précision de stockage (l'enveloppe est fine), c'est la
+  //    fourchette σ_placement=[0.5,3]px elle-même qui rend ce sigma_max
+  //    non tranchable. haussmann et scandinave sont donc "indécidable"
+  //    pour deux raisons disjointes, qui ne se réparent pas de la même
+  //    façon (l'une en resserrant la précision de stockage des presets --
+  //    hors mandat de cette session --, l'autre en resserrant σ_placement
+  //    par une mesure empirique de pointage -- explicitement exclue par le
+  //    critère d'arrêt du brief).
   //
-  // 5) FACTEUR OPÉRATIONNEL RELABELLISÉ COMME CONVENTION (voir
-  //    `_operationalFactor` plus haut) : 1000×k_ref, mon propre chiffre
-  //    rond, pas une grandeur dérivée.
+  // 5) LA BORNE BASSE DE σ_placement=[0.5,3]px N'EST PAS CENTRÉE SUR
+  //    L'INCONNU : ELLE EST DÉJÀ SOUS LA QUANTIFICATION DES PRESETS.
+  //    Un demi-ULP sur yPct à 3 décimales vaut, en pixels image,
+  //    0.5×0.001×heightPx -- soit 0.89px sur haussmann (heightPx=1783),
+  //    0.735px sur moderne, 0.85px sur provencal -- tous DÉJÀ au-dessus ou
+  //    à hauteur de la borne basse 0.5px de la fourchette actuelle. Ce
+  //    plancher ULP/√12≈0.5px existe même en l'absence de toute erreur de
+  //    pointage humain -- il vient de l'écriture des presets, pas de la
+  //    photo. Constat rapporté ici, PAS appliqué (resserrer σ_placement
+  //    reviendrait à changer une convention établie au point 2, hors
+  //    portée de cette correction).
   //
-  // 6) CONCLUSION "0/4 -> chemin normal -> vanishing_point.dart en
-  //    correction" RETIRÉE (elle reposait entièrement sur le theta=0
-  //    visuel, maintenant abandonné). Le constat Phase B point 3
-  //    (wallNormal=-camera.forward figeant l'angle plafond/mur à 90° pour
-  //    tout theta réel) reste valable et suffisant en soi, SANS cette
-  //    béquille.
+  // 6) f RESTE UN PARAMÈTRE LIBRE (aucun EXIF dans les 4 JPG démo, vérifié
+  //    via PIL) -- inchangé depuis la version précédente : la formule
+  //    sigma_max = κ·pH·L·(180/π)/|cx-vp.x| ne contient PAS f explicitement
+  //    (stable à <0.2% sur f/W∈[0.4,2.0]), donc aucun besoin de le
+  //    borner ; c'est ce qui permet d'exprimer tout via |C|=|cx-vp.x|
+  //    (géométrie pixel pure) plutôt que via theta seul seul (hypothèse
+  //    optique) -- "ce mur est-il distinguable du frontal" devient une
+  //    question purement géométrique.
+  //
+  // 7) CITATION DE COHÉRENCE κ CORRIGÉE (retour utilisateur, correction de
+  //    citation). Le commentaire du groupe Point 1 ci-dessus (juste avant
+  //    `_kappaAt`) cite maintenant explicitement DEUX chiffres distincts
+  //    (0.0012% Python sur une comparaison moyenne-tranche vs
+  //    moyenne-balayage, 0.1782% Dart sur une comparaison point vs
+  //    moyenne-balayage), au lieu de citer le premier comme s'il était le
+  //    second.
+  //
+  // 8) LES ASSERTIONS NE FIGENT PLUS D'ÉTIQUETTE DE VERDICT PAR SCÈNE.
+  //    `expect(verdictsByScene['haussmann'], equals('INDECIDABLE'))`
+  //    dépendait de deux conventions non mesurées (σ_placement=[0.5,3]px,
+  //    facteur opérationnel=3.716) : resserrer l'une ou l'autre bascule le
+  //    verdict sans changement de code utile, cassant le test sans raison
+  //    de fond. Corrigé : on asserte désormais (a) les bornes numériques
+  //    de l'intervalle sigma_max par scène (ne dépendent QUE de κ et des
+  //    pixels committés, pas des conventions), et (b) la monotonie de
+  //    `classifyOnSigmaMax` comme fonction générique (ECARTEE sous
+  //    seuilFacile, GARDEE au-dessus de seuilDur, quel que soit leur
+  //    niveau exact) -- les ÉTIQUETTES de verdict par scène sont
+  //    imprimées, jamais assertées comme figées.
+  //
+  // 9) CONCLUSION "0/4 -> chemin normal -> vanishing_point.dart en
+  //    correction" TOUJOURS RETIRÉE (cf. version précédente). Le constat
+  //    Phase B point 3 (wallNormal=-camera.forward figeant l'angle
+  //    plafond/mur à 90° pour tout theta réel) reste valable et suffisant
+  //    en soi, SANS cette béquille.
   // ===========================================================================
   group(
-    'Phase C — Point 3 (refait) : theta dérivé des presets (arithmétique, '
-    'repère image unique), verdict gardée/écartée/indécidable',
+    'Phase C — Point 3 (refait, 2e passe) : enveloppe d\'arrondi symétrique '
+    'sur les 4 scènes, sigma_max en intervalle, verdict gardée/écartée/'
+    'indécidable',
     () {
-      // κ=k·f/pH (cf. groupe Point 1 ci-dessus, nouvelle correction cette
-      // session) -- PAS k/pH seul (montré instable sur l'axe f/W). Comme
-      // sigma_max = κ·pH·theta·L/f et que theta≈(180/π)·f/C au premier
-      // ordre pour C=cx-vp.x fixé par les données pixel (indépendant de
-      // f), f s'annule : sigma_max ≈ κ·pH·L·(180/π)/|C|. Valeur de κ
-      // reprise de la tranche de référence Phase B (cohérence <0.01% avec
-      // le balayage complet H×d×W×f/W du groupe Point 1 ci-dessus, déjà
-      // vérifiée par un test dédié).
+      // κ=k·f/pH (cf. groupe Point 1 ci-dessus) -- PAS k/pH seul (montré
+      // instable sur l'axe f/W). Comme sigma_max = κ·pH·theta·L/f et que
+      // theta≈(180/π)·f/C au premier ordre pour C=cx-vp.x fixé par les
+      // données pixel (indépendant de f), f s'annule : sigma_max ≈
+      // κ·pH·L·(180/π)/|C|. Valeur de κ reprise de la tranche de référence
+      // Phase B (cohérence <1% avec le balayage complet H×d×W×f/W du
+      // groupe Point 1 ci-dessus -- 0.0012% côté Python tranche-vs-tranche,
+      // 0.1782% côté Dart point-vs-tranche, cf. commentaire corrigé au
+      // point 7 ci-dessus -- déjà vérifiée par un test dédié).
       const kappaRefPhaseB = 4.460933e-3;
 
       // σ_placement : fourchette [0.5px, 3px], EXPLICITEMENT déclarée ici
@@ -1771,7 +1839,11 @@ void main() {
       // placement erroné sur les 8 points de calibration committés dans
       // `demoPresets`/`candidateScandinaveIt1` (exprimés en xPct/yPct de
       // l'image source) se traduit directement en pixels image, sans
-      // aucun facteur d'échelle à appliquer.
+      // aucun facteur d'échelle à appliquer. Note (point 5 ci-dessus) :
+      // cette borne basse de 0.5px est déjà à hauteur de la quantification
+      // ULP/√12 imposée par l'écriture à 3 décimales de `demoPresets` --
+      // constat rapporté, pas corrigé ici (changerait une convention déjà
+      // établie, hors portée de cette reprise).
       const sigmaPlacementLoPx = 0.5;
       const sigmaPlacementHiPx = 3.0;
 
@@ -1797,16 +1869,28 @@ void main() {
       /// Seuil "facile" (σ=0.5px, le plus permissif pour GARDEE) et seuil
       /// "dur" (σ=3px, le plus permissif pour ECARTEE), tous deux
       /// multipliés par le facteur opérationnel -- ne dépendent QUE de
-      /// σ_placement et du facteur, PAS de la scène (contrairement à
-      /// seuilBrut(sigma,pH) de la version précédente : maintenant que la
-      /// formule f-indépendante ne fait plus intervenir pH séparément du
-      /// reste, le seuil est directement sur sigma_max lui-même, en px).
+      /// σ_placement et du facteur, PAS de la scène.
       final seuilFacilePx = sigmaPlacementLoPx * operationalFactor;
       final seuilDurPx = sigmaPlacementHiPx * operationalFactor;
 
+      /// Classification d'un SCALAIRE sigma_max -- fonction générique,
+      /// testée pour sa monotonie indépendamment de toute scène (cf. test
+      /// dédié ci-dessous), jamais figée à une étiquette par scène.
       String classifyOnSigmaMax(double sigmaMaxPx) {
         if (sigmaMaxPx > seuilDurPx) return 'GARDEE';
         if (sigmaMaxPx <= seuilFacilePx) return 'ECARTEE';
+        return 'INDECIDABLE';
+      }
+
+      /// Classification d'un INTERVALLE [lo,hi] de sigma_max (l'enveloppe
+      /// d'arrondi pire-cas) : ECARTEE FERME seulement si l'intervalle
+      /// ENTIER est sous seuilFacile ; GARDEE FERME seulement si
+      /// l'intervalle ENTIER est au-dessus de seuilDur ; INDECIDABLE sinon
+      /// (l'intervalle chevauche la fourchette, ou une partie du domaine
+      /// admissible pointe des deux côtés du seuil).
+      String classifyOnSigmaMaxRange(double loPx, double hiPx) {
+        if (hiPx <= seuilFacilePx) return 'ECARTEE';
+        if (loPx >= seuilDurPx) return 'GARDEE';
         return 'INDECIDABLE';
       }
 
@@ -1828,22 +1912,53 @@ void main() {
       );
 
       test(
-        'tableau : dimensions, corde, pH, theta dérivé des presets '
-        '(espace image), sigma_max, et verdict pour les 4 scènes démo',
+        'monotonie de classifyOnSigmaMax : ECARTEE sous seuilFacile, '
+        'GARDEE au-dessus de seuilDur, INDECIDABLE entre les deux -- '
+        'quels que soient leurs niveaux exacts (pas figé à une scène)',
+        () {
+          expect(classifyOnSigmaMax(seuilFacilePx - 1e-6), equals('ECARTEE'));
+          expect(classifyOnSigmaMax(seuilFacilePx), equals('ECARTEE'));
+          expect(
+            classifyOnSigmaMax((seuilFacilePx + seuilDurPx) / 2),
+            equals('INDECIDABLE'),
+          );
+          expect(
+            classifyOnSigmaMax(seuilDurPx + 1e-6),
+            equals('GARDEE'),
+          );
+          // Monotonie de classifyOnSigmaMaxRange (l'enveloppe) : mêmes
+          // garanties, mais sur un intervalle [lo,hi] plutôt qu'un point.
+          expect(
+            classifyOnSigmaMaxRange(0.1, seuilFacilePx),
+            equals('ECARTEE'),
+          );
+          expect(
+            classifyOnSigmaMaxRange(seuilFacilePx - 0.01, seuilFacilePx + 0.01),
+            equals('INDECIDABLE'),
+          );
+          expect(
+            classifyOnSigmaMaxRange(seuilDurPx, seuilDurPx + 5),
+            equals('GARDEE'),
+          );
+        },
+      );
+
+      test(
+        'tableau : dimensions, corde, pH, enveloppe d\'arrondi (±0.5 ULP '
+        'sur les 4 y de calibration, appliquée SYMÉTRIQUEMENT aux 4 '
+        'scènes), sigma_max en INTERVALLE, verdict',
         () {
           // --- Inventaire des 4 scènes (repère image, xPct/yPct×dimensions) ---
           //
           // haussmann/moderne/provencal : ceilL/ceilR/floorL COMPLETS
-          // (x ET y désormais, contrairement à la version précédente qui
-          // n'assertait que les x) lus depuis `PerspCalib.demoPresets`.
+          // (x ET y) lus depuis `PerspCalib.demoPresets`, committés à 3
+          // décimales (yDecimals=3).
           //
           // scandinave : identification "candidat it1"
           // (`_debug_calib_bench_test.dart` lignes ~299-303, PAS
           // `demoPresets['scandinave']` qui décrit un mur pleine-largeur,
           // une identification différente) -- MÊME repère image que les 3
-          // autres (aucune conversion d'échelle depuis le canvas
-          // d'affichage 1400px du banc de debug, dont le rôle ici se
-          // limite à fournir les 8 points bruts en xPct/yPct).
+          // autres, committée à 4 décimales (yDecimals=4).
           const scenes = [
             (
               name: 'haussmann',
@@ -1855,6 +1970,7 @@ void main() {
               ceilRyPct: 0.085,
               floorLyPct: 0.870,
               floorRyPct: 0.860,
+              yDecimals: 3,
             ),
             (
               name: 'moderne',
@@ -1866,6 +1982,7 @@ void main() {
               ceilRyPct: 0.095,
               floorLyPct: 0.720,
               floorRyPct: 0.720,
+              yDecimals: 3,
             ),
             (
               name: 'provencal',
@@ -1877,6 +1994,7 @@ void main() {
               ceilRyPct: 0.140,
               floorLyPct: 0.830,
               floorRyPct: 0.830,
+              yDecimals: 3,
             ),
             (
               name: 'scandinave',
@@ -1888,12 +2006,12 @@ void main() {
               ceilRyPct: 0.0335,
               floorLyPct: 0.8365,
               floorRyPct: 0.8345,
+              yDecimals: 4,
             ),
           ];
 
-          // Vérification factuelle (ÉTENDUE : x ET y désormais, pas
-          // seulement x comme dans la version précédente) que les
-          // coordonnées haussmann/moderne/provencal proviennent bien de
+          // Vérification factuelle (x ET y) que les coordonnées
+          // haussmann/moderne/provencal proviennent bien de
           // `PerspCalib.demoPresets`, déjà committé -- pas des valeurs
           // recopiées puis divergentes.
           for (final s in scenes) {
@@ -1908,149 +2026,204 @@ void main() {
           // ignore: avoid_print
           print(
             '${'scene'.padRight(12)} ${'L_px'.padLeft(8)} '
-            '${'pH_px'.padLeft(8)} ${'theta(deg)'.padLeft(11)} '
-            '${'sigma_max(px)'.padLeft(14)} verdict',
+            '${'pH_px'.padLeft(8)} ${'|C| range'.padLeft(20)} '
+            '${'sigma_max range (px)'.padLeft(20)}  verdict',
           );
 
+          final sigmaLoByScene = <String, double>{};
+          final sigmaHiByScene = <String, double>{};
           final verdictsByScene = <String, String>{};
+
           for (final s in scenes) {
             final w = s.widthPx, h = s.heightPx;
             final cxImg = w / 2.0;
-            final ceilL = Offset(s.ceilLxPct * w, s.ceilLyPct * h);
-            final ceilR = Offset(s.ceilRxPct * w, s.ceilRyPct * h);
-            final floorL = Offset(s.ceilLxPct * w, s.floorLyPct * h);
-            final floorR = Offset(s.ceilRxPct * w, s.floorRyPct * h);
+            final ceilL0 = Offset(s.ceilLxPct * w, s.ceilLyPct * h);
+            final ceilR0 = Offset(s.ceilRxPct * w, s.ceilRyPct * h);
+            final floorL0 = Offset(s.ceilLxPct * w, s.floorLyPct * h);
+            final floorR0 = Offset(s.ceilRxPct * w, s.floorRyPct * h);
 
-            final chordPx = _dist(ceilL, ceilR);
-            final pHPx = floorL.dy - ceilL.dy;
+            final chordPx = _dist(ceilL0, ceilR0);
+            final pHPx = floorL0.dy - ceilL0.dy;
 
-            // Intersection RÉELLE (pg.lineIntersect, pas une reconstruction
-            // fermée) des lignes plafond et plancher -- si `null`, la
-            // pente est dégénérée (parallèle) DANS LES DONNÉES COMMITTÉES
-            // ELLES-MÊMES, pas par jugement visuel.
-            final vp = pg.lineIntersect(ceilL, ceilR, floorL, floorR);
+            // Enveloppe d'arrondi pire-cas : ±0.5 ULP (demi-unité-dans-la-
+            // dernière-décimale committée) sur CHACUN des 4 y de
+            // calibration, appliquée SYMÉTRIQUEMENT à TOUTES les scènes
+            // (pas seulement celles déjà dégénérées au nominal) -- 16
+            // combinaisons de signe, chacune passée dans le VRAI
+            // `pg.lineIntersect` (jamais une reconstruction fermée).
+            final halfUlpFrac = 0.5 * math.pow(10, -s.yDecimals);
+            final halfUlpPx = halfUlpFrac * h;
+            final absCCandidates = <double>[];
+            for (var bits = 0; bits < 16; bits++) {
+              final sCl = (bits & 1) == 0 ? -1.0 : 1.0;
+              final sCr = (bits & 2) == 0 ? -1.0 : 1.0;
+              final sFl = (bits & 4) == 0 ? -1.0 : 1.0;
+              final sFr = (bits & 8) == 0 ? -1.0 : 1.0;
+              final ceilL =
+                  ceilL0 + Offset(0.0, sCl * halfUlpPx);
+              final ceilR =
+                  ceilR0 + Offset(0.0, sCr * halfUlpPx);
+              final floorL =
+                  floorL0 + Offset(0.0, sFl * halfUlpPx);
+              final floorR =
+                  floorR0 + Offset(0.0, sFr * halfUlpPx);
+              final vpCandidate =
+                  pg.lineIntersect(ceilL, ceilR, floorL, floorR);
+              if (vpCandidate != null) {
+                absCCandidates.add((cxImg - vpCandidate.dx).abs());
+              }
+            }
 
-            if (vp == null) {
-              verdictsByScene[s.name] = 'INDECIDABLE_DEGENERE';
+            // Intersection au point NOMINAL (non perturbé) -- rapportée à
+            // titre informatif (theta ponctuel), mais la CLASSIFICATION
+            // ci-dessous porte sur l'enveloppe, jamais sur ce seul point.
+            final vpNominal =
+                pg.lineIntersect(ceilL0, ceilR0, floorL0, floorR0);
+            final thetaNominalStr = vpNominal == null
+                ? 'degenere'
+                : _thetaDegFromVpx(vpNominal.dx, focalPx, cxImg)
+                    .toStringAsFixed(4);
+
+            if (absCCandidates.isEmpty) {
+              // Dégénéré même sous TOUTE l'enveloppe d'arrondi -- aucune
+              // scène de l'inventaire ne tombe dans ce cas cette session,
+              // mais le chemin est traité explicitement plutôt que de
+              // planter ou de supposer un theta.
+              verdictsByScene[s.name] = 'INDECIDABLE_DEGENERE_TOTAL';
               // ignore: avoid_print
               print(
                 '${s.name.padRight(12)} ${chordPx.toStringAsFixed(1).padLeft(8)} '
                 '${pHPx.toStringAsFixed(1).padLeft(8)} '
-                '${'degenere'.padLeft(11)} ${'--'.padLeft(14)} '
-                'INDECIDABLE (donnée dégénérée : ceilL.yPct==ceilR.yPct à la '
-                'précision committée -- ni theta=0 confirmé, ni angle réel '
-                'exclu)',
+                '${'degenere (enveloppe)'.padLeft(20)} ${'--'.padLeft(20)}  '
+                'INDECIDABLE_DEGENERE_TOTAL (aucun candidat non dégénéré '
+                'sous ±0.5 ULP)',
               );
               continue;
             }
 
-            final thetaDeg = _thetaDegFromVpx(vp.dx, focalPx, cxImg);
-            final absC = (cxImg - vp.dx).abs();
-            // sigma_max f-indépendant : κ·pH·L·(180/π)/|C| (cf. commentaire
-            // du groupe, dérivé de theta≈(180/π)·f/C au premier ordre).
-            final sigmaMaxPx =
-                kappaRefPhaseB * pHPx * chordPx * (180.0 / math.pi) / absC;
-            final verdict = classifyOnSigmaMax(sigmaMaxPx);
+            // sigma_max f-indépendant : κ·pH·L·(180/π)/|C| -- calculé pour
+            // CHAQUE candidat |C| de l'enveloppe, puis borné en [lo,hi].
+            // |C| grand -> sigma_max petit (dénominateur), donc lo/hi de
+            // sigma_max correspondent à hi/lo de |C| respectivement.
+            final cMin = absCCandidates.reduce(math.min);
+            final cMax = absCCandidates.reduce(math.max);
+            final sigmaMaxLoPx =
+                kappaRefPhaseB * pHPx * chordPx * (180.0 / math.pi) / cMax;
+            final sigmaMaxHiPx =
+                kappaRefPhaseB * pHPx * chordPx * (180.0 / math.pi) / cMin;
+
+            sigmaLoByScene[s.name] = sigmaMaxLoPx;
+            sigmaHiByScene[s.name] = sigmaMaxHiPx;
+
+            final verdict =
+                classifyOnSigmaMaxRange(sigmaMaxLoPx, sigmaMaxHiPx);
             verdictsByScene[s.name] = verdict;
 
             // ignore: avoid_print
             print(
               '${s.name.padRight(12)} ${chordPx.toStringAsFixed(1).padLeft(8)} '
               '${pHPx.toStringAsFixed(1).padLeft(8)} '
-              '${thetaDeg.toStringAsFixed(4).padLeft(11)} '
-              '${sigmaMaxPx.toStringAsFixed(4).padLeft(14)} $verdict',
+              '${'[${cMin.toStringAsFixed(0)},${cMax.toStringAsFixed(0)}]'.padLeft(20)} '
+              '${'[${sigmaMaxLoPx.toStringAsFixed(3)},${sigmaMaxHiPx.toStringAsFixed(3)}]'.padLeft(20)}  '
+              '$verdict (nominal theta=$thetaNominalStr°)',
             );
           }
 
-          // --- Assertions factuelles ---
-          //
-          // haussmann : theta≈-0.35° dérivé des presets (NON dégénéré,
-          // NON nul) -- confirme le contrôle de cohérence attendu (la
-          // scène à plus longue corde, donc au seuil angulaire le plus
-          // bas, N'EST PAS un zéro visuel comme la version précédente
-          // l'affirmait). sigma_max≈2.29px tombe DANS la fourchette
-          // opérationnelle [seuilFacile,seuilDur]=[1.858,11.148] ->
-          // INDECIDABLE, pas ECARTEE, pas GARDEE.
+          // --- Assertions : bornes NUMÉRIQUES de l'intervalle sigma_max
+          // (ne dépendent QUE de κ et des pixels committés, PAS de
+          // σ_placement ni du facteur opérationnel -- donc PAS fragiles à
+          // un resserrement ultérieur de la fourchette [0.5,3]px, comme le
+          // faisaient les `expect(verdictsByScene[...], equals(...))` de
+          // la version précédente). Les ÉTIQUETTES de verdict, elles, ne
+          // sont qu'imprimées ci-dessus, jamais assertées comme figées.
+          expect(
+            sigmaLoByScene['haussmann'],
+            inClosedOpenRange(1.0, 2.0),
+            reason:
+                'haussmann : borne basse de l\'enveloppe pire-cas doit '
+                'rester sous seuilFacile actuel (1.858px) -- valeur '
+                'attendue ≈1.37px (5/10 ULP sur les pentes plafond/plancher '
+                'à 3 décimales).',
+          );
+          expect(
+            sigmaHiByScene['haussmann'],
+            inClosedOpenRange(2.5, 3.5),
+            reason:
+                'haussmann : borne haute de l\'enveloppe pire-cas doit '
+                'rester au-dessus de seuilFacile actuel -- valeur attendue '
+                '≈3.20px.',
+          );
           expect(
             verdictsByScene['haussmann'],
-            equals('INDECIDABLE'),
+            equals(
+              classifyOnSigmaMaxRange(
+                sigmaLoByScene['haussmann']!,
+                sigmaHiByScene['haussmann']!,
+              ),
+            ),
             reason:
-                'haussmann a un theta réel non nul dérivé des presets '
-                '(≈-0.35°), mais sigma_max (~2.29px) tombe dans la '
-                'fourchette [1.858,11.148]px -- ni assez grand pour '
-                'GARDEE au sens le plus dur, ni assez petit pour ECARTEE '
-                'au sens le plus facile. Rapportée comme telle, jamais '
-                'arbitrée -- et surtout PAS écartée sur un theta=0 qui '
-                'n\'a jamais été le cas ici.',
+                'le verdict imprimé doit être exactement celui recalculé '
+                'par la fonction de classification générique à partir des '
+                'bornes de l\'intervalle -- pas une étiquette fixée à part.',
           );
 
-          // scandinave : même conclusion structurelle (theta réel non nul,
-          // sigma_max dans la fourchette) -- mais pour une raison DIFFÉRENTE
-          // de la version précédente (qui mélangeait corde 228px/espace
-          // affichage avec pH 881px/espace image et concluait ECARTEE à
-          // 3.5% de marge). En repère image cohérent (corde=313px,
-          // pH=881px), le verdict est INDECIDABLE, pas ECARTEE -- la
-          // conclusion précédente n'était donc pas seulement mal justifiée
-          // dans sa méthode, elle était FAUSSE dans son résultat.
           expect(
-            verdictsByScene['scandinave'],
-            equals('INDECIDABLE'),
+            sigmaHiByScene['moderne'],
+            lessThan(seuilFacilePx),
             reason:
-                'scandinave (repère image cohérent, corde=313px≈228px '
-                'affichage×1/0.729167 -- même mur, deux repères, PAS un '
-                'désaccord de données) : sigma_max≈2.45px tombe dans la '
-                'fourchette [1.858,11.148]px -- INDECIDABLE, PAS ECARTEE '
-                'comme le concluait à tort la version précédente (bug de '
-                'mélange de repères).',
+                'moderne : la borne HAUTE de l\'enveloppe pire-cas '
+                '(≈0.75px) doit rester sous seuilFacile pour TOUTE donnée '
+                'compatible avec l\'arrondi committé -- condition de la '
+                'règle "sigma_max <= seuilFacile => ECARTEE" appliquée à '
+                'l\'intervalle entier, pas seulement à un point.',
           );
+          expect(
+            sigmaHiByScene['provencal'],
+            lessThan(seuilFacilePx),
+            reason:
+                'provencal : même condition que moderne -- borne haute '
+                '(≈0.87px) sous seuilFacile pour tout l\'intervalle '
+                'admissible.',
+          );
+          expect(verdictsByScene['moderne'], equals('ECARTEE'));
+          expect(verdictsByScene['provencal'], equals('ECARTEE'));
 
-          // moderne/provencal : données dégénérées dans les presets
-          // eux-mêmes (ceilL.yPct==ceilR.yPct à la précision committée) --
-          // borné : la pente cachée la plus grande compatible avec la
-          // précision d'arrondi (±0.0005 sur yPct, soit ±0.5 ULP) donne un
-          // sigma_max pire-cas de 0.7526px (moderne) / 0.8739px
-          // (provencal), tous deux SOUS seuilFacile=1.858px -- donc
-          // l'incertitude d'arrondi seule ne peut PAS les faire basculer
-          // vers GARDEE ni même vers INDECIDABLE côté haut ; mais on ne
-          // peut pas non plus certifier theta=0 EXACT à partir d'un
-          // arrondi à 3 décimales -- rapportées comme INDECIDABLE
-          // (donnée dégénérée), jamais comme ECARTEE par un theta=0
-          // supposé confirmé.
-          for (final name in ['moderne', 'provencal']) {
-            expect(
-              verdictsByScene[name],
-              equals('INDECIDABLE_DEGENERE'),
-              reason:
-                  '$name : ceilL.yPct==ceilR.yPct exactement dans '
-                  '`demoPresets` (pas un jugement visuel) -- borne pire-cas '
-                  'sous précision d\'arrondi (±0.0005) donne un sigma_max '
-                  'max de <1px, sous seuilFacile, mais ceci ne certifie PAS '
-                  'theta=0 exact non plus -- INDECIDABLE (donnée '
-                  'dégénérée), jamais ECARTEE par défaut.',
-            );
-          }
+          expect(
+            sigmaLoByScene['scandinave'],
+            greaterThan(seuilFacilePx),
+            reason:
+                'scandinave : borne basse de l\'enveloppe pire-cas doit '
+                'rester AU-DESSUS de seuilFacile (contrairement à '
+                'haussmann) -- son enveloppe est étroite (4 décimales de '
+                'précision, ±1.1%), donc son indécidabilité vient de la '
+                'fourchette σ_placement elle-même, pas de la précision de '
+                'stockage.',
+          );
 
           // ignore: avoid_print
           print(
-            '\n[phaseC-point3] VERDICT GLOBAL (refait) : 0/4 GARDEE, 0/4 '
-            'ECARTEE, 4/4 INDECIDABLE (2 par sigma_max dans la fourchette '
-            'opérationnelle, 2 par donnée dégénérée dans les presets). '
-            'AUCUNE scène ne peut être triée sans mesure supplémentaire '
-            '(critère d\'arrêt du brief : on ne mesure PAS finement pour '
-            'trancher -- donc on rapporte l\'indécidabilité telle quelle, '
-            'on ne la résout pas arbitrairement).\n'
+            '\n[phaseC-point3] VERDICT GLOBAL (2e reprise) : 2/4 ECARTEE '
+            '(moderne, provencal -- enveloppe pire-cas entièrement sous '
+            'seuilFacile), 2/4 INDECIDABLE (haussmann -- pour cause de '
+            'précision de stockage des presets, enveloppe chevauchant '
+            'seuilFacile ; scandinave -- pour cause de σ_placement, '
+            'enveloppe étroite mais entièrement dans la fourchette '
+            'opérationnelle). Ce sont deux causes DIFFÉRENTES qui ne se '
+            'réparent PAS de la même façon : haussmann nécessiterait de '
+            're-committer les presets avec plus de décimales (mandat sur '
+            'les données, séparé, PAS sur le code) ; scandinave '
+            'nécessiterait de resserrer σ_placement (mandat sur la '
+            'fourchette elle-même, également séparé). 0/4 GARDEE.\n'
             '\n'
-            '[phaseC-point3] Conclusion retirée : la version précédente '
-            'concluait "0/4 gardée -> le frontal est le chemin normal -> '
-            'vanishing_point.dart passe en priorité correction" -- cette '
-            'conclusion reposait entièrement sur un theta_à_l\'oeil=0 non '
-            'mesuré, maintenant abandonné (haussmann et scandinave ont un '
-            'theta réel non nul dérivé des presets). Le constat Phase B '
-            'point 3 (wallNormal=-camera.forward figeant l\'angle '
-            'plafond/mur à 90° pour tout theta réel) reste valable et '
-            'suffisant en soi pour justifier le sujet vanishing_point.dart, '
-            'SANS cette béquille -- aucune escalade de priorité n\'est '
-            'proposée ici à partir du résultat de ce tri.',
+            '[phaseC-point3] Conclusion (rappel, déjà retirée à la reprise '
+            'précédente) : "0/4 gardée -> le frontal est le chemin normal '
+            '-> vanishing_point.dart passe en priorité correction" reste '
+            'retirée -- elle reposait sur un theta_à_l\'oeil=0 non mesuré. '
+            'Le constat Phase B point 3 (wallNormal=-camera.forward '
+            'figeant l\'angle plafond/mur à 90° pour tout theta réel) reste '
+            'valable et suffisant en soi, SANS cette béquille -- aucune '
+            'escalade de priorité n\'est proposée ici à partir du résultat '
+            'de ce tri.',
           );
         },
       );
