@@ -4,9 +4,12 @@
 /// sources et de l'unité).
 ///
 /// ⚠️ Ce fichier n'importe rien de `lib/core/geometry/` (lignée 3D
-/// jamais branchée) et n'est importé par aucun painter à ce stade — c'est
-/// un loader isolé, testé seul. Le branchement de `cornice_plinth_painter.dart`
-/// et la conversion mm→px sont des étapes ultérieures distinctes.
+/// jamais branchée). Il EST importé, indirectement, par
+/// `room_painter.dart` (via `ProfileDimsCache`, `profile_dims_cache.dart`)
+/// depuis le câblage du 13-17 août 2026 (commit `7440195` et suivants,
+/// voir `docs/ETAT_MOTEUR_RENDU.md` section 6) — cette docstring affirmait
+/// autrefois le contraire, corrigé ici après relecture directe de
+/// `room_painter.dart`.
 ///
 /// ## Définition de `retombeeMm` et `projectionMm`
 ///
@@ -34,17 +37,41 @@
 /// `bbox_mm` est un champ dérivé (min/max arrondi à 3 décimales, résidus
 /// observés de 0.0000 à 0.0005 mm sur les 3 pilotes) — recalculer
 /// l'étendue depuis `profil_mm` évite de dépendre d'un champ qui
-/// pourrait désynchroniser un jour. `bbox_mm` sert ici uniquement de
-/// **contrôle de cohérence en assertion debug** (pas de rejet) : si
-/// l'écart dépasse 0.001 mm, c'est qu'un profil déborde derrière le plan
-/// mur ou au-dessus du plan plafond — cas qui ne s'est pas présenté sur
-/// les 3 pilotes.
+/// pourrait désynchroniser un jour. `bbox_mm` sert de **contrôle de
+/// cohérence** : un écart > 0.001 mm signale un profil qui déborde
+/// derrière le plan mur ou au-dessus du plan plafond — cas qui ne
+/// s'est pas présenté sur les 3 pilotes STEP d'origine, mais qui EST
+/// apparu sur 16 des 56 profils du batch Piste A (ex. `D614`,
+/// `bbox_mm.w=62.389` vs `projectionMm` recalculé=52.8634 — écart
+/// 9.5257mm). Ce contrôle était initialement un `assert()` réel,
+/// **CRASHANT en mode debug** — reproduit expérimentalement sur `D614`
+/// avant ce commit. Un profil géométriquement invalide ne doit jamais
+/// faire tomber l'application : ce contrôle rejette désormais
+/// silencieusement (retourne `null`, jamais de throw), et incrémente
+/// [rejectedByContractCount] pour rester observable sans dépendre de
+/// logs console. C'est précisément le critère bloquant 2 de
+/// `tools/dxf_pipeline/gate_sanite.py` (copie littérale voulue, voir sa
+/// docstring) — un profil qui échoue ce contrôle ici est, par
+/// construction, un profil `SUSPECT_GEOMETRIE` côté gate.
 library;
 
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/services.dart' show rootBundle;
+
+/// Nombre de profils rejetés par le contrôle de cohérence bbox_mm depuis
+/// le dernier appel à [resetRejectedByContractCountForTesting] (ou depuis
+/// le démarrage du process). Exposé en lecture seule pour la télémétrie
+/// — n'affecte aucun repaint, aucun listener : un simple compteur lu à la
+/// demande (déliverable "compteur de rejets JSON" du brief de câblage).
+int get rejectedByContractCount => _rejectedByContractCount;
+int _rejectedByContractCount = 0;
+
+/// Réinitialise le compteur. Réservé aux tests — le compteur est un état
+/// de module partagé entre tous les tests du process.
+void resetRejectedByContractCountForTesting() {
+  _rejectedByContractCount = 0;
+}
 
 /// Dimensions métriques réelles (mm) d'un profil produit, dérivées de
 /// `assets/profiles/<ref>.json`. Valeur immuable.
@@ -142,31 +169,23 @@ Future<ProfileDims?> loadProfileDims(String ref) async {
   final retombeeMm = maxAbsDy;
   final projectionMm = maxAbsDx;
 
-  // Contrôle de cohérence contre bbox_mm : assertion en debug uniquement,
-  // jamais de rejet — un écart > 0.001 mm signalerait un profil qui
-  // déborde derrière le plan mur ou au-dessus du plan plafond (non
-  // observé sur les 3 pilotes STEP à la rédaction de ce loader).
-  if (kDebugMode) {
-    final bbox = data['bbox_mm'];
-    if (bbox is Map) {
-      final bboxW = (bbox['w'] as num?)?.toDouble();
-      final bboxH = (bbox['h'] as num?)?.toDouble();
-      if (bboxW != null) {
-        assert(
-          (bboxW - projectionMm).abs() < 0.001,
-          'ProfileDims[$ref]: bbox_mm.w ($bboxW) diverge de projectionMm '
-          '($projectionMm) au-delà de 0.001mm — profil potentiellement '
-          'débordant du plan mur.',
-        );
-      }
-      if (bboxH != null) {
-        assert(
-          (bboxH - retombeeMm).abs() < 0.001,
-          'ProfileDims[$ref]: bbox_mm.h ($bboxH) diverge de retombeeMm '
-          '($retombeeMm) au-delà de 0.001mm — profil potentiellement '
-          'débordant du plan plafond.',
-        );
-      }
+  // Contrôle de cohérence contre bbox_mm : rejet SILENCIEUX (jamais de
+  // throw, jamais d'assert) — un écart > 0.001 mm signale un profil qui
+  // déborde derrière le plan mur ou au-dessus du plan plafond. Copie
+  // littérale du critère bloquant 2 de gate_sanite.py, à dessein (voir
+  // docstring de fichier) : ne JAMAIS diverger de ce contrat, sous peine
+  // de désynchroniser le gate et le loader.
+  final bbox = data['bbox_mm'];
+  if (bbox is Map) {
+    final bboxW = (bbox['w'] as num?)?.toDouble();
+    final bboxH = (bbox['h'] as num?)?.toDouble();
+    if (bboxW != null && (bboxW - projectionMm).abs() >= 0.001) {
+      _rejectedByContractCount++;
+      return null;
+    }
+    if (bboxH != null && (bboxH - retombeeMm).abs() >= 0.001) {
+      _rejectedByContractCount++;
+      return null;
     }
   }
 

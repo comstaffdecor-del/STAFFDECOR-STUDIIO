@@ -3,12 +3,13 @@
 /// historique de commits `4e0041b`/`97879ac` pour le raisonnement complet
 /// sur le mécanisme de repaint et l'invariant de notification asynchrone).
 ///
-/// ⚠️ Ce fichier n'est PAS encore branché à [RoomPainter] (aucun import
-/// dans `room_painter.dart`, aucun `super(repaint: ...)` mis à jour) —
-/// c'est un cache isolé, testé seul. Le câblage (`Listenable.merge` dans
-/// le `repaint:` de [RoomPainter] et le remplacement du site
-/// `room_painter.dart:134`) est une étape ultérieure distincte, dans son
-/// propre commit.
+/// ⚠️ Ce fichier EST branché à [RoomPainter] depuis le câblage du
+/// 13-17 août 2026 (`Listenable.merge` dans son `repaint:`, cas
+/// `'Corniches'` de `room_painter.dart`) — voir `docs/ETAT_MOTEUR_RENDU
+/// .md` section 6. Cette docstring affirmait autrefois le contraire,
+/// corrigé ici après relecture directe de `room_painter.dart` (le
+/// câblage existait déjà, seule sa couverture — 8 refs, jamais étendue
+/// depuis — restait à mettre à jour).
 ///
 /// ## Différence de contexte avec [ProductTextureCache]
 ///
@@ -20,66 +21,72 @@
 /// ce n'est jamais une erreur applicative, c'est le cas normal. Un cache
 /// naïf qui appelle directement [loadProfileDims] pour chaque `ref`
 /// produirait, à chaque premier rendu de catalogue, jusqu'à 275
-/// exceptions `rootBundle.loadString` levées puis rattrapées (déjà gérées
-/// sans throw par [loadProfileDims] lui-même, mais le coût de lever +
-/// attraper 275 fois reste réel).
+/// tentatives `rootBundle.loadString` (déjà gérées sans throw par
+/// [loadProfileDims] lui-même, mais le coût réel).
 ///
-/// Pour éviter cette tempête, ce cache lit `AssetManifest.json` UNE FOIS
-/// (`AssetManifest.loadFromAssetBundle(rootBundle)`, disponible depuis
-/// Flutter 3.7 — largement couvert par la version figée de ce projet,
-/// 3.35.4, vérifié) et ne tente [loadProfileDims] QUE pour les refs dont
-/// `assets/profiles/<ref>.json` apparaît réellement dans le manifeste.
-/// Les refs absentes du manifeste sont marquées `_failed` directement,
-/// sans jamais invoquer [loadProfileDims]. `AssetManifest
-/// .loadFromAssetBundle` a été vérifié empiriquement fonctionnel sous
-/// `TestWidgetsFlutterBinding` (avec `ensureInitialized()` en tête de
-/// test) — pas seulement en production — donc le chemin de test et le
-/// chemin réel exercent la même logique de filtrage, pas une variante.
+/// ## Couverture : `assets/profiles/index.json`, PAS `AssetManifest.json`
 ///
-/// En prime, la liste des refs couvertes par le manifeste
-/// (`coveredRefsForTesting` / usage futur : indicateur UI "non calibré")
-/// est calculée une fois, réutilisable sans nouvelle lecture disque.
+/// ⚠️ CORRECTION (brief de câblage, étape 0) : ce cache dérivait
+/// initialement sa couverture d'`AssetManifest.json`, qui liste les 56
+/// fichiers `statut: "OK"` produits par le pipeline d'extraction — SANS
+/// filtrer par le gate de sanité (`tools/dxf_pipeline/gate_sanite.py`).
+/// Sur les 56, seuls 31 passent `statut_gate == "OK"` ; les 25 autres
+/// sont géométriquement invalides pour au moins un des deux critères
+/// bloquants du gate (contrat loader ou débord de plan de pose). Un
+/// cache filtrant par `AssetManifest.json` aurait tenté de charger ces
+/// 25 profils — 16 d'entre eux faisaient lever un `assert()` réel dans
+/// l'ancienne version de [loadProfileDims] (crash reproduit
+/// expérimentalement sur `D614` avant ce commit), les 9 autres
+/// n'avaient aucune garantie de validité géométrique.
 ///
-/// Défense en profondeur : si `AssetManifest.loadFromAssetBundle` devait
-/// un jour échouer (binding absent, asset manifeste corrompu — aucun cas
-/// observé à ce stade, mais le risque n'est pas nul), le chargement du
-/// manifeste est protégé par un `try/catch` qui dégrade vers une
-/// tentative directe de [loadProfileDims] pour CHAQUE ref demandée —
-/// exactement le comportement naïf qu'on cherche à éviter dans le cas
-/// normal, mais qui reste correct (juste plus coûteux) si le filtrage en
-/// amont n'est pas disponible.
+/// Ce cache lit désormais `assets/profiles/index.json` — généré par
+/// `tools/dxf_pipeline/build_profiles_index.py` depuis
+/// `gate_sanite_rapport.csv`, liste exacte des 31 SKU gate-OK — UNE
+/// FOIS, mémoïsé, et ne tente [loadProfileDims] QUE pour les refs qui y
+/// figurent. **Fail-closed, imposé** : si `index.json` est absent,
+/// illisible, malformé, ou que son tableau `refs` est vide, la
+/// couverture résolue est l'ensemble VIDE — aucune ref n'est jamais
+/// chargée dans ce cas, et le rendu retombe entièrement sur
+/// `StripThickness.corniceDefault(pH)` côté appelant (voir `corniceFor`,
+/// `cornice_plinth_painter.dart`). **Ce cache ne retombe JAMAIS sur
+/// `AssetManifest.json` en cas d'échec de lecture de `index.json`** —
+/// un tel repli ressusciterait exactement le bug que cette réécriture
+/// corrige (chargement des 25 profils hors gate). Un rendu ratio pixels
+/// honnête (silencieux, connu) est préférable à un rendu métrique sur
+/// des données non garanties par le gate.
 ///
-/// ## Repli TEMPORAIRE pendant le bootstrap du manifeste — PAS un repli
+/// En prime, la liste des refs couvertes (`coveredRefsForTesting` /
+/// usage futur : indicateur UI "non calibré") est calculée une fois,
+/// réutilisable sans nouvelle lecture disque.
+///
+/// ## Repli TEMPORAIRE pendant le bootstrap de l'index — PAS un repli
 /// permanent
 ///
-/// Le chargement du manifeste est lui-même asynchrone
-/// (`AssetManifest.loadFromAssetBundle` retourne un `Future`), mémoïsé
-/// dans [_manifestLoading]. [_resolve] `await`e sa résolution AVANT de
-/// décider si une ref est couverte — la décision n'est donc jamais
-/// prise prématurément : tant que le manifeste n'est pas prêt, la ref
-/// reste marquée `_loading` (PAS `_failed`), [_resolve] est simplement
-/// suspendu sur ce `await`, et aucune notification n'est envoyée.
+/// Le chargement de `index.json` est lui-même asynchrone
+/// (`rootBundle.loadString`), mémoïsé dans [_indexLoading]. [_resolve]
+/// `await`e sa résolution AVANT de décider si une ref est couverte — la
+/// décision n'est donc jamais prise prématurément : tant que l'index
+/// n'est pas prêt, la ref reste marquée `_loading` (PAS `_failed`),
+/// [_resolve] est simplement suspendu sur ce `await`, et aucune
+/// notification n'est envoyée.
 ///
 /// Concrètement, la toute première frame après démarrage affichera en
 /// repli (`StripThickness.corniceDefault`, côté appelant, via
 /// `getIfLoaded` qui renvoie `null` tant que rien n'est en cache) MÊME
-/// pour les 8 refs réellement couvertes (`D705`, `D718`, `D720`, `0900`,
-/// `1000`, `1005`, `1145c`, `20-54`) — c'est un choix délibéré, MAIS
-/// c'est une fenêtre de latence, pas un classement en échec : une fois
-/// le manifeste résolu, la vraie décision est prise et notifiée
+/// pour une ref couverte par `index.json` — c'est un choix délibéré,
+/// MAIS c'est une fenêtre de latence, pas un classement en échec : une
+/// fois l'index résolu, la vraie décision est prise et notifiée
 /// normalement, y compris pour une ref qui aurait été demandée pendant
-/// la fenêtre de bootstrap. Le futur `repaint:` (commit de câblage)
-/// rattrape l'affichage dès que le manifeste est prêt, exactement comme
-/// il rattrape déjà le chargement des textures produit. Vérifié par
-/// test (`profile_dims_cache_test.dart`, cas D720, `setUp` remettant
-/// aussi `_manifestLoading` à `null` avant chaque test — donc exécuté à
-/// froid, pas avec un manifeste déjà chaud d'un test précédent).
+/// la fenêtre de bootstrap. Le `repaint:` de [RoomPainter]
+/// (`Listenable.merge`) rattrape l'affichage dès que l'index est prêt,
+/// exactement comme il rattrape déjà le chargement des textures produit.
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show rootBundle, AssetManifest;
+import 'package:flutter/services.dart' show rootBundle;
 
 import 'profile_dims.dart';
 
@@ -91,11 +98,14 @@ class ProfileDimsCache extends ChangeNotifier {
   final Set<String> _loading = {};
   final Set<String> _failed = {};
 
-  /// `null` tant que le manifeste n'a pas été lu, sinon l'ensemble des
-  /// refs (sans préfixe `assets/profiles/` ni suffixe `.json`) réellement
-  /// présentes dans `assets/profiles/`. Calculé une seule fois.
+  /// `null` tant que `index.json` n'a pas été lu, sinon l'ensemble des
+  /// refs gate-OK (31 SKU, `statut_gate == "OK"` dans
+  /// `gate_sanite_rapport.csv`) listées par
+  /// `assets/profiles/index.json`. Calculé une seule fois. Reste un
+  /// ensemble VIDE si `index.json` est absent/illisible/vide — jamais
+  /// un repli sur `AssetManifest.json` (voir docstring de fichier).
   Set<String>? _coveredRefs;
-  Future<Set<String>>? _manifestLoading;
+  Future<Set<String>>? _indexLoading;
 
   /// Dimensions déjà chargées pour [ref], ou `null` si pas encore
   /// disponibles (chargement en cours, pas démarré, ref non couverte, ou
@@ -107,11 +117,24 @@ class ProfileDimsCache extends ChangeNotifier {
   @visibleForTesting
   bool isLoadingForTesting(String ref) => _loading.contains(ref);
 
-  /// Liste des refs couvertes par `assets/profiles/`, une fois le
-  /// manifeste résolu (`null` avant résolution) — utile pour un futur
-  /// indicateur "non calibré" côté UI catalogue.
+  /// Liste des refs gate-OK couvertes par `assets/profiles/index.json`,
+  /// une fois l'index résolu (`null` avant résolution) — utile pour un
+  /// futur indicateur "non calibré" côté UI catalogue.
   @visibleForTesting
   Set<String>? get coveredRefsForTesting => _coveredRefs;
+
+  /// Nombre de refs actuellement en cache (dimensions chargées avec
+  /// succès). Lecture seule, aucun effet sur le repaint — déliverable
+  /// "log hit/miss" du brief de câblage : à consulter à la demande
+  /// (ex. bouton debug, log manuel), jamais un second canal de
+  /// notification (voir garde-fou "pas de compteur de génération
+  /// séparé" du brief : `Listenable.merge` suffit pour le repaint).
+  int get loadedCountForLogging => _cache.length;
+
+  /// Nombre de refs ayant échoué (non couvertes par index.json, ou
+  /// rejetées par [loadProfileDims] — asset absent, statut non-OK,
+  /// contrat géométrique violé). Lecture seule.
+  int get failedCountForLogging => _failed.length;
 
   /// Réinitialise tout l'état interne. Réservé aux tests : le singleton
   /// est partagé entre tous les tests du process, et une ref déjà en
@@ -123,7 +146,7 @@ class ProfileDimsCache extends ChangeNotifier {
     _loading.clear();
     _failed.clear();
     _coveredRefs = null;
-    _manifestLoading = null;
+    _indexLoading = null;
   }
 
   /// Démarre le chargement des dimensions de [ref] si elles ne sont ni
@@ -162,25 +185,19 @@ class ProfileDimsCache extends ChangeNotifier {
   }
 
   Future<void> _resolve(String ref) async {
-    try {
-      final covered = await _ensureCoveredRefsLoaded();
-      if (!covered.contains(ref)) {
-        _loading.remove(ref);
-        _failed.add(ref);
-        notifyListeners();
-        return;
-      }
-    } catch (e) {
-      // Défense en profondeur : le manifeste n'a pas pu être lu (aucun
-      // cas observé, voir docstring de fichier). On dégrade vers une
-      // tentative directe de loadProfileDims — plus coûteux si beaucoup
-      // de refs sont absentes, mais correct.
-      if (kDebugMode) {
-        debugPrint(
-          'ProfileDimsCache: AssetManifest indisponible, repli sur '
-          'loadProfileDims direct pour $ref — $e',
-        );
-      }
+    // Fail-closed STRICT : contrairement à l'ancienne version (repli sur
+    // une tentative directe de loadProfileDims si AssetManifest.json
+    // était indisponible), aucun try/catch de contournement ici. Si
+    // _ensureCoveredRefsLoaded() échoue, l'ensemble résolu est VIDE
+    // (voir son implémentation) — ref non couverte, jamais de repli sur
+    // AssetManifest.json qui ressusciterait le chargement des 25 refs
+    // hors gate.
+    final covered = await _ensureCoveredRefsLoaded();
+    if (!covered.contains(ref)) {
+      _loading.remove(ref);
+      _failed.add(ref);
+      notifyListeners();
+      return;
     }
 
     try {
@@ -207,20 +224,44 @@ class ProfileDimsCache extends ChangeNotifier {
     }
   }
 
-  /// Lit `AssetManifest.json` une seule fois (mémoïsé par [_manifestLoading])
-  /// et renvoie l'ensemble des refs couvertes par `assets/profiles/`.
+  /// Lit `assets/profiles/index.json` une seule fois (mémoïsé par
+  /// [_indexLoading]) et renvoie l'ensemble des refs gate-OK qu'il liste.
+  ///
+  /// ⚠️ FAIL-CLOSED, imposé : toute anomalie (asset absent, JSON
+  /// malformé, champ `refs` absent/non-liste) renvoie un ensemble VIDE
+  /// — jamais une exception propagée à l'appelant, jamais un repli sur
+  /// `AssetManifest.json`. Un ensemble vide fait échouer TOUTES les
+  /// refs (`_failed`), donc TOUT le rendu retombe sur
+  /// `StripThickness.corniceDefault(pH)` — le seul cas où l'ancien
+  /// chemin en dur est préférable à un rendu métrique reposant sur des
+  /// données non garanties par le gate.
   Future<Set<String>> _ensureCoveredRefsLoaded() {
     final cached = _coveredRefs;
     if (cached != null) return Future.value(cached);
 
-    return _manifestLoading ??= () async {
-      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+    return _indexLoading ??= () async {
       final refs = <String>{};
-      for (final asset in manifest.listAssets()) {
-        const prefix = 'assets/profiles/';
-        const suffix = '.json';
-        if (asset.startsWith(prefix) && asset.endsWith(suffix)) {
-          refs.add(asset.substring(prefix.length, asset.length - suffix.length));
+      try {
+        final raw = await rootBundle.loadString('assets/profiles/index.json');
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) {
+          final list = decoded['refs'];
+          if (list is List) {
+            for (final r in list) {
+              if (r is String) refs.add(r);
+            }
+          }
+        }
+      } catch (e) {
+        // Fail-closed : index.json absent/illisible/malformé -> refs
+        // reste l'ensemble vide construit ci-dessus, PAS un repli sur
+        // AssetManifest.json. Journalisé pour diagnostic uniquement.
+        if (kDebugMode) {
+          debugPrint(
+            'ProfileDimsCache: assets/profiles/index.json indisponible '
+            'ou invalide ($e) — couverture vide, repli intégral sur '
+            'StripThickness.corniceDefault pour toutes les refs.',
+          );
         }
       }
       _coveredRefs = refs;
