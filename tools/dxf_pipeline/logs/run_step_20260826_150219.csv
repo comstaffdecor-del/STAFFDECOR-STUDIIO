@@ -1,0 +1,2 @@
+sku,fichier,mapping_absent,statut,nb_sommets,nb_sommets_dedup_retires,bbox_w_mm,bbox_h_mm,hauteur_mur_mm,projection_plafond_mm,motif_type,motif_periode_mm,nb_solides,unite_ocp,unite_kind_brut,unite_facteur_brut,origine_unite,message
+D615,D615.stp,True,ERREUR_SELECTION,0,0,,,,,,,1,MM,CONVERSION_BASED_UNIT,1.0,step_header,Aucune coupe valide sur le balayage dense de D615.stp (85 positions testees). Solide non ferme (non watertight) ou axe long mal identifie.

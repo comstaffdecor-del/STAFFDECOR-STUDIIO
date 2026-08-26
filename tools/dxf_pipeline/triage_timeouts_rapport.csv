@@ -1,0 +1,24 @@
+sku,fichier,ocp_unit,nb_solides,ratio_2_1,length_native,N,verdict,pas_native
+D116,D116.stp,MM,1,0.0031,2000.0,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D515,D515.stp,MM,1,0.002,2000.005,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D545,D545.stp,MM,1,0.0029,1750.0,840,"N_PLAUSIBLE (840) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D561,D561.stp,MM,1,0.0011,2000.0,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D569,D569.stp,MM,1,0.0015,2000.006,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D578,D578.stp,MM,1,0.0034,2000.0,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D612,D612.stp,MM,1,0.0025,2000.0,959,"N_PLAUSIBLE (959) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D615,D615.stp,MM,1,0.0009,1750.024,840,"N_PLAUSIBLE (840) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D617,D617.stp,MM,1,0.0008,2000.002,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D628,D628.stp,MM,1,0.0017,2000.0,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D629,D629.stp,MM,1,0.0008,2000.004,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D633,D633.stp,MM,1,0.0294,2000.0,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D653,D653.stp,MM,1,0.0051,2000.0,959,"N_PLAUSIBLE (959) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D715,D715.stp,MM,1,0.0005,1750.003,840,"N_PLAUSIBLE (840) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D801,D801.stp,MM,1,0.0045,2000.0,959,"N_PLAUSIBLE (959) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D802,D802.stp,MM,1,0.0038,2000.0,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D814,D814.stp,MM,1,0.0025,1995.015,957,"N_PLAUSIBLE (957) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D815,D815.stp,MM,1,0.0019,1984.017,952,"N_PLAUSIBLE (952) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D840,D840.stp,MM,1,0.0008,2000.003,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D880,D880.stp,MM,1,0.0122,2000.0,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D887,D887.step,MM,1,0.007,2000.126,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D892,D892.stp,MM,1,0.0263,2000.176,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
+D898,D898.stp,MM,1,0.0066,2000.041,960,"N_PLAUSIBLE (960) -> blocage probable DANS la boucle (section individuelle qui coince), pas un volume excessif",2.0
