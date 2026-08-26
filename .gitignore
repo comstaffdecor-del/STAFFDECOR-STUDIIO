@@ -49,3 +49,4 @@ app.*.map.json
 # les commits "genspark auto-backup" (fc81f18/6397ef7/4fa4af6), pas par un
 # commit explicite. A ne jamais versionner.
 /tmp_review/
+tools/dxf_pipeline/logs/

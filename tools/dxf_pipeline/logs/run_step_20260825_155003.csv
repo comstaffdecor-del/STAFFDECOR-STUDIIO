@@ -1,2 +1,0 @@
-sku,fichier,mapping_absent,statut,nb_sommets,nb_sommets_dedup_retires,bbox_w_mm,bbox_h_mm,hauteur_mur_mm,projection_plafond_mm,motif_type,motif_periode_mm,nb_solides,unite_ocp,unite_kind_brut,unite_facteur_brut,origine_unite,message
-D113,D113.stp,True,ERREUR_SELECTION,0,0,,,,,,,3,MM,CONVERSION_BASED_UNIT,1.0,,3 solide(s) detecte(s) dans D113.stp -- regle '1 fichier = 1 reference' appliquee : AUCUNE supposition sur lequel serait la reference. ERREUR_SELECTION.

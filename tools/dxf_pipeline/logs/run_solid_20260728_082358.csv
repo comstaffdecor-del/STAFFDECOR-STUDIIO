@@ -1,3 +1,0 @@
-sku,fichier,mapping_absent,statut,nb_sommets,bbox_w_mm,bbox_h_mm,hauteur_mur_mm,projection_plafond_mm,motif_type,motif_periode_mm,insunits,proposition_unite,proposition_motif,message
-CL39_corps0,CL39_corps0.stl,True,ERREUR_ORIENTATION,0,,,,,,,4,,,Maillage CL39_corps0.stl pas nettement allonge (ratio 2e/1re valeur propre = 0.677 > seuil 0.5). Impossible d'identifier l'axe long avec confiance -> ERREUR_ORIENTATION.
-PLINCL12_corps1,PLINCL12_corps1.stl,True,OK,96,119.496,30.003,20.037,9.97,lisse,,4,,,"Coupe 3D (axe long ratio=0.0046), motif=lisse, 96 sommets. Aire min/moy/max sur balayage dense (1440 coupes valides / 1440): 1748.8 / 1748.8 / 1748.8 mm2."

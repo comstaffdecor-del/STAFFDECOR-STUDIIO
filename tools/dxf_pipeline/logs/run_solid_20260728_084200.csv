@@ -1,3 +1,0 @@
-sku,fichier,mapping_absent,statut,nb_sommets,bbox_w_mm,bbox_h_mm,hauteur_mur_mm,projection_plafond_mm,motif_type,motif_periode_mm,insunits,proposition_unite,proposition_motif,message
-Corniche - D899,Corniche - D899.stl,True,OK,783,19.556,31.248,0.0,1.086,variable,20.0,4,,,"Coupe 3D (axe long ratio=0.0266), motif=variable, 783 sommets. Aire min/moy/max sur balayage dense (193 coupes valides / 193): 9.2 / 77.1 / 83.5 mm2."
-Rosaces - M303,Rosaces - M303.stl,True,ERREUR_ORIENTATION,0,,,,,,,4,,,Maillage Rosaces - M303.stl pas nettement allonge (ratio 2e/1re valeur propre = 0.991 > seuil 0.5). Impossible d'identifier l'axe long avec confiance -> ERREUR_ORIENTATION.

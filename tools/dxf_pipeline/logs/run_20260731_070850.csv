@@ -1,6 +1,0 @@
-sku,fichier,mapping_absent,statut,nb_sommets,nb_sommets_dedup_retires,bbox_w_mm,bbox_h_mm,hauteur_mur_mm,projection_plafond_mm,insunits,proposition_unite,proposition_motif,message
-0900,0900.dxf,False,ERREUR_SELECTION,0,0,,,,,4,,,"Aucune polyligne fermée candidate trouvée dans 0900.dxf. Calques présents: 0, Cloison, Defpoints, Ligne, Lignes, STAFF Pièce, Traits d'axe, Wireframes, axes, cotations."
-1000,1000.dxf,False,OK,49,1,230.0,30.0,30.0,230.0,4,,,"Contour retenu: calque 'Ligne', 49 sommets après aplatissement (tolérance 0.15mm), 1 sommet(s) confondu(s)/colinéaire(s) retiré(s) à la source (< 0.01mm)."
-1005,1005.dxf,False,ERREUR_SELECTION,0,0,,,,,4,,,"Aucune polyligne fermée candidate trouvée dans 1005.dxf. Calques présents: 0, Cloison, Defpoints, General."
-1145c,1145C-pièce.dxf,False,ERREUR_SELECTION,0,0,,,,,4,,,"Aucune polyligne fermée candidate trouvée dans 1145C-pièce.dxf. Calques présents: 0, 1145C, Cloison, Defpoints."
-20-54,20-54.dxf,False,ERREUR_SELECTION,0,0,,,,,4,,,"Aucune polyligne fermée candidate trouvée dans 20-54.dxf. Calques présents: 0, Cloison, D114, Defpoints, Ligne, Lignes, PERIPHERIQUE, STAFF Pièce, Traits d'axe, Wireframes, axes, cotations."
