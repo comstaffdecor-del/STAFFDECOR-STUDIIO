@@ -15,10 +15,13 @@
 //      IDENTIQUE à StripThickness.corniceDefault(pH). C'est le test de
 //      non-régression qui compte le plus : si un jour ce repli change
 //      par erreur, ce test doit rougir.
-//   2. r non-null (8 refs couvertes par assets/profiles/) -> copie 1:1
-//      des 4 champs de r, via StripThickness.fromPx — déjà testé isolément
-//      dans strip_thickness_from_px_test.dart, revérifié ici seulement au
-//      niveau de la sélection (le "if" lui-même), pas de l'arithmétique.
+//   2. r non-null (refs couvertes par assets/profiles/index.json, 31 SKU
+//      gate-OK à ce jour — le nombre exact n'est pas ce que ce test
+//      verrouille, voir profile_dims_cache.dart pour l'historique de ce
+//      chiffre) -> copie 1:1 des 4 champs de r, via StripThickness.fromPx
+//      — déjà testé isolément dans strip_thickness_from_px_test.dart,
+//      revérifié ici seulement au niveau de la sélection (le "if"
+//      lui-même), pas de l'arithmétique.
 library;
 
 import 'package:flutter_test/flutter_test.dart';

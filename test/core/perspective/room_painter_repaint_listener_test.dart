@@ -61,8 +61,8 @@ void main() {
     'quand ProfileDimsCache echoue le chargement d\'une ref non couverte '
     '(commit de cablage, super(repaint: Listenable.merge([...]))). Sans '
     'ce merge, seul ProductTextureCache declenche repaint et le "pop" de '
-    'premiere frame documente pour les 8 refs couvertes ne rattraperait '
-    'jamais l\'affichage.',
+    'premiere frame documente pour les refs couvertes par index.json ne '
+    'rattraperait jamais l\'affichage.',
     () async {
       final painter = RoomPainter(
         roomImage: null,

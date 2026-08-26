@@ -31,6 +31,61 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:staff_decor_studio/core/perspective/profile_dims.dart';
 import 'package:staff_decor_studio/core/perspective/profile_dims_cache.dart';
 
+/// Découpage minimal d'une ligne CSV : suffisant ici car
+/// `gate_sanite_rapport.csv` ne contient aucune virgule ni guillemet à
+/// l'intérieur d'un champ sur les colonnes lues (`sku`, `statut_gate`,
+/// `motifs`) — vérifié par lecture directe du fichier. Un vrai parseur
+/// CSV serait nécessaire si ce fichier évoluait pour citer des champs.
+List<Map<String, String>> _readGateCsvRows() {
+  final lines = File('tools/dxf_pipeline/gate_sanite_rapport.csv')
+      .readAsLinesSync()
+      .where((l) => l.trim().isNotEmpty)
+      .toList();
+  final headers = lines.first.split(',');
+  final rows = <Map<String, String>>[];
+  for (final line in lines.skip(1)) {
+    final cells = line.split(',');
+    final row = <String, String>{};
+    for (var i = 0; i < headers.length && i < cells.length; i++) {
+      row[headers[i]] = cells[i];
+    }
+    rows.add(row);
+  }
+  return rows;
+}
+
+/// Les refs "à risque de crash sous l'ancien `assert()`" -- c'est-à-dire
+/// `statut_gate == "SUSPECT_GEOMETRIE"` pour un motif de type
+/// `DEBORD_PLAN_*` (débord bbox_mm/profil_mm), À L'EXCLUSION des refs
+/// rejetées plus tôt par le loader pour indices de face de pose
+/// vides/absents (`CONTRAT_LOADER_*_VIDE`, `STATUT_NON_OK`,
+/// `PROFIL_INSUFFISANT`) -- celles-ci ne passaient déjà jamais le
+/// contrôle bbox_mm puisqu'elles n'atteignaient jamais ce code (voir
+/// `loadProfileDims`, rejet avant même le calcul de `maxAbsDx/Dy`).
+///
+/// Dérivé du CSV plutôt que recopié en dur (correction demandée : un
+/// `expect(rejectedByContractCount, 16)` codé en dur devient
+/// incompréhensible et cassant le jour où le batch d'extraction tourne
+/// à nouveau avec un jeu de données différent -- ce test doit rester
+/// vrai vis-à-vis de la SOURCE, pas d'un instantané recopié).
+List<String> _readCrashRiskRefsFromCsv() {
+  final rows = _readGateCsvRows();
+  final refs = <String>[];
+  for (final row in rows) {
+    if (row['statut_gate'] != 'SUSPECT_GEOMETRIE') continue;
+    final motifs = row['motifs'] ?? '';
+    final isDebordBbox = motifs.contains('DEBORD_PLAN');
+    final isExcludedEarlyByLoader = motifs.contains('VIDE') ||
+        motifs.contains('STATUT_NON_OK') ||
+        motifs.contains('PROFIL_INSUFFISANT');
+    if (isDebordBbox && !isExcludedEarlyByLoader) {
+      refs.add(row['sku']!);
+    }
+  }
+  refs.sort();
+  return refs;
+}
+
 /// Les 31 SKU `statut_gate == "OK"` (`gate_sanite_rapport.csv`), lus
 /// directement depuis `assets/profiles/index.json` généré par
 /// `tools/dxf_pipeline/build_profiles_index.py` — pas une liste recopiée à
@@ -238,18 +293,31 @@ void main() {
 
   test(
     'verification directe (hors cache, appel loadProfileDims explicite) : '
-    'les 16 profils a risque de crash sous l\'ancien assert() retournent '
-    'desormais null et incrementent rejectedByContractCount, zero '
-    'exception -- verrouille l\'invariant "plus jamais de crash" '
-    'independamment du filtrage index.json (defense en profondeur : meme '
-    'si index.json etait un jour mal genere et laissait passer une de ces '
-    'refs, loadProfileDims la rejetterait quand meme silencieusement)',
+    'les profils a risque de crash sous l\'ancien assert() -- derives du '
+    'CSV (statut_gate == SUSPECT_GEOMETRIE, motif DEBORD_PLAN_*, hors '
+    'exclusion precoce par indices de face de pose vides), PAS une liste '
+    'recopiee a la main -- retournent desormais null et incrementent '
+    'rejectedByContractCount, zero exception -- verrouille l\'invariant '
+    '"plus jamais de crash" independamment du filtrage index.json '
+    '(defense en profondeur : meme si index.json etait un jour mal '
+    'genere et laissait passer une de ces refs, loadProfileDims la '
+    'rejetterait quand meme silencieusement)',
     () async {
-      const crashRiskRefs = [
-        'D106', 'D110', 'D555', 'D560', 'D576', 'D604', 'D614', 'D622',
-        'D650', 'D652', 'D703', 'D712', 'D717', 'D835', 'D888', 'D896',
-      ];
-      expect(crashRiskRefs.length, 16);
+      final crashRiskRefs = _readCrashRiskRefsFromCsv();
+
+      // Le nombre exact depend des donnees du batch d'extraction (16 sur
+      // le jeu de donnees actuel, verifie le 2026-08-XX lors de cette
+      // session) -- ce test ne verrouille PAS ce chiffre : il verrouille
+      // le COMPORTEMENT (rejet + comptage cumulatif) pour la liste telle
+      // qu'elle est aujourd'hui, quelle que soit sa taille demain.
+      expect(
+        crashRiskRefs,
+        isNotEmpty,
+        reason:
+            'Aucun profil a risque de crash trouve dans le CSV -- soit le '
+            'jeu de donnees a change (bien), soit le parsing CSV de ce '
+            'test est casse (mauvais) : a distinguer avant de continuer.',
+      );
 
       var rejectedCount = 0;
       for (final ref in crashRiskRefs) {
@@ -265,7 +333,11 @@ void main() {
         );
       }
 
-      expect(rejectedByContractCount, 16);
+      // Bilan cumulatif final = nombre de refs testees, PAS un nombre
+      // magique fixe -- coherent par construction avec la boucle
+      // ci-dessus, mais verifie explicitement pour capter toute
+      // desynchronisation future entre le compteur et la liste source.
+      expect(rejectedByContractCount, crashRiskRefs.length);
     },
   );
 }

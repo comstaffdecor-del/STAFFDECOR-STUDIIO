@@ -100,17 +100,19 @@ class RoomPainter extends CustomPainter {
   // indépendamment du rebuild d'ancêtre dont dépendent les autres champs.
   //
   // ⚠️ "Pop" de première frame (comportement VOULU, pas un bug) : pour les
-  // 8 refs couvertes par assets/profiles/ (D705, D718, D720, 0900, 1000,
-  // 1005, 1145c, 20-54), la toute première frame après ajout au projet
-  // affiche le repli StripThickness.corniceDefault(pH) (27,5/70 pour
-  // pH=500 — ProfileDimsCache.getIfLoaded renvoie encore `null`, chargement
-  // asynchrone pas terminé), PUIS bascule sur les dimensions réelles
-  // (40,6/39,8 pour D720, pH=500) dès que ProfileDimsCache notifie — via
-  // exactement ce Listenable.merge. Identique, dans son mécanisme, au
-  // "pop" déjà existant sur la texture produit (ProductTextureCache) : ni
-  // l'un ni l'autre n'est une régression de ce commit, c'est la latence
-  // réseau/disque incompressible entre le premier paint() et la résolution
-  // du cache.
+  // refs couvertes par assets/profiles/index.json (31 SKU gate-OK, voir
+  // profile_dims_cache.dart — PAS une liste figée de 8 refs, ce chiffre
+  // n'a jamais décrit qu'un instantané daté du 17 août 2026, dépassé dès
+  // le dépôt du batch d'extraction Piste A), la toute première frame
+  // après ajout au projet affiche le repli StripThickness.corniceDefault
+  // (pH) (27,5/70 pour pH=500 — ProfileDimsCache.getIfLoaded renvoie
+  // encore `null`, chargement asynchrone pas terminé), PUIS bascule sur
+  // les dimensions réelles (40,6/39,8 pour D720, pH=500) dès que
+  // ProfileDimsCache notifie — via exactement ce Listenable.merge.
+  // Identique, dans son mécanisme, au "pop" déjà existant sur la texture
+  // produit (ProductTextureCache) : ni l'un ni l'autre n'est une
+  // régression de ce commit, c'est la latence réseau/disque incompressible
+  // entre le premier paint() et la résolution du cache.
 
   @override
   void paint(Canvas canvas, Size size) {

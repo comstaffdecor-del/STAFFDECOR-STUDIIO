@@ -7,9 +7,21 @@
 /// 13-17 août 2026 (`Listenable.merge` dans son `repaint:`, cas
 /// `'Corniches'` de `room_painter.dart`) — voir `docs/ETAT_MOTEUR_RENDU
 /// .md` section 6. Cette docstring affirmait autrefois le contraire,
-/// corrigé ici après relecture directe de `room_painter.dart` (le
-/// câblage existait déjà, seule sa couverture — 8 refs, jamais étendue
-/// depuis — restait à mettre à jour).
+/// corrigé ici après relecture directe de `room_painter.dart`.
+///
+/// ⚠️ CORRECTION D'UN SECOND CADRAGE ERRONÉ (celui-ci dans le brief de
+/// câblage lui-même, pas seulement dans cette docstring) : la couverture
+/// n'a JAMAIS été une liste figée de 8 refs. Avant ce commit, elle était
+/// **dérivée dynamiquement d'`AssetManifest.json`** — c'est-à-dire de
+/// TOUS les fichiers `assets/profiles/<ref>.json` présents sur disque
+/// avec `statut: "OK"`. Le nombre "8" cité ailleurs dans ce dépôt
+/// (`room_painter.dart`, tests) était la valeur EMPIRIQUE de ce compte le
+/// 17 août 2026 — un instantané documenté, pas une borne du code — et
+/// elle est passée toute seule de 8 à 56 le jour où le batch
+/// d'extraction Piste A a déposé les 54 nouveaux fichiers JSON, SANS
+/// aucun changement de code. Ce commit ne fait donc PAS une extension
+/// 8 → 31 : c'est une **restriction 56 → 31** — voir le détail complet
+/// dans la section suivante.
 ///
 /// ## Différence de contexte avec [ProductTextureCache]
 ///
@@ -30,14 +42,28 @@
 /// initialement sa couverture d'`AssetManifest.json`, qui liste les 56
 /// fichiers `statut: "OK"` produits par le pipeline d'extraction — SANS
 /// filtrer par le gate de sanité (`tools/dxf_pipeline/gate_sanite.py`).
-/// Sur les 56, seuls 31 passent `statut_gate == "OK"` ; les 25 autres
-/// sont géométriquement invalides pour au moins un des deux critères
-/// bloquants du gate (contrat loader ou débord de plan de pose). Un
-/// cache filtrant par `AssetManifest.json` aurait tenté de charger ces
-/// 25 profils — 16 d'entre eux faisaient lever un `assert()` réel dans
-/// l'ancienne version de [loadProfileDims] (crash reproduit
-/// expérimentalement sur `D614` avant ce commit), les 9 autres
-/// n'avaient aucune garantie de validité géométrique.
+/// Sur ces 56 : 9 ont des indices de face de pose vides/absents, déjà
+/// écartés par [loadProfileDims] lui-même AVANT le contrôle bbox_mm (ils
+/// retombaient déjà sur le repli, avant comme après ce commit — sans
+/// rapport avec l'index) ; il en reste 47 pour lesquels
+/// [loadProfileDims] calculait réellement des dimensions. Sur ces 47,
+/// seuls 31 passent `statut_gate == "OK"` (bbox_mm cohérent avec le
+/// recalcul depuis `profil_mm`) ; les 16 restants divergent de plus de
+/// 0.001mm (ex. `D835` : bbox_mm.w=104.962 vs projectionMm
+/// recalculé=65.097 — la bande dessinée aurait une projection 38% trop
+/// étroite pour la largeur réelle du profil, une erreur plausible à
+/// l'œil, pas une aberration visible).
+///
+/// **Bilan honnête, PAS une extension de couverture** : avant ce commit,
+/// en build RELEASE (`assert()` absent du binaire), 47 références
+/// rendaient déjà en métrique — 31 justes, 16 fausses (silencieusement,
+/// sans aucun signal). En build DEBUG, ces mêmes 16 faisaient lever
+/// l'`assert()` (crash reproduit expérimentalement sur `D614` avant ce
+/// commit). Après ce commit : 31 justes, 0 fausse, 0 crash possible —
+/// gain en JUSTESSE et en SÛRETÉ, pas en nombre de refs rendues en
+/// métrique (ce nombre baisse, de 47 à 31 ; il n'a jamais été de 8, ce
+/// chiffre ne décrivait qu'un instantané dépassé dès l'arrivée du batch
+/// Piste A, voir plus haut).
 ///
 /// Ce cache lit désormais `assets/profiles/index.json` — généré par
 /// `tools/dxf_pipeline/build_profiles_index.py` depuis
@@ -51,9 +77,21 @@
 /// `cornice_plinth_painter.dart`). **Ce cache ne retombe JAMAIS sur
 /// `AssetManifest.json` en cas d'échec de lecture de `index.json`** —
 /// un tel repli ressusciterait exactement le bug que cette réécriture
-/// corrige (chargement des 25 profils hors gate). Un rendu ratio pixels
-/// honnête (silencieux, connu) est préférable à un rendu métrique sur
-/// des données non garanties par le gate.
+/// corrige (chargement des 25 profils hors gate, 16 d'entre eux à
+/// dimensions fausses). Un rendu ratio pixels honnête (silencieux,
+/// connu) est préférable à un rendu métrique sur des données non
+/// garanties par le gate.
+///
+/// ⚠️ `_coveredRefs` est mémoïsé même vide (`Set<String>?`, jamais
+/// remis à `null` hors test) : un échec de lecture au démarrage
+/// désactive le rendu métrique pour TOUTE la session, sans retry. Ce
+/// choix est délibéré et accepté tel quel — `index.json` est un asset
+/// EMBARQUÉ DANS LE BINAIRE (pas un fichier réseau/disque externe),
+/// donc un échec au premier chargement (asset manquant du bundle, JSON
+/// corrompu committé par erreur) ne peut structurellement pas être
+/// transitoire ; un retry ne changerait jamais le résultat, et
+/// fail-closed pour la session entière est le comportement le plus sûr
+/// dans ce cas précis.
 ///
 /// En prime, la liste des refs couvertes (`coveredRefsForTesting` /
 /// usage futur : indicateur UI "non calibré") est calculée une fois,

@@ -4,20 +4,24 @@
 // .json`, qui liste les 56 fichiers `statut: OK` sans distinction — 16
 // d'entre eux faisaient lever l'ancien `assert()` du loader (corrigé
 // dans `profile_dims.dart`, voir `profile_dims_contract_reject_test
-// .dart`), les 9 autres passaient avec des dimensions non garanties par
-// le gate. Ce test fixe le nouveau contrat : la couverture doit venir de
-// `assets/profiles/index.json` (généré par
+// .dart`), les autres passaient avec des dimensions correctes MAIS sans
+// aucune garantie structurelle (une simple coïncidence bbox_mm/profil_mm,
+// pas un contrôle de gate). Ce test fixe le nouveau contrat : la
+// couverture doit venir de `assets/profiles/index.json` (généré par
 // `tools/dxf_pipeline/build_profiles_index.py` depuis les 31 SKU
 // `statut_gate == "OK"`), PAS d'AssetManifest.json.
 //
-// Preuve d'extension de couverture (pas de mise en service, D705 était
-// déjà couvert avant ce commit) : `D830` fait partie des 27 SKU
-// nouvellement gate-OK (hors des 8 refs d'origine du câblage
-// 13-17 août). Avant ce commit, `D830` était déjà présent dans
-// `AssetManifest.json` (fichier `assets/profiles/D830.json` existe,
-// `statut: OK`) donc DÉJÀ "couvert" au sens de l'ancien mécanisme — ce
-// test vérifie que le nouveau mécanisme (index.json) le couvre AUSSI,
-// via la bonne source (31 gate-OK), pas par accident via l'ancienne.
+// ⚠️ CE N'EST PAS UNE EXTENSION DE COUVERTURE, c'est une RESTRICTION
+// (56 -> 31) : `D830` (gate-OK) ET `D705` (gate-OK) étaient TOUS LES DEUX
+// déjà présents dans `AssetManifest.json` avant ce commit (fichiers
+// `statut: OK` sur disque depuis le batch Piste A), donc DEJA "couverts"
+// et rendus en métrique en build RELEASE par l'ancien mécanisme (le
+// contrôle bbox_mm n'était qu'un `assert()`, absent du binaire release).
+// Ce test ne vérifie donc PAS que D830 devient nouvellement accessible
+// -- il vérifie que le nouveau mécanisme (index.json, 31 gate-OK)
+// couvre D830 pour la BONNE raison structurelle (gate), et non plus par
+// la coïncidence de l'ancien mécanisme (AssetManifest.json, 56
+// statut:OK sans distinction).
 //
 // Règle fail-closed (imposée par le brief) : une ref simplement absente
 // d'index.json (mais dont le fichier <ref>.json existe bel et bien,
@@ -40,8 +44,10 @@ void main() {
   });
 
   test(
-    'D830 (gate-OK, hors des 8 refs d\'origine du cablage aout) est '
-    'couvert par index.json et charge reellement ses dimensions reelles',
+    'D830 (gate-OK, deja rendu en metrique par l\'ancien mecanisme AVANT '
+    'ce commit -- pas une nouvelle couverture) est couvert par index.json '
+    'pour la bonne raison structurelle (gate), et charge reellement ses '
+    'dimensions reelles',
     () async {
       final completer = Completer<void>();
       void cb() {
@@ -126,23 +132,8 @@ void main() {
     },
   );
 
-  test(
-    'fail-closed : si index.json est absent/illisible/vide, le cache ne '
-    'charge RIEN (jamais de repli sur AssetManifest.json, qui '
-    'ressusciterait le bug des 56 non filtres)',
-    () async {
-      // Ce test documente le contrat attendu du mecanisme de lecture de
-      // index.json cote production (verifie par construction du code,
-      // pas par simulation d'un fichier absent ici -- deplacer
-      // index.json pendant flutter test casserait aussi les DEUX autres
-      // tests de ce fichier qui en dependent legitimement). Voir
-      // l'implementation de _ensureCoveredRefsLoaded : le bloc
-      // try/catch autour de la lecture de index.json degrade vers un
-      // ensemble VIDE, jamais vers AssetManifest.json.
-    },
-    skip:
-        'Documentation du contrat -- verification par lecture de code, '
-        'pas par execution (deplacer index.json casserait les tests '
-        'voisins qui en dependent).',
-  );
+  // Le test fail-closed (index.json absent/illisible/vide) est desormais
+  // EXECUTE reellement, par mock de rootBundle via
+  // TestDefaultBinaryMessengerBinding, dans
+  // profile_dims_cache_fail_closed_test.dart -- plus de skip ici.
 }
