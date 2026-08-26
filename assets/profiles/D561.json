@@ -1,0 +1,89 @@
+{
+  "sku": "D561",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D561.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      -17.5424,
+      -72.1119
+    ],
+    [
+      -17.4873,
+      -53.5851
+    ],
+    [
+      0.0127,
+      -53.5604
+    ],
+    [
+      -0.0127,
+      -35.5604
+    ],
+    [
+      16.9873,
+      -35.5364
+    ],
+    [
+      16.9618,
+      -17.5364
+    ],
+    [
+      33.9618,
+      -17.5124
+    ],
+    [
+      33.937,
+      -0.0124
+    ],
+    [
+      51.437,
+      0.0124
+    ],
+    [
+      51.4538,
+      -11.8228
+    ],
+    [
+      1.1154,
+      -71.8137
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      2,
+      3
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      7,
+      8
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 68.996,
+    "h": 72.124
+  },
+  "hauteur_mur_mm": 18.0,
+  "projection_plafond_mm": 17.5,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

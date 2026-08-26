@@ -116,6 +116,7 @@ import csv
 import datetime as dt
 import re
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -182,6 +183,13 @@ ORIENTATION_RATIO_MAX = 0.5
 # pour détecter un motif périodique de period >= 10mm (Nyquist) et garde
 # un temps de run raisonnable (~1000 coupes pour une barre de 2m).
 STEP_SWEEP_STEP_MM = 2.0
+
+# Balayage en deux passes (diagnostic timeouts du 2026-08-26, 23 SKU
+# ERREUR_TIMEOUT) : une passe grossière localise le plateau/les extremes,
+# une passe fine ne raffine qu'autour d'argmin/argmax/milieu -- les seules
+# positions reellement exploitees en aval (voir sample_areas_along_axis).
+STEP_SWEEP_COARSE_MM = 20.0   # passe grossière : localise le plateau
+STEP_SWEEP_BUDGET_S = 60.0    # garde-fou coût/coupe (TIMEOUT_SECONDS=90 en amont)
 
 # Unités OCP reconnues (valeurs possibles de xstep.cascade.unit) -> mm.
 OCP_UNIT_TO_MM = {"MM": 1.0, "CM": 10.0, "M": 1000.0, "IN": 25.4, "FT": 304.8}
@@ -426,17 +434,84 @@ def section_polygon_at(solid, origin_pt, axis, offset_along_axis: float, fixed_r
     return best
 
 
-def sample_areas_along_axis(solid, origin_pt, axis, length_mm, fixed_rotation):
-    """Balayage dense de l'aire de section tous les STEP_SWEEP_STEP_MM le
-    long de l'axe long — même principe que solid2profile.py
-    (sample_areas_along_axis), résolution adaptée au coût plus élevé
-    d'une section B-rep exacte (voir constante STEP_SWEEP_STEP_MM)."""
+def _sweep_positions(margin, length_mm, step):
+    return np.arange(margin, length_mm - margin, step)
+
+
+def sample_areas_along_axis(solid, origin_pt, axis, length_mm, fixed_rotation,
+                             coarse_step=STEP_SWEEP_COARSE_MM,
+                             fine_step=STEP_SWEEP_STEP_MM,
+                             budget_s=STEP_SWEEP_BUDGET_S):
+    """Balayage en DEUX passes, contrat de retour inchangé (positions, areas)
+    avec np.nan pour toute coupe échouée.
+
+    Passe 1 (grossière, coarse_step) : localise le plateau et les extrêmes.
+    Passe 2 (fine, fine_step) : uniquement dans une fenêtre +/-coarse_step
+    autour de argmin, argmax et du milieu -- les seules positions que
+    process_one_step exploite réellement (masque ~isnan pour
+    ERREUR_SELECTION, (max-min)/mean vs AIRE_TOL_RELATIF pour lisse/orné,
+    argmin/argmax pour l'enveloppe unary_union, position la plus proche
+    du milieu).
+
+    Garde-fou : si le budget de temps est dépassé, retourne un tableau
+    entièrement NaN (fail-closed) -> process_one_step conclut
+    ERREUR_SELECTION au lieu de laisser le batch mourir en timeout.
+    Introduit suite au diagnostic du 2026-08-26 sur les 23 SKU
+    ERREUR_TIMEOUT (voir docs/ETAT_MOTEUR_RENDU.md) : le balayage dense a
+    2mm coûte ~202s sur le plus léger des 23 fichiers, largement au-dessus
+    du budget batch de 90s (TIMEOUT_SECONDS, batch_extraction_corniches.py).
+    """
     margin = max(length_mm * 0.02, 2.0)
-    positions = np.arange(margin, length_mm - margin, STEP_SWEEP_STEP_MM)
-    areas = np.empty(len(positions), dtype=np.float64)
-    for i, pos in enumerate(positions):
-        poly = section_polygon_at(solid, origin_pt, axis, pos, fixed_rotation)
-        areas[i] = poly.area if poly is not None else np.nan
+    t0 = time.perf_counter()
+    measured = {}
+    aborted = False
+
+    def measure(pos):
+        nonlocal aborted
+        key = round(float(pos), 6)
+        if key in measured:
+            return
+        if time.perf_counter() - t0 > budget_s:
+            aborted = True
+            return
+        poly = section_polygon_at(solid, origin_pt, axis, float(pos), fixed_rotation)
+        measured[key] = poly.area if poly is not None else np.nan
+
+    for pos in _sweep_positions(margin, length_mm, coarse_step):
+        measure(pos)
+        if aborted:
+            break
+
+    if not aborted:
+        valid = {k: v for k, v in measured.items() if not np.isnan(v)}
+        if valid:
+            offs = np.array(sorted(valid), dtype=np.float64)
+            vals = np.array([valid[float(o)] for o in offs], dtype=np.float64)
+            mid = length_mm / 2.0
+            centers = {
+                float(offs[int(np.argmin(vals))]),
+                float(offs[int(np.argmax(vals))]),
+                float(offs[int(np.argmin(np.abs(offs - mid)))]),
+            }
+            for c in sorted(centers):
+                lo = max(margin, c - coarse_step)
+                hi = min(length_mm - margin, c + coarse_step)
+                for pos in np.arange(lo, hi, fine_step):
+                    measure(pos)
+                    if aborted:
+                        break
+                if aborted:
+                    break
+
+    if aborted:
+        positions = _sweep_positions(margin, length_mm, coarse_step)
+        print(f"[sweep] budget {budget_s}s depasse apres {len(measured)} coupes "
+              f"-- abandon fail-closed (cout par coupe anormal).",
+              file=sys.stderr, flush=True)
+        return positions, np.full(len(positions), np.nan, dtype=np.float64)
+
+    positions = np.array(sorted(measured), dtype=np.float64)
+    areas = np.array([measured[float(p)] for p in positions], dtype=np.float64)
     return positions, areas
 
 

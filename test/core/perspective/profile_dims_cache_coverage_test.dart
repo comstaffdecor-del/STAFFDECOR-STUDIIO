@@ -2,24 +2,30 @@
 // vérification EXHAUSTIVE, pas seulement échantillonnée, que le cache réel
 // (`ProfileDimsCache.ensureLoading`/`getIfLoaded`, PAS un script Python
 // séparé qui ne prouverait rien du comportement Dart) retourne des
-// dimensions non-null pour les 31 SKU gate-OK, avec ZÉRO exception — et
-// que la couverture reste correctement fermée (fail-closed) pour les 25
-// SKU hors gate qui ont pourtant un fichier `<ref>.json` sur disque avec
-// `statut: "OK"` (25 = 16 profils à risque de crash sous l'ancien
-// `assert()` + 9 profils "subtils" passant l'assert mais rejetés par le
-// gate pour d'autres critères).
+// dimensions non-null pour les SKU gate-OK (`kExpectedGateOkCount`), avec
+// ZÉRO exception — et que la couverture reste correctement fermée
+// (fail-closed) pour les SKU hors gate qui ont pourtant un fichier
+// `<ref>.json` sur disque avec `statut: "OK"`
+// (`kExpectedHorsGateButFileExistsCount`).
 //
 // Règle du brief, rappelée : « si à l'étape 1 le cache ne renvoie pas les
-// 31, on s'arrête et on remonte l'écart avant de toucher au painter ».
-// Ce fichier EST ce point d'arrêt/rapport, exécuté avant toute étape 3/4.
+// gate-OK attendus, on s'arrête et on remonte l'écart avant de toucher au
+// painter ». Ce fichier EST ce point d'arrêt/rapport, exécuté avant toute
+// étape 3/4.
 //
 // Livrable "log hit/miss" (brief, réponse (b) de l'utilisateur) : les
 // deux derniers tests consultent `loadedCountForLogging` /
-// `failedCountForLogging` après la boucle des 31 + la boucle des 25, et
-// vérifient les cardinalités exactes 31/25 — preuve que ces compteurs
-// reflètent fidèlement l'état réel du cache, prêts pour un usage log à la
-// demande (bouton debug, log manuel), sans jamais avoir déclenché de
-// second canal de notification.
+// `failedCountForLogging` après la boucle des gate-OK + la boucle des
+// hors-gate, et vérifient les cardinalités exactes (constantes ci-dessous)
+// — preuve que ces compteurs reflètent fidèlement l'état réel du cache,
+// prêts pour un usage log à la demande (bouton debug, log manuel), sans
+// jamais avoir déclenché de second canal de notification.
+//
+// Les deux cardinalités (`kExpectedGateOkCount`,
+// `kExpectedHorsGateButFileExistsCount`) sont des pins volontaires,
+// centralisés dans `gate_ok_count_helper.dart` -- un seul point d'édition
+// pour le prochain batch d'extraction, au lieu de cinq assertions
+// dispersées (voir ce fichier pour l'historique du chiffre).
 library;
 
 import 'dart:async';
@@ -30,6 +36,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:staff_decor_studio/core/perspective/profile_dims.dart';
 import 'package:staff_decor_studio/core/perspective/profile_dims_cache.dart';
+
+import 'gate_ok_count_helper.dart';
 
 /// Découpage minimal d'une ligne CSV : suffisant ici car
 /// `gate_sanite_rapport.csv` ne contient aucune virgule ni guillemet à
@@ -156,13 +164,14 @@ void main() {
       _readHorsGateButFileExistsRefsFromDisk(coveredRefs);
 
   test(
-    'garde-fou de comptage : exactement 31 refs couvertes et 25 refs '
+    'garde-fou de comptage : exactement kExpectedGateOkCount refs '
+    'couvertes et kExpectedHorsGateButFileExistsCount refs '
     'hors-gate-mais-fichier-existant sur le jeu de donnees actuel -- si '
     'ces nombres bougent, les tests suivants ne verifient plus ce que '
     'leur nom promet',
     () {
-      expect(coveredRefs.length, 31);
-      expect(horsGateButFileExists.length, 25);
+      expect(coveredRefs.length, kExpectedGateOkCount);
+      expect(horsGateButFileExists.length, kExpectedHorsGateButFileExistsCount);
       // Aucune intersection possible par construction (l'un est defini
       // comme l'exclusion de l'autre), verifie neanmoins explicitement.
       expect(
@@ -173,10 +182,11 @@ void main() {
   );
 
   test(
-    'ETAPE 1 -- les 31 SKU gate-OK chargent TOUS reellement via le cache '
-    '(ProfileDimsCache.ensureLoading/getIfLoaded), zero exception, zero '
-    'echec -- point d\'arret du brief : si un seul echoue ici, on s\'arrete '
-    'et on remonte l\'ecart avant de toucher au painter',
+    'ETAPE 1 -- les SKU gate-OK (kExpectedGateOkCount) chargent TOUS '
+    'reellement via le cache (ProfileDimsCache.ensureLoading/getIfLoaded), '
+    'zero exception, zero echec -- point d\'arret du brief : si un seul '
+    'echoue ici, on s\'arrete et on remonte l\'ecart avant de toucher au '
+    'painter',
     () async {
       final failures = <String>[];
       for (final ref in coveredRefs) {
@@ -212,22 +222,23 @@ void main() {
             'tant que cet ecart n\'est pas explique et corrige.',
       );
 
-      // Livrable log (brief, reponse (b)) : les 31 refs sont bien
+      // Livrable log (brief, reponse (b)) : les refs gate-OK sont bien
       // comptees comme chargees, aucune comme echouee, sans qu'aucun
       // compteur n'ait declenche de repaint (verifie separement dans
       // profile_dims_cache_test.dart -- "aucune notification synchrone").
-      expect(ProfileDimsCache.instance.loadedCountForLogging, 31);
+      expect(ProfileDimsCache.instance.loadedCountForLogging, kExpectedGateOkCount);
       expect(ProfileDimsCache.instance.failedCountForLogging, 0);
     },
   );
 
   test(
-    'ETAPE 1 (complement securite) -- les 25 SKU hors-gate dont le '
-    'fichier <ref>.json existe pourtant sur disque (statut: OK) ne '
-    'chargent JAMAIS via le cache -- zero exception, hasFailed==true '
-    'pour les 25, y compris les 16 qui auraient fait lever l\'ancien '
-    'assert() (verification qu\'ils sont maintenant neutralises par le '
-    'filtre index.json, avant meme d\'atteindre loadProfileDims)',
+    'ETAPE 1 (complement securite) -- les SKU hors-gate '
+    '(kExpectedHorsGateButFileExistsCount) dont le fichier <ref>.json '
+    'existe pourtant sur disque (statut: OK) ne chargent JAMAIS via le '
+    'cache -- zero exception, hasFailed==true pour tous, y compris ceux '
+    'qui auraient fait lever l\'ancien assert() (verification qu\'ils '
+    'sont maintenant neutralises par le filtre index.json, avant meme '
+    'd\'atteindre loadProfileDims)',
     () async {
       final unexpectedlyLoaded = <String>[];
       for (final ref in horsGateButFileExists) {
@@ -250,12 +261,12 @@ void main() {
             'index.json : $unexpectedlyLoaded',
       );
 
-      // Livrable log : les 25 sont comptees comme echouees (exclusion
-      // par index.json), zero chargee -- cardinalites exactes,
+      // Livrable log : tous sont comptes comme echoues (exclusion
+      // par index.json), zero charge -- cardinalites exactes,
       // demontrant que loadedCountForLogging/failedCountForLogging
       // reflete fidelement get etat reel apres cette boucle.
       expect(ProfileDimsCache.instance.loadedCountForLogging, 0);
-      expect(ProfileDimsCache.instance.failedCountForLogging, 25);
+      expect(ProfileDimsCache.instance.failedCountForLogging, kExpectedHorsGateButFileExistsCount);
 
       // Le rejet a eu lieu au niveau de la couverture (index.json), PAS
       // au niveau du controle de coherence bbox_mm de loadProfileDims --
@@ -266,10 +277,11 @@ void main() {
   );
 
   test(
-    'ETAPE 1 (bout-en-bout, meme test) -- chargement des 31 gate-OK PUIS '
-    'des 25 hors-gate dans le MEME cache (ordre realiste : un catalogue '
+    'ETAPE 1 (bout-en-bout, meme test) -- chargement des SKU gate-OK PUIS '
+    'des SKU hors-gate dans le MEME cache (ordre realiste : un catalogue '
     'affiche un melange de refs) -- les cardinalites finales du livrable '
-    'log sont exactement 31 charges / 25 echoues, sans interference entre '
+    'log sont exactement kExpectedGateOkCount charges / '
+    'kExpectedHorsGateButFileExistsCount echoues, sans interference entre '
     'les deux groupes',
     () async {
       for (final ref in coveredRefs) {
@@ -279,8 +291,8 @@ void main() {
         await _ensureLoadedOrFailed(ref);
       }
 
-      expect(ProfileDimsCache.instance.loadedCountForLogging, 31);
-      expect(ProfileDimsCache.instance.failedCountForLogging, 25);
+      expect(ProfileDimsCache.instance.loadedCountForLogging, kExpectedGateOkCount);
+      expect(ProfileDimsCache.instance.failedCountForLogging, kExpectedHorsGateButFileExistsCount);
 
       for (final ref in coveredRefs) {
         expect(ProfileDimsCache.instance.getIfLoaded(ref), isNotNull);

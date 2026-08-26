@@ -1,0 +1,85 @@
+{
+  "sku": "D545",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D545.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      45.0,
+      0.0
+    ],
+    [
+      45.0,
+      -11.7127
+    ],
+    [
+      43.0522,
+      -14.5909
+    ],
+    [
+      41.1345,
+      -14.8731
+    ],
+    [
+      23.0291,
+      -43.2604
+    ],
+    [
+      23.0291,
+      -53.5317
+    ],
+    [
+      13.9314,
+      -62.0952
+    ],
+    [
+      6.7118,
+      -120.0
+    ],
+    [
+      0.0,
+      -120.0
+    ],
+    [
+      0.0,
+      0.0
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      8,
+      9
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      9,
+      0
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 45.0,
+    "h": 120.0
+  },
+  "hauteur_mur_mm": 120.0,
+  "projection_plafond_mm": 45.0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 1750.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

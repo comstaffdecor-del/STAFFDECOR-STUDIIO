@@ -1,0 +1,78 @@
+{
+  "sku": "D578",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D578.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      72.9602,
+      -137.8093
+    ],
+    [
+      63.6213,
+      -137.1542
+    ],
+    [
+      63.6213,
+      -106.6542
+    ],
+    [
+      59.2196,
+      -106.268
+    ],
+    [
+      0.0,
+      -18.5327
+    ],
+    [
+      0.0,
+      -11.0327
+    ],
+    [
+      -25.7648,
+      -9.8105
+    ],
+    [
+      -26.0395,
+      -0.0836
+    ],
+    [
+      4.1302,
+      0.0
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      4,
+      5
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [],
+    "auto": false
+  },
+  "bbox_mm": {
+    "w": 99.0,
+    "h": 137.809
+  },
+  "hauteur_mur_mm": 7.5,
+  "projection_plafond_mm": 0,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

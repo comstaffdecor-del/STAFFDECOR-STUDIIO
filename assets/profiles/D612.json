@@ -1,0 +1,101 @@
+{
+  "sku": "D612",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D612.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      74.2765,
+      -78.6544
+    ],
+    [
+      75.2823,
+      -79.5608
+    ],
+    [
+      76.5817,
+      -79.9412
+    ],
+    [
+      78.6247,
+      -79.9412
+    ],
+    [
+      78.6247,
+      -115.0
+    ],
+    [
+      71.002,
+      -114.5605
+    ],
+    [
+      62.7898,
+      -85.1191
+    ],
+    [
+      62.197,
+      -84.6247
+    ],
+    [
+      58.6401,
+      -83.8338
+    ],
+    [
+      18.3837,
+      -19.5375
+    ],
+    [
+      11.7639,
+      -18.6476
+    ],
+    [
+      0.0,
+      -9.6793
+    ],
+    [
+      0.0,
+      0.0
+    ],
+    [
+      18.9547,
+      0.0
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      11,
+      12
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      12,
+      13
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 78.625,
+    "h": 115.0
+  },
+  "hauteur_mur_mm": 9.679,
+  "projection_plafond_mm": 18.955,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}

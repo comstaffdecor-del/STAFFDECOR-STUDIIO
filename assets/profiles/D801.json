@@ -1,0 +1,125 @@
+{
+  "sku": "D801",
+  "marque": "",
+  "famille": null,
+  "source": {
+    "fichier": "D801.stp",
+    "insunits": null,
+    "unite_retenue": "mm",
+    "origine_unite": "step_header",
+    "methode": "section_step"
+  },
+  "profil_mm": [
+    [
+      50.3812,
+      -52.6153
+    ],
+    [
+      50.1242,
+      -47.9869
+    ],
+    [
+      44.9852,
+      -47.6012
+    ],
+    [
+      44.8042,
+      -43.0244
+    ],
+    [
+      28.1792,
+      -24.3998
+    ],
+    [
+      18.858,
+      -24.0725
+    ],
+    [
+      0.0,
+      -13.5993
+    ],
+    [
+      0.0,
+      0.0
+    ],
+    [
+      27.6622,
+      0.0
+    ],
+    [
+      69.3094,
+      -41.0226
+    ],
+    [
+      70.9218,
+      -112.9376
+    ],
+    [
+      105.0039,
+      -155.5279
+    ],
+    [
+      105.0039,
+      -185.0
+    ],
+    [
+      98.2403,
+      -183.7366
+    ],
+    [
+      85.5212,
+      -153.9738
+    ],
+    [
+      81.9881,
+      -153.781
+    ],
+    [
+      81.41,
+      -149.1527
+    ],
+    [
+      75.2102,
+      -138.3317
+    ],
+    [
+      52.7622,
+      -137.496
+    ],
+    [
+      52.7622,
+      -130.6178
+    ]
+  ],
+  "face_pose_mur": {
+    "indices": [
+      6,
+      7
+    ],
+    "auto": true
+  },
+  "face_pose_plafond": {
+    "indices": [
+      7,
+      8
+    ],
+    "auto": true
+  },
+  "bbox_mm": {
+    "w": 105.004,
+    "h": 185.0
+  },
+  "hauteur_mur_mm": 13.599,
+  "projection_plafond_mm": 27.662,
+  "motif": null,
+  "assets": {
+    "albedo": null,
+    "normal": null,
+    "height": null
+  },
+  "longueur_barre_mm": 2000.0,
+  "longueur_barre_mm_origine": "mesure_brep",
+  "prix_ml": null,
+  "statut": "OK",
+  "version_schema": 1
+}
