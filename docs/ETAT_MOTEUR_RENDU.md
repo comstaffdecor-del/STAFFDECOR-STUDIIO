@@ -577,3 +577,88 @@ coefficients changent un jour.
 `avoid_print` dans les fichiers `_debug_*` de `test/core/geometry/`) et
 suite complète (`flutter test`, 106 tests) verte au moment de cette mise
 à jour et du commit qui l'accompagne.
+
+---
+
+**Mise à jour du 2026-08-26** (date système du sandbox à la rédaction de
+cette mise à jour) : résultat négatif de la tentative de correction du
+picker de face de pose (`tools/dxf_pipeline/dxf2profile.py::
+detect_wall_and_ceiling_faces`), pour les 19 corniches `SUSPECT_GEOMETRIE`
+identifiées dans `tools/dxf_pipeline/analyse_correction_perimetre.md`
+(dont `D555`, `D576`, `D835`, `D896`). Consigné ici pour qu'une future
+session ne reparte pas sur la même piste sans en connaître l'issue.
+
+**Deux impasses successives, dans l'ordre où elles ont été rencontrées** :
+
+1. **Oracle de débord symétrique par construction.** Le critère 2 du
+   gate (`gate_sanite.py`, `DEBORD_PLAN_MUR`/`PLAFOND`) teste
+   `débord = |maxd − extent|` où `extent = max − min` sur l'axe et
+   `maxd = max(|coord − plan|)`. Si `plan = min`, alors `maxd = extent`
+   exactement, débord nul ; si `plan = max`, `maxd = extent` aussi,
+   débord nul également. Ce critère est donc satisfait indifféremment
+   par les deux extrêmes opposés du contour — il ne rejette que les
+   plans strictement à l'intérieur du contour. Il ne peut donc pas, seul,
+   départager quel extrême est la vraie face de pose. Une première
+   tentative de correction (ancrage du candidat le plus proche de
+   l'extrême réel de bbox, comme départage) a été écartée avant même le
+   garde-fou de régression : elle introduit une convention muette
+   (« le mur toujours à gauche, le plafond toujours en haut ») que les
+   données contredisent — exemple retenu : sur `D560`, un plan plafond
+   retenu à 267 mm de `max(ys)` réel affiche pourtant un débord nul.
+
+2. **Coin de bounding-box départagé par longueur totale de contact,
+   invalidé par le garde-fou de régression.** Reformulation : les faces
+   mur et plafond forment un coin, nécessairement un coin de la bbox
+   (4 candidats : `(xmin|xmax) × (ymin|ymax)`) ; pour chaque coin, on
+   vérifie l'existence d'un run quasi-vertical touchant ce x et d'un run
+   quasi-horizontal touchant ce y, et on départage par la longueur totale
+   de contact (mur + plafond) en cas de coins concurrents qualifiés.
+   **Garde-fou exécuté avant tout travail sur les 19** (comme exigé) :
+   comparaison stricte des ensembles d'indices `face_pose_mur`/
+   `face_pose_plafond` produits par cette nouvelle logique contre ceux
+   actuellement stockés sur les 31 SKU `statut_gate=OK` de
+   `gate_sanite_rapport.csv`, à trois tolérances angulaires (3°, 5°, 8°).
+   **Résultat : 20 SKU sur 31 changent de face, identiquement aux trois
+   tolérances** — le problème n'est pas la tolérance, c'est la logique de
+   sélection. Cause identifiée sur `D114` (22 sommets) : la face mur
+   actuellement retenue (`face_pose_mur.indices = [4, 5]`, à x=0) fait
+   15 mm de long ; un bord de bloc de réservation à l'autre extrême de la
+   bbox (x=190) fait 200 mm. Le critère de longueur totale choisit
+   systématiquement ce second bord, plus long, qui n'est pas une face de
+   collage. Le même schéma (onglet court à l'extrême correct, bord long
+   à l'extrême opposé) explique 18 des 20 écarts. `D114` révèle en outre
+   que le postulat « mur et plafond forment un coin commun » est faux
+   dans ce cas précis : la face mur (`[4, 5]`, x=0) et la face plafond
+   (`face_pose_plafond.indices = [17, 18]`, y=0) sont à des indices
+   disjoints et non adjacents dans le contour — deux choix indépendants
+   par axe, pas un coin unique.
+
+**Aucun critère discriminant supplémentaire n'a été proposé après ces
+deux impasses** : le débord ne départage pas entre extrêmes ; la
+longueur ne départage pas entre coins ; l'adjacence mur/plafond n'est
+pas garantie par la géométrie réelle. Une nuance à ne pas perdre : le
+fait que l'ancienne face (`[4, 5]` sur `D114`) soit celle actuellement
+« gate-OK » ne prouve pas qu'elle soit la bonne — le critère de débord du
+gate est, par le point 1 ci-dessus, satisfait aussi bien par l'ancienne
+face que par l'alternative à l'autre extrême. « L'ancienne face est
+gate-OK » est une hypothèse d'incumbent, pas une preuve géométrique. Un
+picker fiable demanderait une vérité terrain externe (faces de pose
+annotées côté BE, ou plan de pose) — pas une heuristique supplémentaire
+déduite du seul nuage de points.
+
+**Clause de sortie appliquée** (décision explicite de l'auteur du
+projet, aucune deuxième itération sur le picker) : les 31 `statut_gate=
+OK` sont livrés tels quels — retenus pour leur cohérence interne et leur
+validation arithmétique par le gate, pas pour une preuve de justesse de
+leurs faces de pose. Les 19 `SUSPECT_GEOMETRIE` restent `SUSPECT`, cause
+« face de pose indéterminable par cette voie ». Aucun code de picker
+prototype n'a été committé — les trois versions successives testées
+(`new_picker.py`, `new_picker2.py`, `picker_v3.py`, plus les scripts de
+diagnostic associés) sont restées hors dépôt, dans `/tmp`, et n'ont
+jamais été appliquées à `dxf2profile.py`. **Aucun changement de code de
+production dans cette mise à jour** : `dxf2profile.py`,
+`gate_sanite.py`, `step2profile.py`, `gate_sanite_rapport.csv`,
+`assets/profiles/*.json` et `assets/profiles/index.json` restent
+identiques à leur état du commit `354201e`. Total `statut_gate=OK`
+inchangé à 31/62. Pas de nouveau hash au-delà de `354201e` pour ce
+volet.
