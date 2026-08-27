@@ -101,7 +101,12 @@ class _MotifChip extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: Container(
                 height: 46,
-                color: AppColors.platre,
+                // card2 (fond sombre) au lieu de platre : les PNG produits
+                // sont RGBA majoritairement transparents (76-93 %), le
+                // plâtre blanc sur fond platre donne une amplitude ~46-66
+                // (invisible) contre ~201-204 sur fond sombre. Voir commit
+                // d'obsolescence de 73787af pour le détail de la mesure.
+                color: AppColors.card2,
                 child: imgUrl.isEmpty
                     ? const Icon(FontAwesomeIcons.image, size: 14, color: AppColors.text3)
                     : ClipRect(
