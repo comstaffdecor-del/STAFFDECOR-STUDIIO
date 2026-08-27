@@ -110,6 +110,20 @@ class _MotifChip extends StatelessWidget {
                           child: Image.network(
                             imgUrl,
                             fit: BoxFit.cover,
+                            // ⚠️ Fallback CORS (diagnostic vignettes blanches
+                            // D520/PLIN08M — détail complet dans le message de
+                            // commit) : bascule sur un <img> HTML, hors CORS
+                            // strict du fetch CanvasKit, UNIQUEMENT si le
+                            // fetch échoue ; inerte sinon.
+                            // ⚠️ Ce widget est composé DANS le RepaintBoundary
+                            // exporté par ComparateurScreen
+                            // ._downloadComparisonImage — un <img> HTML n'y
+                            // est pas capturé (vide au lieu de l'icône
+                            // d'erreur actuelle, pas une régression). NE PAS
+                            // reproduire sur les 3 autres sites Image.network
+                            // du dépôt sans revérifier leur exposition à un
+                            // export RepaintBoundary.
+                            webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
                             errorBuilder: (_, __, ___) => const Icon(
                               FontAwesomeIcons.image,
                               size: 14,
