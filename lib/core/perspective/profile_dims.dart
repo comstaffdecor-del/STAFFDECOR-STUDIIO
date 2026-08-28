@@ -38,7 +38,7 @@
 /// observés de 0.0000 à 0.0005 mm sur les 3 pilotes) — recalculer
 /// l'étendue depuis `profil_mm` évite de dépendre d'un champ qui
 /// pourrait désynchroniser un jour. `bbox_mm` sert de **contrôle de
-/// cohérence** : un écart > 0.001 mm signale un profil qui déborde
+/// cohérence** : un écart > tolérance signale un profil qui déborde
 /// derrière le plan mur ou au-dessus du plan plafond — cas qui ne
 /// s'est pas présenté sur les 3 pilotes STEP d'origine, mais qui EST
 /// apparu sur 16 des 56 profils du batch Piste A (ex. `D614`,
@@ -53,6 +53,14 @@
 /// `tools/dxf_pipeline/gate_sanite.py` (copie littérale voulue, voir sa
 /// docstring) — un profil qui échoue ce contrôle ici est, par
 /// construction, un profil `SUSPECT_GEOMETRIE` côté gate.
+///
+/// La tolérance elle-même était à l'origine `0.001` codée en dur ici ET
+/// dans `gate_sanite.py` (`ASSERTION_TOL_MM`) séparément — risque de
+/// dérive documenté mais jamais corrigé. Depuis le batch tolérance-bruit
+/// (2026-08-XX), les deux lisent `assets/config/gate_config.json`
+/// (`assertion_tol_mm`, valeur 0.5mm — voir ce fichier pour la
+/// justification physique) comme SOURCE UNIQUE ; voir
+/// [_loadAssertionTolMm] plus bas.
 library;
 
 import 'dart:convert';
@@ -71,6 +79,54 @@ int _rejectedByContractCount = 0;
 /// de module partagé entre tous les tests du process.
 void resetRejectedByContractCountForTesting() {
   _rejectedByContractCount = 0;
+}
+
+/// Tolérance (mm) du contrôle de cohérence bbox_mm vs profil_mm recalculé
+/// (débord derrière le plan mur ou au-dessus du plan plafond), lue depuis
+/// `assets/config/gate_config.json` — SOURCE UNIQUE partagée avec
+/// `tools/dxf_pipeline/gate_sanite.py` (son critère bloquant 2). Voir ce
+/// JSON pour la justification physique de la valeur (tolérance de
+/// fabrication d'un moulage en plâtre) et l'historique du changement
+/// 0.001mm -> 0.5mm (2026-08-XX, batch tolérance-bruit).
+///
+/// Mémoïsée : un seul chargement disque par process. FAIL-CLOSED, imposé :
+/// si l'asset est absent, illisible ou malformé, ce loader retombe sur
+/// l'ANCIENNE tolérance stricte (0.001mm) — jamais sur une valeur plus
+/// permissive par défaut. Une config cassée doit rejeter davantage de
+/// profils, jamais moins ; ne JAMAIS recopier `0.5` en dur ici en guise de
+/// secours, ce serait réintroduire la duplication que ce fichier JSON
+/// existe pour éliminer.
+double? _cachedAssertionTolMm;
+
+Future<double> _loadAssertionTolMm() async {
+  final cached = _cachedAssertionTolMm;
+  if (cached != null) return cached;
+
+  const fallbackStrict = 0.001;
+  try {
+    final raw =
+        await rootBundle.loadString('assets/config/gate_config.json');
+    final decoded = jsonDecode(raw);
+    if (decoded is Map<String, dynamic>) {
+      final v = decoded['assertion_tol_mm'];
+      if (v is num && v > 0) {
+        _cachedAssertionTolMm = v.toDouble();
+        return _cachedAssertionTolMm!;
+      }
+    }
+  } catch (_) {
+    // Fail-closed : voir docstring ci-dessus. _cachedAssertionTolMm reste
+    // null ici, on retombe sur fallbackStrict sans le mémoïser comme
+    // "définitif" (un chargement ultérieur réussi doit pouvoir corriger).
+  }
+  return fallbackStrict;
+}
+
+/// Réinitialise le cache de tolérance. Réservé aux tests — sinon un test
+/// qui charge un `gate_config.json` factice via `TestAssetBundle` resterait
+/// invisible aux tests suivants du même process.
+void resetAssertionTolMmCacheForTesting() {
+  _cachedAssertionTolMm = null;
 }
 
 /// Dimensions métriques réelles (mm) d'un profil produit, dérivées de
@@ -170,20 +226,24 @@ Future<ProfileDims?> loadProfileDims(String ref) async {
   final projectionMm = maxAbsDx;
 
   // Contrôle de cohérence contre bbox_mm : rejet SILENCIEUX (jamais de
-  // throw, jamais d'assert) — un écart > 0.001 mm signale un profil qui
+  // throw, jamais d'assert) — un écart > tolérance signale un profil qui
   // déborde derrière le plan mur ou au-dessus du plan plafond. Copie
   // littérale du critère bloquant 2 de gate_sanite.py, à dessein (voir
   // docstring de fichier) : ne JAMAIS diverger de ce contrat, sous peine
-  // de désynchroniser le gate et le loader.
+  // de désynchroniser le gate et le loader. La tolérance elle-même vient
+  // désormais de `assets/config/gate_config.json` (voir
+  // `_loadAssertionTolMm` ci-dessus) — SOURCE UNIQUE partagée avec le
+  // gate Python, plus jamais une constante `0.001` recopiée ici en dur.
   final bbox = data['bbox_mm'];
   if (bbox is Map) {
+    final tol = await _loadAssertionTolMm();
     final bboxW = (bbox['w'] as num?)?.toDouble();
     final bboxH = (bbox['h'] as num?)?.toDouble();
-    if (bboxW != null && (bboxW - projectionMm).abs() >= 0.001) {
+    if (bboxW != null && (bboxW - projectionMm).abs() >= tol) {
       _rejectedByContractCount++;
       return null;
     }
-    if (bboxH != null && (bboxH - retombeeMm).abs() >= 0.001) {
+    if (bboxH != null && (bboxH - retombeeMm).abs() >= tol) {
       _rejectedByContractCount++;
       return null;
     }

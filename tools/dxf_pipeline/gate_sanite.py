@@ -41,7 +41,10 @@ CRITÈRES BLOQUANTS (2, déterminent statut_gate) :
      non vides), PLUS un seuil de 3 points minimum (plus strict que le
      loader littéral qui accepte tout non-vide, jamais moins strict).
   2. DEBORD_PLAN_MUR/PLAFOND — reprise littérale de l'assertion debug du
-     loader (tolérance 0.001mm, aucune variante).
+     loader (tolérance lue depuis assets/config/gate_config.json,
+     SOURCE UNIQUE partagée avec le loader Dart -- 0.5mm depuis le
+     batch tolérance-bruit du 2026-08-XX, 0.001mm avant -- jamais une
+     valeur recopiée en dur séparément dans ce fichier).
 
 CRITÈRES NON BLOQUANTS (4, calculés et rapportés comme drapeaux uniquement,
 AUCUN effet sur statut_gate) :
@@ -94,11 +97,43 @@ from pathlib import Path
 HERE = Path(__file__).parent
 DEFAULT_PROFILES_DIR = HERE.parent.parent / "assets" / "profiles"
 DEFAULT_OUTPUT_CSV = HERE / "gate_sanite_rapport.csv"
+GATE_CONFIG_JSON = HERE.parent.parent / "assets" / "config" / "gate_config.json"
+
+
+def _load_assertion_tol_mm() -> float:
+    """Lit `assertion_tol_mm` depuis `assets/config/gate_config.json` —
+    SOURCE UNIQUE partagée avec `lib/core/perspective/profile_dims.dart`
+    (`_loadAssertionTolMm`). Voir ce JSON pour la justification physique
+    de la valeur et l'historique du changement 0.001mm -> 0.5mm.
+
+    FAIL-CLOSED, imposé, symétrique du côté Dart : si le fichier est
+    absent, illisible ou malformé, on retombe sur l'ANCIENNE tolérance
+    stricte (0.001mm) — jamais une valeur plus permissive par défaut. Ne
+    JAMAIS recopier 0.5 en dur ici en guise de secours : ce serait
+    réintroduire la duplication que ce fichier JSON existe pour éliminer.
+    """
+    fallback_strict = 0.001
+    try:
+        with open(GATE_CONFIG_JSON, encoding="utf-8") as fp:
+            data = json.load(fp)
+        v = data.get("assertion_tol_mm")
+        if isinstance(v, (int, float)) and v > 0:
+            return float(v)
+    except (OSError, json.JSONDecodeError, AttributeError):
+        pass
+    print(
+        f"ATTENTION: {GATE_CONFIG_JSON} indisponible/invalide -- "
+        f"repli sur l'ancienne tolerance stricte ({fallback_strict}mm), "
+        "jamais une valeur plus permissive par defaut.",
+        file=sys.stderr,
+    )
+    return fallback_strict
+
 
 # --- Seuils fixes (spécifiés, non provisoires) ---------------------------
 ANGLE_COLINEAIRE_DEG = 175.0
 SOMMETS_EFFECTIFS_MIN = 5
-ASSERTION_TOL_MM = 0.001
+ASSERTION_TOL_MM = _load_assertion_tol_mm()
 PLATITUDE_RATIO_MAX = 0.15
 PROFIL_MM_MIN_POINTS = 3
 
