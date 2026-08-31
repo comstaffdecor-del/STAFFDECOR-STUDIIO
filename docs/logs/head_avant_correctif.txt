@@ -1,0 +1,5 @@
+47c17ecaa9d0f17a29d0a0cd8d908a963d4f386a
+Flutter 3.35.4 • channel stable • https://github.com/flutter/flutter.git
+Framework • revision d693b4b9db (12 months ago) • 2025-09-16 14:27:41 +0000
+Engine • hash feee8ee8fb8b975dd9990f86d3bda11e6e75faf3 (revision c298091351) (11 months ago) • 2025-09-15 14:04:24.000Z
+Tools • Dart 3.9.2 • DevTools 2.48.0
