@@ -2432,34 +2432,46 @@ void main() {
   );
 
   // ===========================================================================
-  // POINT 4 (brief définitif Étapes B/C) — LE SEUL ROUGE QUI COMPTE.
+  // POINT 4a (Suite — Étapes B/C, point 2) — VALIDATION INDÉPENDANTE de
+  // `expectedDepthVpClosedForm`, SANS script jetable.
   //
-  // Contrairement à TOUS les groupes ci-dessus (0/25 assertions n'appellent
-  // le vrai solveur — voir docs/logs/etape_b_audit_harnais.txt), ce groupe
-  // appelle réellement `VanishingPoint.compute` (import ajouté ci-dessus,
-  // absent du reste de ce fichier) avec les 4 coins EXACTS projetés par
-  // `buildSyntheticWall` — donc directement comparable à la vérité terrain
-  // analytique `expectedVpClosedForm` déjà utilisée par le groupe "Point 1".
+  // Deux vérifications, chacune indépendante de l'autre ET de la fonction
+  // testée elle-même (pas de circularité) :
   //
-  // Écrit et exécuté AVANT le correctif Étape C (signature actuelle de
-  // `compute` : 4 coins nommés fTL/fTR/fBL/fBR, sans paramètre de
-  // profondeur) — donc contre le VP-centre actuellement sur disque. Ce
-  // design échoue nécessairement : `expectedVpClosedForm` est le VP de
-  // l'axe HORIZONTAL du mur du fond (même axe que `lineIntersect(ceilL,
-  // ceilR, floorL, floorR)`, voir groupe "Point 1"), alors que le VP-centre
-  // ne calcule ni une intersection de fuyantes ni une fonction de theta —
-  // c'est une moyenne des 4 coins, indépendante de l'azimut au premier
-  // ordre pour une scène symétrique. La différence attendue croît avec
-  // theta (voir table numérique imprimée ci-dessous) : ce n'est pas un
-  // simple écart numérique mais une absence totale de dépendance à
-  // l'obliquité — exactement le diagnostic du brief.
-  group('Point 4 — VanishingPoint.compute (le vrai solveur) vs forme fermée '
-      '(le seul rouge qui compte, brief définitif Étapes B/C)', () {
+  // (a) Intersection RÉELLE de deux droites parallèles à l'axe de
+  //     profondeur, projetées via `Camera3D.project` à l'intérieur de
+  //     `buildSyntheticWall` : (wallTL→ceilL) et (wallTR→ceilR). Ce sont
+  //     deux images de deux droites du MONDE réel, toutes deux parallèles
+  //     à `n` (l'axe de profondeur) par construction (wallTL = ceilL +
+  //     n*nearOffsetM, wallTR = ceilR + n*nearOffsetM) — leur intersection
+  //     via `pg.lineIntersect` est donc le VP de profondeur au sens
+  //     géométrique strict, calculé sans passer par
+  //     `expectedDepthVpClosedForm` ni par `VanishingPoint.compute`. Ce
+  //     test est comparé à `expectedDepthVpClosedForm` : c'est la
+  //     "Dérivation 2" (limite de projection) validée numériquement contre
+  //     une intersection de droites indépendante.
+  //
+  // (b) Identité d'orthogonalité Caprile-Torre : (v_h.x − cx)(v_d.x − cx)
+  //     == −f² EXACTEMENT (à tangage nul), où v_h vient de
+  //     `expectedVpClosedForm` (groupe Point 1, déjà validé contre
+  //     `lineIntersect` à 1e-6) et v_d de `expectedDepthVpClosedForm`.
+  //     C'est la "Dérivation 1" (algébrique), reproduisant le contrôle
+  //     numérique cité par l'utilisateur pour theta=8° :
+  //     (−9001.5−960)(1156.76−960) ≈ −1400².
+  //
+  // Les deux dérivations sont indépendantes l'une de l'autre (l'une
+  // géométrique par intersection de droites projetées, l'autre algébrique
+  // par une identité de produit scalaire déjà utilisée en production dans
+  // `camera.dart::estimateFocalFromBackWallRectangle`) et convergent vers
+  // la même formule — ce n'est donc pas une vérification circulaire.
+  // ===========================================================================
+  group('Point 4a — validation indépendante de expectedDepthVpClosedForm '
+      '(intersection réelle + identité d\'orthogonalité Caprile-Torre)', () {
     for (final thetaDeg in [8.0, 18.0, 32.0]) {
       test(
-        'theta=$thetaDeg° : VanishingPoint.compute(4 coins synthétiques) '
-        'doit converger vers expectedVpClosedForm (axe horizontal) à moins '
-        'de 2% — ROUGE attendu avec le VP-centre actuel',
+        'theta=$thetaDeg°, pitch=0 : intersection réelle '
+        '(wallTL→ceilL) ∩ (wallTR→ceilR) == expectedDepthVpClosedForm à '
+        '1e-6 près',
         () {
           final wall = buildSyntheticWall(
             wallWidthM: 3.0,
@@ -2472,17 +2484,215 @@ void main() {
             thetaDeg: thetaDeg,
           );
 
-          // Appel RÉEL du solveur de production — jamais fait ailleurs
-          // dans ce fichier ni dans aucun autre test de ce dossier avant
-          // ce groupe (voir audit `docs/logs/etape_b_audit_harnais.txt`).
+          // Intersection réelle des deux droites de profondeur projetées —
+          // AUCUN appel à expectedDepthVpClosedForm ni à
+          // VanishingPoint.compute ici : c'est une vérité terrain
+          // indépendante, obtenue par pure géométrie de projection.
+          final vpDepthReal = pg.lineIntersect(
+            wall.wallTL,
+            wall.ceilL,
+            wall.wallTR,
+            wall.ceilR,
+          );
+          expect(vpDepthReal, isNotNull,
+              reason: 'theta=$thetaDeg° ne doit jamais être dégénéré pour '
+                  'lineIntersect sur les droites de profondeur (mur non '
+                  'strictement frontal)');
+
+          final vpDepthClosed = expectedDepthVpClosedForm(
+            focalPx: focalPx,
+            cx: cx,
+            cy: cy,
+            thetaDeg: thetaDeg,
+          );
+
+          final errRel = _dist(vpDepthReal!, vpDepthClosed) / _norm(vpDepthClosed);
+
+          // ignore: avoid_print
+          print(
+            '[point4a-intersection] theta=$thetaDeg°  '
+            'vp_depth_lineIntersect=$vpDepthReal  '
+            'vp_depth_closedform=$vpDepthClosed  '
+            'err_rel=${errRel.toStringAsExponential(3)}',
+          );
+
+          expect(
+            errRel,
+            lessThan(1e-6),
+            reason:
+                'theta=$thetaDeg° : intersection réelle des droites de '
+                'profondeur ($vpDepthReal) diverge de '
+                'expectedDepthVpClosedForm ($vpDepthClosed) — la forme '
+                'fermée ne correspond pas à la géométrie de projection '
+                'réelle (Dérivation 2 invalidée).',
+          );
+        },
+      );
+    }
+
+    test(
+      'theta=8°, pitch=0 : identité d\'orthogonalité Caprile-Torre '
+      '(v_h − cx)(v_d − cx) == −f² à 1% près (reproduit le contrôle '
+      'numérique du brief)',
+      () {
+        const thetaDeg = 8.0;
+        final vH = expectedVpClosedForm(
+          focalPx: focalPx,
+          cx: cx,
+          cy: cy,
+          thetaDeg: thetaDeg,
+        );
+        final vD = expectedDepthVpClosedForm(
+          focalPx: focalPx,
+          cx: cx,
+          cy: cy,
+          thetaDeg: thetaDeg,
+        );
+
+        final product = (vH.dx - cx) * (vD.dx - cx);
+        final expected = -(focalPx * focalPx);
+        final errRel = (product - expected).abs() / expected.abs();
+
+        // ignore: avoid_print
+        print(
+          '[point4a-orthogonalite] theta=$thetaDeg°  v_h.x=${vH.dx}  '
+          'v_d.x=${vD.dx}  produit=$product  attendu(-f²)=$expected  '
+          'err_rel=${errRel.toStringAsExponential(3)}',
+        );
+
+        expect(
+          errRel,
+          lessThan(0.01),
+          reason:
+              '(v_h.x−cx)(v_d.x−cx)=$product loin de −f²=$expected — '
+              'l\'identité d\'orthogonalité Caprile-Torre (déjà en '
+              'production dans camera.dart) n\'est pas satisfaite par '
+              'expectedDepthVpClosedForm : la Dérivation 1 est invalidée.',
+        );
+      },
+    );
+
+    test(
+      'theta=12°, pitch=15° : Dérivation 2 (avec tangage non nul) == '
+      'intersection réelle à 1e-6 près',
+      () {
+        const thetaDeg = 12.0;
+        const pitchDeg = 15.0;
+        final wall = buildSyntheticWall(
+          wallWidthM: 3.0,
+          wallHeightM: wallHeightM,
+          depthM: depthM,
+          focalPx: focalPx,
+          cx: cx,
+          cy: cy,
+          heightCamM: heightCamM,
+          thetaDeg: thetaDeg,
+          pitchDeg: pitchDeg,
+        );
+
+        final vpDepthReal = pg.lineIntersect(
+          wall.wallTL,
+          wall.ceilL,
+          wall.wallTR,
+          wall.ceilR,
+        );
+        expect(vpDepthReal, isNotNull);
+
+        final vpDepthClosed = expectedDepthVpClosedForm(
+          focalPx: focalPx,
+          cx: cx,
+          cy: cy,
+          thetaDeg: thetaDeg,
+          pitchDeg: pitchDeg,
+        );
+
+        final errRel = _dist(vpDepthReal!, vpDepthClosed) / _norm(vpDepthClosed);
+
+        // ignore: avoid_print
+        print(
+          '[point4a-pitch] theta=$thetaDeg° pitch=$pitchDeg°  '
+          'vp_depth_lineIntersect=$vpDepthReal  '
+          'vp_depth_closedform=$vpDepthClosed  '
+          'err_rel=${errRel.toStringAsExponential(3)}',
+        );
+
+        expect(
+          errRel,
+          lessThan(1e-6),
+          reason:
+              'À tangage non nul, la Dérivation 2 (vp.x = cx + '
+              'f·tanθ/cos(pitch), vp.y = cy − f·tanp) diverge de '
+              'l\'intersection réelle projetée : $vpDepthReal vs '
+              '$vpDepthClosed.',
+        );
+      },
+    );
+  });
+
+  // ===========================================================================
+  // POINT 4 (brief définitif Étapes B/C, RECIBLÉ per "Suite" point 3) —
+  // LE SEUL ROUGE QUI COMPTE.
+  //
+  // Historique de ce groupe (trace conservée, pas effacée — voir
+  // docs/logs/rouge_point4_synth_vp_avant_correctif.txt pour le rouge
+  // capturé AVANT ce reciblage) :
+  //   1. Écrit AVANT le correctif Étape C, contre le VP-centre (moyenne
+  //      des 4 coins) : comparait `compute()` à `expectedVpClosedForm`
+  //      (axe horizontal) — rouge, comme attendu, le VP-centre n'a aucun
+  //      terme en theta.
+  //   2. Après le correctif Étape C, `compute()` retourne désormais le VP
+  //      de l'axe de PROFONDEUR (voir vanishing_point.dart), PAS l'axe
+  //      horizontal — la comparaison à `expectedVpClosedForm` était donc
+  //      devenue elle-même la mauvaise référence (rouge pour la MAUVAISE
+  //      raison : pas parce que le solveur est faux, mais parce que la
+  //      cible de comparaison est le VP horizontal, pas celui de
+  //      profondeur). Capturé dans le log ci-dessus AVANT ce reciblage.
+  //   3. RECIBLAGE (ici) : `compute()` reçoit maintenant les 4 points de
+  //      mur latéral (wallTL/wallTR/wallBL/wallBR, requis depuis Étape C)
+  //      et la comparaison se fait contre `expectedDepthVpClosedForm`
+  //      (axe de profondeur, validée indépendamment par le groupe
+  //      "Point 4a" ci-dessus, à 1e-6 par intersection réelle ET par
+  //      l'identité d'orthogonalité Caprile-Torre). C'est la bonne
+  //      référence pour le solveur corrigé — le seuil n'est PAS relâché
+  //      (toujours 2%), le groupe n'est ni supprimé ni skip (brief
+  //      "Suite" point 1).
+  group('Point 4 — VanishingPoint.compute (le vrai solveur) vs forme fermée '
+      '(le seul rouge qui compte, reciblé sur l\'axe de profondeur, '
+      '"Suite" point 3)', () {
+    for (final thetaDeg in [8.0, 18.0, 32.0]) {
+      test(
+        'theta=$thetaDeg° : VanishingPoint.compute(4 coins + 4 points mur '
+        'latéral) doit converger vers expectedDepthVpClosedForm (axe de '
+        'profondeur) à moins de 2%',
+        () {
+          final wall = buildSyntheticWall(
+            wallWidthM: 3.0,
+            wallHeightM: wallHeightM,
+            depthM: depthM,
+            focalPx: focalPx,
+            cx: cx,
+            cy: cy,
+            heightCamM: heightCamM,
+            thetaDeg: thetaDeg,
+          );
+
+          // Appel RÉEL du solveur de production, RECIBLÉ : les 4 points
+          // de mur latéral sont désormais fournis (requis par la
+          // signature Étape C de `compute`) — jamais fait ailleurs dans
+          // ce fichier ni dans aucun autre test de ce dossier avant ce
+          // groupe (voir audit `docs/logs/etape_b_audit_harnais.txt`).
           final vpReal = VanishingPoint.compute(
             fTL: wall.ceilL,
             fTR: wall.ceilR,
             fBL: wall.floorL,
             fBR: wall.floorR,
+            wallTL: wall.wallTL,
+            wallTR: wall.wallTR,
+            wallBL: wall.wallBL,
+            wallBR: wall.wallBR,
           );
 
-          final vpClosed = expectedVpClosedForm(
+          final vpClosed = expectedDepthVpClosedForm(
             focalPx: focalPx,
             cx: cx,
             cy: cy,
@@ -2493,20 +2703,21 @@ void main() {
 
           // ignore: avoid_print
           print(
-            '[point4] theta=$thetaDeg°  vp_reel(compute)=${vpReal.vp}  '
-            'vp_closedform=$vpClosed  err_rel=${errRel.toStringAsExponential(3)}',
+            '[point4-apres-reciblage] theta=$thetaDeg°  '
+            'vp_reel(compute)=${vpReal.vp}  '
+            'vp_depth_closedform=$vpClosed  '
+            'err_rel=${errRel.toStringAsExponential(3)}',
           );
 
           expect(
             errRel,
             lessThan(0.02),
             reason:
-                'theta=$thetaDeg° : VanishingPoint.compute (VP-centre) '
-                'renvoie ${vpReal.vp}, loin de expectedVpClosedForm '
-                '$vpClosed (err_rel=$errRel >> 2%). Le VP-centre est une '
-                'moyenne des 4 coins, sans terme dépendant de theta : ce '
-                "n'est pas le point de fuite de l'axe qui converge "
-                'réellement dans cette scène synthétique.',
+                'theta=$thetaDeg° : VanishingPoint.compute renvoie '
+                '${vpReal.vp}, loin de expectedDepthVpClosedForm '
+                '$vpClosed (err_rel=$errRel >> 2%). Le solveur corrigé '
+                '(intersection wallTL→fTL / wallTR→fTR) devrait '
+                'converger vers le VP de profondeur réel.',
           );
         },
       );
@@ -2514,7 +2725,8 @@ void main() {
 
     test(
       'contrôle de monotonie : frac(theta) doit varier avec theta (pas '
-      'une constante indépendante de l\'obliquité du mur)',
+      'une constante indépendante de l\'obliquité du mur), ET converger '
+      'vers la forme analytique à quelques % près',
       () {
         const depthPx = 100.0;
         final fracs = <double, double>{};
@@ -2534,6 +2746,10 @@ void main() {
             fTR: wall.ceilR,
             fBL: wall.floorL,
             fBR: wall.floorR,
+            wallTL: wall.wallTL,
+            wallTR: wall.wallTR,
+            wallBL: wall.wallBL,
+            wallBR: wall.wallBR,
           );
           fracs[thetaDeg] = vpReal.frac(wall.ceilL, depthPx);
         }
@@ -2553,6 +2769,70 @@ void main() {
               'scène (theta croissant -> VP horizontal plus proche -> '
               'convergence plus rapide pour une même profondeur en px).',
         );
+
+        // Un VP-centre donnerait frac CONSTANT en theta (la moyenne des 4
+        // coins ne dépend pas de l'azimut au premier ordre pour une scène
+        // symétrique) : c'est le "seul rouge qui vaut quelque chose" cité
+        // par le brief — vérifié explicitement ci-dessus (allEqual==false),
+        // pas seulement en confiance.
+        //
+        // Sens de la monotonie (vérifié par calcul, pas supposé a priori) :
+        // vp_depth.x = cx + f·tanθ croît avec theta (le VP de profondeur
+        // s'éloigne du centre image quand le mur devient plus oblique),
+        // donc la distance (p, vp_depth) — p=wall.ceilL fixe — CROÎT elle
+        // aussi, et frac = depthPx / distance DÉCROÎT. C'est la monotonie
+        // attendue ici (strictement décroissante), pas croissante.
+        final thetas = fracs.keys.toList()..sort();
+        for (var i = 1; i < thetas.length; i++) {
+          expect(
+            fracs[thetas[i]]! < fracs[thetas[i - 1]]!,
+            isTrue,
+            reason:
+                'frac(theta) doit être strictement décroissant avec theta '
+                '(mur plus oblique -> VP de profondeur plus éloigné du '
+                'point p=wall.ceilL -> frac plus petit pour une même '
+                'profondeur en px) : fracs=$fracs',
+          );
+        }
+
+        // Conformité à quelques % près à la forme analytique : frac
+        // analytique = depthPx / distance(p, vp_closed_form).
+        for (final thetaDeg in [8.0, 18.0, 32.0]) {
+          final vpClosed = expectedDepthVpClosedForm(
+            focalPx: focalPx,
+            cx: cx,
+            cy: cy,
+            thetaDeg: thetaDeg,
+          );
+          final wall = buildSyntheticWall(
+            wallWidthM: 3.0,
+            wallHeightM: wallHeightM,
+            depthM: depthM,
+            focalPx: focalPx,
+            cx: cx,
+            cy: cy,
+            heightCamM: heightCamM,
+            thetaDeg: thetaDeg,
+          );
+          final fracAnalytical = depthPx / _dist(wall.ceilL, vpClosed);
+          final errRel = (fracs[thetaDeg]! - fracAnalytical).abs() / fracAnalytical;
+
+          // ignore: avoid_print
+          print(
+            '[point4-frac-analytique] theta=$thetaDeg°  '
+            'frac_reel=${fracs[thetaDeg]}  frac_analytique=$fracAnalytical  '
+            'err_rel=${errRel.toStringAsExponential(3)}',
+          );
+
+          expect(
+            errRel,
+            lessThan(0.02),
+            reason:
+                'theta=$thetaDeg° : frac(theta) réel (${fracs[thetaDeg]}) '
+                'diverge de la forme analytique ($fracAnalytical) à plus '
+                'de 2% (err_rel=$errRel).',
+          );
+        }
       },
     );
   });

@@ -202,17 +202,66 @@ class VanishingPoint {
   /// géométrie ne justifie de tronquer la convergence à cette valeur
   /// précise, voir brief définitif Étapes B/C point 7).
   ///
+  /// Suppression du plafond 0.45 SANS remplacement créerait une NOUVELLE
+  /// dégénérescence à la place de l'ancienne (brief "Suite" point 4) :
+  /// `frac > 1` place le point résultant AU-DELÀ du point de fuite sur la
+  /// droite (p → vp) — géométriquement impossible pour une face qui doit
+  /// reculer VERS l'intérieur de la pièce, et produirait un rendu de
+  /// corniche/plinthe inversé (face repliée en miroir derrière le VP). Ce
+  /// cas lève donc un [StateError] EXPLICITE — jamais un clamp silencieux
+  /// (`??`, `.clamp(0,1)`) qui masquerait une entrée de calibration
+  /// invalide (profondeur demandée trop grande vis-à-vis de la distance
+  /// réelle du point au VP) derrière un résultat numérique plausible mais
+  /// faux.
+  ///
   /// Pour un VP à l'infini (`w = 0`), il n'y a pas de "distance au VP"
-  /// (infinie par définition) : la valeur renvoyée est directement
-  /// [depthPx], interprétée par [toward] comme une magnitude de
-  /// translation en pixels selon la direction de l'axe de profondeur —
-  /// c'est la sémantique de projection parallèle attendue pour un mur
-  /// strictement frontal.
+  /// (infinie par définition, donc pas de notion de "dépasser" le VP) :
+  /// la valeur renvoyée est directement [depthPx], interprétée par
+  /// [toward] comme une magnitude de translation en pixels selon la
+  /// direction de l'axe de profondeur — c'est la sémantique de projection
+  /// parallèle attendue pour un mur strictement frontal. Mais l'exigence
+  /// de garde explicite s'applique ICI AUSSI (brief "Suite" point 4,
+  /// "même exigence sur la branche w=0") : une profondeur négative n'a de
+  /// sens géométrique dans AUCUN des deux cas (reculer d'une distance
+  /// négative n'est pas une opération valide sur une face de corniche),
+  /// donc ce cas est également rejeté explicitement, plutôt que de
+  /// produire silencieusement une translation dans le mauvais sens.
   double frac(Offset p, double depthPx) {
+    if (depthPx < 0) {
+      throw ArgumentError(
+        'VanishingPoint.frac : depthPx=$depthPx négatif — une profondeur '
+        'de recul ne peut pas être négative (ni pour un VP fini, ni pour '
+        'un VP à l\'infini). Vérifier le calcul amont de depthPx.',
+      );
+    }
     if (w == 0) return depthPx;
+
     final vpPos = Offset(x / w, y / w);
     final d = dist(p, vpPos);
-    final distVp = d == 0 ? 1.0 : d;
-    return depthPx / distVp;
+    if (d < 1e-9) {
+      throw StateError(
+        'VanishingPoint.frac : le point p=$p coïncide avec le VP fini '
+        '$vpPos (distance ${d.toStringAsExponential(2)} < 1e-9) — aucune '
+        'fraction de convergence n\'est définissable (division par une '
+        'distance quasi nulle). Ce n\'est pas un cas valide de '
+        'calibration : p doit être un point du mur du fond, distinct du '
+        'VP par construction.',
+      );
+    }
+    final result = depthPx / d;
+    if (result > 1.0) {
+      throw StateError(
+        'VanishingPoint.frac : depthPx=$depthPx à distance $d du VP '
+        'fini $vpPos donne frac=$result > 1 — la face demandée reculerait '
+        'AU-DELÀ du point de fuite, ce qui est géométriquement impossible '
+        '(donnerait une corniche/plinthe inversée). Plafonner '
+        'silencieusement (comme le faisait l\'ancienne borne à 0.45) '
+        'masquerait une profondeur de calibration incohérente avec la '
+        'géométrie réelle de la scène : réduire depthPx, ou vérifier la '
+        'calibration (mur latéral trop proche de fTL/fTR, ou point de '
+        'vue incompatible avec la profondeur demandée).',
+      );
+    }
+    return result;
   }
 }

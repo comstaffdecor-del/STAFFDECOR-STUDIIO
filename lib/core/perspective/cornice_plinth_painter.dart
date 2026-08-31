@@ -23,6 +23,7 @@ library;
 
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'persp_geometry.dart';
 import 'vanishing_point.dart';
 import 'profile_strip.dart';
@@ -60,6 +61,34 @@ double _cornerSharpness(Offset a, Offset b, Offset c) {
 /// Seuil sous lequel un "coin" est considéré trop plat pour un onglet
 /// géométrique fiable (sin(7°) ≈ 0.12).
 const double _kFlatCornerThreshold = 0.12;
+
+/// Calcule le point de convergence `vp.toward(p, vp.frac(p, depthPx))` en
+/// absorbant les exceptions EXPLICITES désormais levées par
+/// [VanishingPoint.frac] (brief "Suite" point 4 : `frac > 1`, VP fini
+/// coïncidant avec `p`, ou `depthPx` négatif — voir docstring de `frac`
+/// dans `vanishing_point.dart`) : ces cas sont des données de calibration
+/// incohérentes avec la géométrie réelle de la scène pour CE segment
+/// précis, pas des bugs du solveur. On ne les masque pas silencieusement
+/// (pas de clamp implicite comme l'ancien plafond à 0.45) : on les
+/// journalise explicitement en mode debug, et on renvoie `null` pour que
+/// l'appelant renonce à dessiner UNIQUEMENT la face plafond/sol de ce
+/// segment (la face mur reste dessinée normalement) plutôt que de faire
+/// planter tout le rendu de la pièce pour une seule bande de corniche
+/// dégénérée. C'est le point d'appel qui manquait de garde, signalé par
+/// le brief ("cornice_plinth_painter.dart:361 appelle sans garde").
+Offset? _safeToward(VanishingPoint vp, Offset p, double depthPx) {
+  try {
+    return vp.toward(p, vp.frac(p, depthPx));
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint(
+        '[cornice_plinth_painter] convergence VP ignorée pour p=$p, '
+        'depthPx=$depthPx : $e',
+      );
+    }
+    return null;
+  }
+}
 
 /// Épaisseurs (en px canvas, dérivées de `pH` = hauteur perspective du
 /// mur du fond) pour un segment de corniche ou de plinthe.
@@ -358,8 +387,11 @@ void _drawCorniceStrip(
   if (len < 2) return;
 
   // Face plafond : convergence vers VP depuis les deux points hauts.
-  final pA = vp.toward(topA, vp.frac(topA, depthPx));
-  final pB = vp.toward(topB, vp.frac(topB, depthPx));
+  // `_safeToward` absorbe les exceptions explicites de VanishingPoint.frac
+  // (frac>1, VP coïncident, depthPx<0) — voir sa docstring : ce segment
+  // renonce alors À LA SEULE face plafond, pas au reste du rendu.
+  final pA = _safeToward(vp, topA, depthPx);
+  final pB = _safeToward(vp, topB, depthPx);
 
   // ① Face MUR — vraie photo produit si chargée, sinon silhouette
   // procédurale pilotée par le ratio réel (fallback).
@@ -367,7 +399,9 @@ void _drawCorniceStrip(
   drawEdgeLine(canvas, topA, topB, const Color(0xF2FFFFFF), 2.0);
   drawEdgeLine(canvas, botA, botB, const Color(0x66413426), 0.8);
 
-  // ② Face PLAFOND — plan horizontal convergent vers VP.
+  // ② Face PLAFOND — plan horizontal convergent vers VP. Ignorée si la
+  // convergence n'a pas pu être calculée pour l'un des deux points.
+  if (pA == null || pB == null) return;
   final path = Path()
     ..moveTo(topA.dx, topA.dy)
     ..lineTo(topB.dx, topB.dy)
@@ -399,8 +433,10 @@ void _drawPlinthStrip(
   final len = dist(botA, botB);
   if (len < 2) return;
 
-  final sA = vp.toward(botA, vp.frac(botA, depthPx));
-  final sB = vp.toward(botB, vp.frac(botB, depthPx));
+  // Voir commentaire équivalent dans [_drawCorniceStrip] : `_safeToward`
+  // absorbe les exceptions explicites de VanishingPoint.frac.
+  final sA = _safeToward(vp, botA, depthPx);
+  final sB = _safeToward(vp, botB, depthPx);
 
   // ① Face MUR — vraie photo produit si chargée, sinon silhouette
   // procédurale (fallback).
@@ -408,7 +444,9 @@ void _drawPlinthStrip(
   drawEdgeLine(canvas, topA, topB, const Color(0xF2FFFFFF), 1.8);
   drawEdgeLine(canvas, botA, botB, const Color(0x61322820), 0.8);
 
-  // ② Face SOL — convergence vers VP.
+  // ② Face SOL — convergence vers VP. Ignorée si la convergence n'a pas
+  // pu être calculée pour l'un des deux points.
+  if (sA == null || sB == null) return;
   final path = Path()
     ..moveTo(botA.dx, botA.dy)
     ..lineTo(botB.dx, botB.dy)
