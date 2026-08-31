@@ -8,8 +8,10 @@ issus des logs `tools/dxf_pipeline/logs/run_step_20260826_15{0219,0323,0426,0531
 et `run_step_20260826_145936.csv` (D887, premier essai) — ces cinq fichiers
 sont générés localement par `step2profile.py` et **ne sont pas versionnés**
 (`tools/dxf_pipeline/logs/` est explicitement dans `.gitignore` à la racine
-du dépôt) ; ils restent cependant lisibles tels quels tant que le poste de
-travail qui les a produits n'a pas été réinitialisé.
+du dépôt). Les six lignes utiles (les cinq échecs + le premier essai D887)
+sont extraites et versionnées dans `docs/annexe_A_run_step_extrait.csv` —
+un extrait curé dans `docs/` n'est pas un log brut, il ne contourne pas la
+règle `.gitignore` visant les CSV complets de `tools/dxf_pipeline/logs/`.
 
 ---
 

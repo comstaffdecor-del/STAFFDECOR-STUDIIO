@@ -1,5 +1,40 @@
-47c17ecaa9d0f17a29d0a0cd8d908a963d4f386a
+a7c711d5194981a43aabdb3e36373001efc0c649
 Flutter 3.35.4 • channel stable • https://github.com/flutter/flutter.git
 Framework • revision d693b4b9db (12 months ago) • 2025-09-16 14:27:41 +0000
 Engine • hash feee8ee8fb8b975dd9990f86d3bda11e6e75faf3 (revision c298091351) (11 months ago) • 2025-09-15 14:04:24.000Z
 Tools • Dart 3.9.2 • DevTools 2.48.0
+
+$ ls -la test/core/perspective/
+total 348
+drwxr-xr-x 2 user user   4096 Aug 31 10:43 .
+drwxr-xr-x 4 user user   4096 Aug 12 12:31 ..
+-rw-r--r-- 1 user user  19629 Aug 24 08:22 _debug_calib_bench_test.dart
+-rw-r--r-- 1 user user   3597 Aug 17 11:17 _debug_grid_reference_test.dart
+-rw-r--r-- 1 user user   4356 Aug 17 11:29 _debug_grid_zoom_mid_test.dart
+-rw-r--r-- 1 user user   4419 Aug 17 11:52 _debug_grid_zoom_sofabase_test.dart
+-rw-r--r-- 1 user user   5590 Aug 17 11:18 _debug_grid_zoom_test.dart
+-rw-r--r-- 1 user user  19681 Aug 17 11:03 _debug_room_painter_real_render_test.dart
+-rw-r--r-- 1 user user 108636 Aug 25 12:24 _synth_vp_harness_test.dart
+-rw-r--r-- 1 user user   4291 Aug 26 09:53 cornice_for_test.dart
+-rw-r--r-- 1 user user  14083 Aug 26 10:17 d835_wrong_vs_fallback_capture_test.dart
+-rw-r--r-- 1 user user   3407 Aug 28 11:01 gate_ok_count_helper.dart
+-rw-r--r-- 1 user user  14203 Aug 13 21:11 persp_geometry_test.dart
+-rw-r--r-- 1 user user   2263 Aug 13 10:42 product_texture_cache_async_notify_test.dart
+-rw-r--r-- 1 user user  14925 Aug 26 16:07 profile_dims_cache_coverage_test.dart
+-rw-r--r-- 1 user user   8273 Aug 26 10:18 profile_dims_cache_fail_closed_test.dart
+-rw-r--r-- 1 user user   5995 Aug 26 16:07 profile_dims_cache_index_test.dart
+-rw-r--r-- 1 user user   5897 Aug 13 12:04 profile_dims_cache_test.dart
+-rw-r--r-- 1 user user   2796 Aug 26 09:12 profile_dims_contract_reject_test.dart
+-rw-r--r-- 1 user user   3169 Aug 12 12:32 profile_dims_test.dart
+-rw-r--r-- 1 user user   4151 Aug 26 10:01 profiles_index_anti_drift_test.dart
+-rw-r--r-- 1 user user   6182 Aug 13 12:09 room_painter_paint_integration_test.dart
+-rw-r--r-- 1 user user   3405 Aug 26 09:53 room_painter_repaint_listener_test.dart
+-rw-r--r-- 1 user user  17171 Aug 17 09:32 strip_px_from_dims_test.dart
+-rw-r--r-- 1 user user   3517 Aug 13 09:57 strip_thickness_from_px_test.dart
+-rw-r--r-- 1 user user   9072 Aug 28 11:00 tolerance_relaxation_guard_test.dart
+-rw-r--r-- 1 user user   7881 Aug 31 10:43 vp_frac_degenere_test.dart
+
+$ wc -c test/core/perspective/vp_frac_degenere_test.dart test/core/perspective/_synth_vp_harness_test.dart
+  7881 test/core/perspective/vp_frac_degenere_test.dart
+108636 test/core/perspective/_synth_vp_harness_test.dart
+116517 total

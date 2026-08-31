@@ -48,4 +48,104 @@ Downloading packages...
 Got dependencies!
 44 packages have newer versions incompatible with dependency constraints.
 Try `flutter pub outdated` for more information.
-00:00 +0: loading /home/user/flutter_app/test/core/perspective/vp_frac_degenere_test.dart                                                                                                              00:01 +0: loading /home/user/flutter_app/test/core/perspective/vp_frac_degenere_test.dart                                                                                                              00:02 +0: loading /home/user/flutter_app/test/core/perspective/vp_frac_degenere_test.dart                                                                                                              00:03 +0: loading /home/user/flutter_app/test/core/perspective/vp_frac_degenere_test.dart                                                                                                              00:03 +0: Étape 0 — frac() de la face plafond, par preset (non dégénéré) haussmann : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                        00:04 +0: Étape 0 — frac() de la face plafond, par preset (non dégénéré) haussmann : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                        00:04 +1: Étape 0 — frac() de la face plafond, par preset (non dégénéré) haussmann : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                        00:04 +1: Étape 0 — frac() de la face plafond, par preset (non dégénéré) moderne : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                          00:04 +2: Étape 0 — frac() de la face plafond, par preset (non dégénéré) moderne : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                          00:04 +2: Étape 0 — frac() de la face plafond, par preset (non dégénéré) provencal : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                        00:04 +3: Étape 0 — frac() de la face plafond, par preset (non dégénéré) provencal : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                        00:04 +3: Étape 0 — frac() de la face plafond, par preset (non dégénéré) scandinave : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                       00:04 +4: Étape 0 — frac() de la face plafond, par preset (non dégénéré) scandinave : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                       00:04 +4: All tests passed!                                                                                                                                                                            
+00:00 +0: loading /home/user/flutter_app/test/core/perspective/vp_frac_degenere_test.dart                                                                                                              00:01 +0: loading /home/user/flutter_app/test/core/perspective/vp_frac_degenere_test.dart                                                                                                              00:02 +0: loading /home/user/flutter_app/test/core/perspective/vp_frac_degenere_test.dart                                                                                                              00:02 +0: Étape 0 — frac() de la face plafond, par preset (non dégénéré) haussmann : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                        00:02 +1: Étape 0 — frac() de la face plafond, par preset (non dégénéré) haussmann : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                        00:02 +1: Étape 0 — frac() de la face plafond, par preset (non dégénéré) moderne : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                          00:02 +2: Étape 0 — frac() de la face plafond, par preset (non dégénéré) moderne : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                          00:02 +2: Étape 0 — frac() de la face plafond, par preset (non dégénéré) provencal : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                        00:02 +3: Étape 0 — frac() de la face plafond, par preset (non dégénéré) provencal : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                        00:02 +3: Étape 0 — frac() de la face plafond, par preset (non dégénéré) scandinave : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                       00:02 +4: Étape 0 — frac() de la face plafond, par preset (non dégénéré) scandinave : VanishingPoint.compute ne doit pas produire un VP dégénéré                                                       00:02 +4: All tests passed!                                                                                                                                                                            
+
+================================================================================
+CONSTAT — le test ci-dessus est VERT (4/4), pas rouge.
+================================================================================
+Le brief "câblage du moteur géométrique réel" (sections 1 et 6) part de la
+prémisse que ce test est rouge sur HEAD, sur la base de l'ancienne
+implémentation `lineIntersect(fTL,fTR,fBL,fBR)` décrite dans son diagnostic
+(section 3). Vérification directe : lib/core/perspective/vanishing_point.dart,
+tel qu'il est RÉELLEMENT sur disque au SHA ci-dessus, ne contient PLUS cette
+implémentation. Il contient une version "VP = centre du mur du fond"
+(moyenne des 4 abscisses, mi-hauteur plafond/sol) — c'est très précisément
+le "final design" que le brief lui-même diagnostique (sa section 3, dernier
+paragraphe) comme un TROISIÈME régime dégénéré : frac = 0.14·pH / sqrt(0.16·dw²
++ 0.25·pH²), sans terme d'obliquité, une constante arbitraire remplaçant une
+autre. C'est cette version qui fait passer le test au vert : frac(ceilL) vaut
+0.129 à 0.163 selon le preset (voir sonde ci-dessous), donc > 0.05 — le test
+passe pour la MAUVAISE raison, pas parce que la géométrie a été corrigée.
+
+Origine de cette modification, établie par `git diff b6d1bb0..47c17ec --
+lib/core/perspective/vanishing_point.dart` : le fichier A ÉTÉ modifié, dans
+le commit 47c17ec ("genspark auto-backup", 31/08 12:14:33 UTC) — le MÊME
+commit qui a poussé les deux courriers publiquement. Rectification d'une
+première hypothèse erronée (rédigée puis vérifiée dans cette même session) :
+le fichier n'est pas resté non commité sur disque, il a bien été committé,
+simplement dans un commit distinct de b6d1bb0 (les deux commits sont
+successifs, tous deux étiquetés "genspark auto-backup", donc probablement
+produits par deux vagues de sauvegarde automatique du même tour de travail).
+Aucune trace d'exécution `flutter test` n'accompagne ce commit — le diff
+montre uniquement la réécriture de `VanishingPoint.compute` et de sa
+docstring, aucun fichier de log.
+
+Consequence explicite (section 4 du brief, "le test rouge ne peut pas valider
+le correctif") : le passage au vert de vp_frac_degenere_test.dart N'EST PAS
+un critère d'acceptation valide. Il est nécessaire, pas suffisant. Le
+critère réel reste frac(theta) variable et conforme à l'analytique sur scène
+synthétique (Étape B/C, non encore faites).
+
+================================================================================
+SONDE VERSIONNÉE — tools/calib_measure/vp_current_state_probe.dart
+================================================================================
+Remplace toute mesure produite par un script jetable /tmp (règle de
+provenance, brief section 5/10). Sortie brute ci-dessous, non éditée :
+
+$ flutter test tools/calib_measure/vp_current_state_probe.dart
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  exif_reader 4.1.0 (4.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  http 1.5.0 (1.6.0 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+21 available)
+  image_picker_ios 0.8.13+3 (0.8.13+7 available)
+  intl 0.19.0 (0.20.3 available)
+  iso_base_media 6.3.2 (6.3.3 available)
+  lints 5.1.1 (6.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.16.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  random_access_source 4.2.1 (4.3.1 available)
+  share_plus 12.0.2 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  shared_preferences 2.5.3 (2.5.5 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.6 (0.7.13 available)
+  url_launcher 6.3.1 (6.3.2 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.3.6 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_web 2.4.1 (2.4.3 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.2.0 (15.3.0 available)
+  win32 5.15.0 (6.4.0 available)
+Got dependencies!
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/flutter_app/tools/calib_measure/vp_current_state_probe.dart                                                                                                               00:01 +0: loading /home/user/flutter_app/tools/calib_measure/vp_current_state_probe.dart                                                                                                               00:02 +0: loading /home/user/flutter_app/tools/calib_measure/vp_current_state_probe.dart                                                                                                               00:02 +0: sonde: ImgDraw + distVp effectif par preset (VanishingPoint.compute actuel)                                                                                                                  00:02 +0: sonde: ImgDraw + distVp effectif par preset (VanishingPoint.compute actuel)                                                                                                                  
+=== SONDE vp_current_state_probe — VanishingPoint.compute actuel sur disque ===
+haussmann : imgDraw(dx=0.06, dy=0.00, dw=1399.89, dh=975.00, scale=0.546831) | vp=(700.00, 464.34) | pH=760.500 | depthPx=106.470 | distVp=651.77 | frac=0.16336
+moderne : imgDraw(dx=50.00, dy=0.00, dw=1300.00, dh=975.00, scale=0.663265) | vp=(700.00, 397.31) | pH=609.375 | depthPx=85.313 | distVp=602.69 | frac=0.14155
+provencal : imgDraw(dx=0.00, dy=20.74, dw=1400.00, dh=933.52, scale=0.546875) | vp=(700.00, 473.50) | pH=644.126 | depthPx=90.178 | distVp=646.01 | frac=0.13959
+scandinave : imgDraw(dx=0.00, dy=90.83, dw=1400.00, dh=793.33, scale=0.729167) | vp=(700.00, 441.88) | pH=583.100 | depthPx=81.634 | distVp=631.35 | frac=0.12930
+00:02 +1: sonde: ImgDraw + distVp effectif par preset (VanishingPoint.compute actuel)                                                                                                                  00:02 +1: All tests passed!                                                                                                                                                                            
