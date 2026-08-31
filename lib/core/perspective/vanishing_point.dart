@@ -38,6 +38,56 @@ class VanishingPoint {
 
   final Offset fTL, fTR, fBL, fBR;
 
+  /// Écart absolu (pixels canvas) entre les deux estimations INDÉPENDANTES
+  /// du VP de profondeur — couple haut (wallTL→fTL / wallTR→fTR) et couple
+  /// bas (wallBL→fBL / wallBR→fBR) — voir [compute]. C'est une mesure
+  /// DIRECTE du conditionnement de l'entrée de calibration : ce n'est ni
+  /// un angle limite arbitraire, ni un seuil deviné, juste la distance
+  /// entre deux résultats géométriques qui devraient coïncider si la
+  /// calibration portait une information de profondeur cohérente
+  /// (brief "Suite 2" point 3).
+  ///
+  /// `null` si un seul des deux couples a produit une intersection finie
+  /// (l'autre étant parallèle/dégénéré, cas normal si le mur latéral haut
+  /// ou bas est aligné avec sa fuyante) : il n'y a alors qu'UNE SEULE
+  /// estimation, donc aucun écart n'est mesurable — `null`, pas `0.0`
+  /// (`0.0` affirmerait à tort un accord parfait entre deux mesures dont
+  /// une seule existe).
+  final double? residualPx;
+
+  /// [residualPx] exprimé en fraction de la distance `fTL→vp` (PAS en
+  /// fraction de [pH]) — c'est la formulation exacte du brief "Suite 2"
+  /// point 3 : "un écart de 300 px n'a pas le même sens à 700 px [de VP]
+  /// qu'à 22 000 px". `fTL` est le point de référence canonique déjà
+  /// utilisé comme `p` par [frac]/[toward] ailleurs dans le moteur (voir
+  /// `vp_frac_degenere_test.dart`, Groupe 4 : `frac(cp.ceilL, ...)`, et
+  /// `ceilL == fTL`) — pas un choix arbitraire différent du reste du code.
+  /// `null` dans les mêmes conditions que [residualPx].
+  ///
+  /// Aucun seuil de fiabilité n'est appliqué ICI : cette classe expose la
+  /// mesure, elle ne décide pas seule de ce qui est "trop" — voir
+  /// [residualExceeds] pour une décision explicite, paramétrée par
+  /// l'appelant (pas un seuil deviné en dur dans le moteur géométrique).
+  double? get residualFrac {
+    if (residualPx == null) return null;
+    final d = dist(fTL, vp);
+    if (d < 1e-9) return null;
+    return residualPx! / d;
+  }
+
+  /// `true` si [residualFrac] dépasse [thresholdFrac] — decision EXPLICITE
+  /// et paramétrée, jamais un seuil deviné en dur : c'est à l'appelant
+  /// (site de rendu, sonde, test) de justifier la valeur qu'il passe ici,
+  /// pas à [VanishingPoint] de la choisir pour lui. Renvoie `false` si
+  /// [residualFrac] est `null` (une seule estimation disponible : rien à
+  /// comparer, donc rien à rejeter sur ce critère précis — un autre
+  /// contrôle serait nécessaire pour juger la fiabilité dans ce cas).
+  bool residualExceeds(double thresholdFrac) {
+    final f = residualFrac;
+    if (f == null) return false;
+    return f > thresholdFrac;
+  }
+
   const VanishingPoint._({
     required this.x,
     required this.y,
@@ -46,15 +96,19 @@ class VanishingPoint {
     required this.fTR,
     required this.fBL,
     required this.fBR,
+    this.residualPx,
   });
 
   /// Construction directe à partir d'un point FINI (`w = 1`) — pour les
   /// sites d'appel (tests, démonstrations) qui connaissent déjà la
-  /// position du VP sans passer par [compute].
+  /// position du VP sans passer par [compute]. [residualPx] est `null` :
+  /// aucune comparaison haut/bas n'a été faite (le VP est fourni
+  /// directement, pas dérivé de deux couples de points de mur latéral).
   VanishingPoint({required Offset vp, required this.fTL, required this.fTR, required this.fBL, required this.fBR})
     : x = vp.dx,
       y = vp.dy,
-      w = 1.0;
+      w = 1.0,
+      residualPx = null;
 
   /// Position du VP en coordonnées cartésiennes — valide seulement si
   /// [w] != 0 (point fini). Lève une [StateError] explicite sinon : un
@@ -137,9 +191,36 @@ class VanishingPoint {
       );
     }
 
-    // Couple haut, puis repli sur le couple bas si dégénéré (parallèles).
+    // Couple haut ET couple bas : DEUX estimations indépendantes du même
+    // VP de profondeur (voir docstring de classe). PAS un `??` de repli
+    // silencieux (interdit — brief "Suite 2" point 3) : quand les deux
+    // sont finies, leur écart (résidu géométrique en pixels, avec unité,
+    // PAS un angle limite arbitraire) est calculé et exposé via
+    // [residualPx]/[residualFrac] pour que l'appelant puisse juger le
+    // conditionnement de l'entrée — [compute] ne décide pas seul qu'un
+    // écart est "trop grand", il le mesure et le rapporte.
     final vpTop = lineIntersect(wallTL, fTL, wallTR, fTR);
     final vpBottom = lineIntersect(wallBL, fBL, wallBR, fBR);
+
+    if (vpTop != null && vpBottom != null) {
+      final residual = dist(vpTop, vpBottom);
+      // Le couple haut est retenu comme position (convention stable,
+      // arbitraire mais documentée) — le résidu accompagne TOUJOURS ce
+      // choix, il n'est jamais perdu au profit d'un seul des deux points.
+      return VanishingPoint._(
+        x: vpTop.dx,
+        y: vpTop.dy,
+        w: 1.0,
+        fTL: fTL,
+        fTR: fTR,
+        fBL: fBL,
+        fBR: fBR,
+        residualPx: residual,
+      );
+    }
+    // Un seul des deux couples a produit une intersection finie (l'autre
+    // parallèle/dégénéré) : une seule estimation existe, donc AUCUN
+    // résidu n'est mesurable (`residualPx` reste `null`, pas `0.0`).
     final vpFinite = vpTop ?? vpBottom;
     if (vpFinite != null) {
       return VanishingPoint._(x: vpFinite.dx, y: vpFinite.dy, w: 1.0, fTL: fTL, fTR: fTR, fBL: fBL, fBR: fBR);

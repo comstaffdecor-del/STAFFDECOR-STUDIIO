@@ -63,27 +63,53 @@ double _cornerSharpness(Offset a, Offset b, Offset c) {
 const double _kFlatCornerThreshold = 0.12;
 
 /// Calcule le point de convergence `vp.toward(p, vp.frac(p, depthPx))` en
-/// absorbant les exceptions EXPLICITES désormais levées par
-/// [VanishingPoint.frac] (brief "Suite" point 4 : `frac > 1`, VP fini
-/// coïncidant avec `p`, ou `depthPx` négatif — voir docstring de `frac`
-/// dans `vanishing_point.dart`) : ces cas sont des données de calibration
-/// incohérentes avec la géométrie réelle de la scène pour CE segment
-/// précis, pas des bugs du solveur. On ne les masque pas silencieusement
-/// (pas de clamp implicite comme l'ancien plafond à 0.45) : on les
-/// journalise explicitement en mode debug, et on renvoie `null` pour que
-/// l'appelant renonce à dessiner UNIQUEMENT la face plafond/sol de ce
-/// segment (la face mur reste dessinée normalement) plutôt que de faire
-/// planter tout le rendu de la pièce pour une seule bande de corniche
-/// dégénérée. C'est le point d'appel qui manquait de garde, signalé par
-/// le brief ("cornice_plinth_painter.dart:361 appelle sans garde").
+/// absorbant UNIQUEMENT les exceptions EXPLICITES documentées, levées par
+/// [VanishingPoint.frac] (brief "Suite" point 4 : `frac > 1` → [StateError],
+/// VP fini coïncidant avec `p` → [StateError], `depthPx` négatif →
+/// [ArgumentError] — voir docstring de `frac` dans `vanishing_point.dart`) :
+/// ces cas sont des données de calibration incohérentes avec la géométrie
+/// réelle de la scène pour CE segment précis, pas des bugs du solveur.
+///
+/// ⚠️ Restriction délibérée à `on ArgumentError`/`on StateError` (brief
+/// "Suite 2" point 5) : un `catch (e)` non typé attraperait AUSSI un
+/// [NoSuchMethodError], une erreur de type, ou tout bug de refactor futur
+/// dans [VanishingPoint] ou ses appelants — masquant silencieusement la
+/// face plafond/sol (et, en mode release, `kDebugMode` étant faux,
+/// [debugPrint] ne produit alors AUCUN signal) exactement le mode
+/// d'échec que cet exercice visait à éliminer. Toute autre exception
+/// REMONTE désormais normalement (crash visible en debug, pas de face
+/// manquante silencieuse en release pour une cause imprévue).
+///
+/// On ne masque pas silencieusement les deux cas gérés ici (pas de clamp
+/// implicite comme l'ancien plafond à 0.45) : on les journalise
+/// explicitement en mode debug, et on renvoie `null` pour que l'appelant
+/// renonce à dessiner UNIQUEMENT la face plafond/sol de ce segment (la
+/// face mur reste dessinée normalement) plutôt que de faire planter tout
+/// le rendu de la pièce pour une seule bande de corniche dégénérée. C'est
+/// le point d'appel qui manquait de garde, signalé par le brief
+/// ("cornice_plinth_painter.dart:361 appelle sans garde"). Voir
+/// `_synth_vp_harness_test.dart` / `vp_frac_degenere_test.dart` pour la
+/// preuve que ce chemin n'est PAS empruntable aujourd'hui par les 4
+/// presets réels (tous les `frac` mesurés tombent dans `(0, 1]`) : la
+/// garde de conditionnement (résidu haut/bas) est susceptible de changer
+/// cette situation une fois activée en amont — voir brief "Suite 2"
+/// point 7 (arbitrage produit, non tranché ici).
 Offset? _safeToward(VanishingPoint vp, Offset p, double depthPx) {
   try {
     return vp.toward(p, vp.frac(p, depthPx));
-  } catch (e) {
+  } on ArgumentError catch (e) {
     if (kDebugMode) {
       debugPrint(
-        '[cornice_plinth_painter] convergence VP ignorée pour p=$p, '
-        'depthPx=$depthPx : $e',
+        '[cornice_plinth_painter] convergence VP ignorée (ArgumentError) '
+        'pour p=$p, depthPx=$depthPx : $e',
+      );
+    }
+    return null;
+  } on StateError catch (e) {
+    if (kDebugMode) {
+      debugPrint(
+        '[cornice_plinth_painter] convergence VP ignorée (StateError) '
+        'pour p=$p, depthPx=$depthPx : $e',
       );
     }
     return null;

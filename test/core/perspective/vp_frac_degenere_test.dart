@@ -349,4 +349,72 @@ void main() {
       });
     }
   });
+
+  // =========================================================================
+  // GROUPE 5 — Garde de conditionnement (brief "Suite 2" point 3) : mesure
+  // du résidu ENTRE LES DEUX ESTIMATIONS INDÉPENDANTES du VP de profondeur
+  // (couple haut wallTL→fTL/wallTR→fTR vs couple bas wallBL→fBL/wallBR→
+  // fBR), exposée par `VanishingPoint.residualPx`/`.residualFrac` (voir
+  // `vanishing_point.dart`, ligne visée à l'origine de ce correctif :
+  // l'ancien `final vpFinite = vpTop ?? vpBottom;` qui écrasait
+  // silencieusement l'un des deux résultats sans jamais comparer les deux).
+  //
+  // C'est un résidu géométrique AVEC UNITÉ (pixels canvas, puis fraction de
+  // la distance fTL→vp) — pas un angle limite deviné. Sur les 4 presets
+  // réels, ce résidu est massif (>90% de la distance au VP) : les deux
+  // estimations indépendantes du même point de fuite ne s'accordent
+  // presque pas du tout, ce qui est une mesure DIRECTE que ces calibrations
+  // ne portent pas l'information de profondeur cohérente que le solveur
+  // requiert (même diagnostic que le Groupe 2, par une voie de mesure
+  // différente et complémentaire).
+  //
+  // Contrôle négatif (voir `_synth_vp_harness_test.dart`, groupe "Point
+  // 3-bis") : sur une scène SYNTHÉTIQUE bien conditionnée (8 points issus
+  // d'une seule projection cohérente), ce même résidu est nul à la
+  // précision machine (~1e-13 px, ~1e-15 en fraction) — la distinction
+  // entre "calibration cohérente" et "calibration incohérente" est donc
+  // sans ambiguïté, aucun seuil à la limite n'est nécessaire pour la
+  // démontrer.
+  // =========================================================================
+  group('Groupe 5 — résidu haut/bas (conditionnement), mesuré sur les 4 '
+      'presets réels — sans seuil deviné, juste le rapport de la mesure', () {
+    for (final key in kDemoSceneNativeSize.keys) {
+      test('$key : residualPx/residualFrac rapportés (pas de seuil ici)', () {
+        final cp = calibPointsFor(key);
+        final vp = VanishingPoint.compute(
+          fTL: cp.ceilL,
+          fTR: cp.ceilR,
+          fBL: cp.floorL,
+          fBR: cp.floorR,
+          wallTL: cp.wallTL,
+          wallTR: cp.wallTR,
+          wallBL: cp.wallBL,
+          wallBR: cp.wallBR,
+        );
+
+        expect(
+          vp.residualPx,
+          isNotNull,
+          reason: "preset '$key' : les deux couples (haut et bas) doivent "
+              'produire chacun une intersection finie pour cette '
+              'calibration — si `residualPx` est `null`, un seul couple a '
+              'réussi et ce test doit être adapté, pas relâché.',
+        );
+
+        // ignore: avoid_print
+        print('[groupe5-conditionnement] $key : residualPx='
+            '${vp.residualPx!.toStringAsFixed(1)}px  '
+            'residualFrac=${(vp.residualFrac! * 100).toStringAsFixed(1)}%  '
+            'vpTop_utilise=${vp.vp}');
+
+        // Ce test ne fixe PAS de seuil de rejet (ce serait deviner une
+        // limite) : il rapporte la mesure et vérifie seulement qu'elle est
+        // bien positive et finie (contrôle de sanité sur le calcul
+        // lui-même, pas sur la qualité de la calibration).
+        expect(vp.residualPx! >= 0, isTrue);
+        expect(vp.residualFrac! >= 0, isTrue);
+        expect(vp.residualPx!.isFinite, isTrue);
+      });
+    }
+  });
 }

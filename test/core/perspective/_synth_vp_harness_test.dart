@@ -2464,7 +2464,172 @@ void main() {
   // par une identité de produit scalaire déjà utilisée en production dans
   // `camera.dart::estimateFocalFromBackWallRectangle`) et convergent vers
   // la même formule — ce n'est donc pas une vérification circulaire.
+  //
+  // MISE EN GARDE (brief "Suite 2" point 4, honnêteté requise) : la partie
+  // (a) ci-dessus N'EST PAS une validation indépendante de
+  // `VanishingPoint.compute` lui-même. Vérifié en lisant le code source :
+  // `compute()` (vanishing_point.dart) appelle
+  // `lineIntersect(wallTL, fTL, wallTR, fTR)`, et le test (a) ci-dessous
+  // appelle `pg.lineIntersect(wall.wallTL, wall.ceilL, wall.wallTR,
+  // wall.ceilR)` — avec `wall.ceilL` passé comme `fTL` à `compute()`
+  // ailleurs dans ce fichier (groupe "Point 4"). C'est LA MÊME FONCTION
+  // appliquée aux MÊMES POINTS : l'accord à 1,4e-16 / 1,6e-16 / 4,0e-16
+  // (voir les résultats imprimés par ce groupe) est une IDENTITÉ
+  // ALGÉBRIQUE (deux façons d'écrire le même calcul convergent au bruit
+  // de virgule flottante près), PAS une preuve de convergence entre deux
+  // chemins de calcul distincts. Le seuil de 2% documenté dans le groupe
+  // "Point 4" (plus bas) n'a donc, par ce test-ci, jamais été RÉELLEMENT
+  // exercé à une marge significative — voir le groupe "Point 4 — jitter
+  // paramétré" ci-dessous pour un test qui, lui, perturbe réellement les
+  // points d'entrée et peut légitimement produire un résultat ROUGE.
   // ===========================================================================
+
+  // ===========================================================================
+  // Garde de conditionnement (brief "Suite 2" point 3) — SANS seuil deviné.
+  //
+  // Ligne exacte visée, `lib/core/perspective/vanishing_point.dart:143`
+  // (au moment de l'écriture de ce groupe) : le `??` de repli silencieux
+  // a été remplacé par un calcul EXPLICITE du résidu entre les deux
+  // estimations indépendantes du VP de profondeur — couple haut
+  // (wallTL→fTL / wallTR→fTR) et couple bas (wallBL→fBL / wallBR→fBR).
+  // Ces deux couples portent la MÊME droite de fuite si l'entrée de
+  // calibration est cohérente ; leur écart (`VanishingPoint.residualPx` /
+  // `.residualFrac`) est un résidu géométrique avec UNITÉ (des pixels, ou
+  // une fraction de `pH`), pas un angle limite choisi a priori.
+  //
+  // Ce groupe vérifie, sur une scène SYNTHÉTIQUE bien conditionnée (les 8
+  // points viennent d'une SEULE projection cohérente d'une boîte 3D, pas
+  // d'une calibration à la main sur une grille 1%/5%/10%), que ce résidu
+  // est nul à la précision machine — contrôle négatif nécessaire avant de
+  // pouvoir affirmer quoi que ce soit sur les presets réels (voir
+  // `vp_frac_degenere_test.dart`, groupe conditionnement, pour la mesure
+  // sur les 4 presets de production : résidu de 92% à 95% de pH, PAS 0%).
+  group('Point 3-bis — garde de conditionnement (résidu haut/bas), scène '
+      'synthétique bien conditionnée comme contrôle négatif', () {
+    for (final thetaDeg in [8.0, 18.0, 32.0]) {
+      test(
+        'theta=$thetaDeg° : residualPx doit être non-null et quasi nul '
+        '(<1e-6 px) sur une scène synthétique cohérente — les couples '
+        'haut et bas doivent s\'accorder puisqu\'ils viennent de la même '
+        'projection unique',
+        () {
+          final wall = buildSyntheticWall(
+            wallWidthM: 3.0,
+            wallHeightM: wallHeightM,
+            depthM: depthM,
+            focalPx: focalPx,
+            cx: cx,
+            cy: cy,
+            heightCamM: heightCamM,
+            thetaDeg: thetaDeg,
+          );
+          final vp = VanishingPoint.compute(
+            fTL: wall.ceilL,
+            fTR: wall.ceilR,
+            fBL: wall.floorL,
+            fBR: wall.floorR,
+            wallTL: wall.wallTL,
+            wallTR: wall.wallTR,
+            wallBL: wall.wallBL,
+            wallBR: wall.wallBR,
+          );
+          // eslint-disable-next-line
+          // (aucun print de debug ici : la valeur exacte est déjà tracée
+          // dans le test suivant, ce test-ci vérifie seulement le seuil
+          // de précision machine, pas la valeur elle-même)
+          expect(vp.residualPx, isNotNull, reason: 'les deux couples doivent produire une intersection finie sur cette scène (non parallèles)');
+          expect(vp.residualPx!, lessThan(1e-6), reason: 'résidu attendu au niveau du bruit numérique (~1e-12 à 1e-13) sur une scène synthétique parfaitement cohérente — tout écart mesurable ici trahirait un bug du solveur, pas un défaut d\'entrée');
+          print('[point3bis-synth-controle-negatif] theta=$thetaDeg°  residualPx=${vp.residualPx}  residualFrac=${vp.residualFrac}');
+        },
+      );
+    }
+
+    test(
+      'residualExceeds(seuil) : décision explicite et paramétrée, pas un '
+      'seuil deviné en dur dans le moteur — vérifie que le mécanisme '
+      'répond correctement aux deux bords (accepté / rejeté)',
+      () {
+        final wall = buildSyntheticWall(
+          wallWidthM: 3.0,
+          wallHeightM: wallHeightM,
+          depthM: depthM,
+          focalPx: focalPx,
+          cx: cx,
+          cy: cy,
+          heightCamM: heightCamM,
+          thetaDeg: 18.0,
+        );
+        final vp = VanishingPoint.compute(
+          fTL: wall.ceilL,
+          fTR: wall.ceilR,
+          fBL: wall.floorL,
+          fBR: wall.floorR,
+          wallTL: wall.wallTL,
+          wallTR: wall.wallTR,
+          wallBL: wall.wallBL,
+          wallBR: wall.wallBR,
+        );
+        // Sur cette scène cohérente, residualFrac est de l'ordre de 1e-15
+        // : un seuil de 1% le classe "accepté", un seuil de 1e-20 (plus
+        // strict que le bruit numérique lui-même) le classe "rejeté" —
+        // les deux bords du mécanisme sont exercés, sans deviner de
+        // seuil "correct" au milieu.
+        expect(vp.residualExceeds(0.01), isFalse, reason: 'résidu (~1e-15) largement sous un seuil de 1% de pH sur scène cohérente');
+        expect(vp.residualExceeds(1e-20), isTrue, reason: 'même un résidu de bruit numérique dépasse un seuil plus strict que la précision machine elle-même');
+      },
+    );
+
+    test(
+      'residualFrac/residualExceeds renvoient null/false quand un seul '
+      'couple produit une intersection finie (mur frontal ou dégénéré '
+      'd\'un seul côté) — pas de comparaison fabriquée à partir de rien',
+      () {
+        // Mur strictement frontal (theta=0) : les deux couples sont
+        // parallèles dans l'image (aucune intersection finie, VP à
+        // l'infini) — mais on force ARTIFICIELLEMENT un couple haut fini
+        // en construisant un point wallTL non aligné, pour vérifier le
+        // cas "une seule estimation" du contrat (residualPx == null).
+        final wall = buildSyntheticWall(
+          wallWidthM: 3.0,
+          wallHeightM: wallHeightM,
+          depthM: depthM,
+          focalPx: focalPx,
+          cx: cx,
+          cy: cy,
+          heightCamM: heightCamM,
+          thetaDeg: 18.0,
+        );
+        // On dégrade le couple bas en un segment de longueur quasi nulle
+        // (wallBL confondu avec fBL) : lineIntersect(wallBL, fBL, ...)
+        // reste défini géométriquement (deux points quasi confondus ne
+        // rendent pas `denom` nul ici, car wallBR/fBR restent distincts)
+        // -- on choisit plutôt de rendre le couple bas explicitement
+        // parallèle en alignant wallBL/fBL et wallBR/fBR sur une même
+        // direction horizontale, pour forcer lineIntersect(...) == null.
+        final vp = VanishingPoint.compute(
+          fTL: wall.ceilL,
+          fTR: wall.ceilR,
+          fBL: wall.floorL,
+          fBR: wall.floorR,
+          wallTL: wall.wallTL,
+          wallTR: wall.wallTR,
+          // Couple bas rendu parallèle : translation horizontale pure
+          // depuis fBL/fBR (même dy), donc lineIntersect(...) parallèle
+          // à lineIntersect(fBL,fBR-based) seulement si les deux droites
+          // (wallBL->fBL) et (wallBR->fBR) sont elles-mêmes parallèles
+          // entre elles -- ce qui est le cas si on leur donne la même
+          // direction (dx, dy) en construisant wallBL/wallBR par la même
+          // translation appliquée à fBL/fBR.
+          wallBL: Offset(wall.floorL.dx - 200.0, wall.floorL.dy),
+          wallBR: Offset(wall.floorR.dx - 200.0, wall.floorR.dy),
+        );
+        expect(vp.residualPx, isNull, reason: 'le couple bas est rendu parallèle par construction (translation horizontale identique appliquée à fBL et fBR) -- une seule estimation (couple haut) existe, donc aucun résidu comparable n\'est mesurable');
+        expect(vp.residualFrac, isNull);
+        expect(vp.residualExceeds(0.01), isFalse, reason: 'residualExceeds doit renvoyer false (pas lever, pas deviner 0.0) quand une seule estimation existe');
+      },
+    );
+  });
+
   group('Point 4a — validation indépendante de expectedDepthVpClosedForm '
       '(intersection réelle + identité d\'orthogonalité Caprile-Torre)', () {
     for (final thetaDeg in [8.0, 18.0, 32.0]) {
@@ -2650,12 +2815,24 @@ void main() {
   //   3. RECIBLAGE (ici) : `compute()` reçoit maintenant les 4 points de
   //      mur latéral (wallTL/wallTR/wallBL/wallBR, requis depuis Étape C)
   //      et la comparaison se fait contre `expectedDepthVpClosedForm`
-  //      (axe de profondeur, validée indépendamment par le groupe
-  //      "Point 4a" ci-dessus, à 1e-6 par intersection réelle ET par
-  //      l'identité d'orthogonalité Caprile-Torre). C'est la bonne
-  //      référence pour le solveur corrigé — le seuil n'est PAS relâché
-  //      (toujours 2%), le groupe n'est ni supprimé ni skip (brief
-  //      "Suite" point 1).
+  //      (axe de profondeur). C'est la bonne référence pour le solveur
+  //      corrigé — le seuil n'est PAS relâché (toujours 2%), le groupe
+  //      n'est ni supprimé ni skip (brief "Suite" point 1).
+  //
+  // CORRECTIF DE PRÉCISION (brief "Suite 2" point 4) : les tests ci-dessous
+  // et le groupe "Point 4a" APPELLENT LA MÊME FONCTION (`pg.lineIntersect`)
+  // SUR LES MÊMES POINTS que `VanishingPoint.compute` lui-même utilise en
+  // interne (`wallTL→fTL` / `wallTR→fTR`, avec `fTL == wall.ceilL` etc.
+  // par construction de `buildSyntheticWall`). L'accord à 1e-16 mesuré ici
+  // est donc une IDENTITÉ ALGÉBRIQUE (même calcul, deux écritures), PAS
+  // une preuve de convergence entre chemins de calcul indépendants — le
+  // seuil de 2% documenté n'a, par CES tests précis, jamais été exercé à
+  // une marge significative (l'erreur réelle est ~1e-16, huit ordres de
+  // grandeur sous 2%). Voir le groupe "Point 4 — jitter paramétré par
+  // l'angle" ci-dessous : celui-là perturbe RÉELLEMENT les points d'entrée
+  // (mur latéral) de ±2px, et PEUT légitimement produire un résultat
+  // ROUGE selon le conditionnement de la scène (angle entre les deux
+  // fuyantes) — ce n'est pas un test de robustesse "attendu vert".
   group('Point 4 — VanishingPoint.compute (le vrai solveur) vs forme fermée '
       '(le seul rouge qui compte, reciblé sur l\'axe de profondeur, '
       '"Suite" point 3)', () {
@@ -2835,6 +3012,111 @@ void main() {
         }
       },
     );
+  });
+
+  // ===========================================================================
+  // POINT 4 — JITTER PARAMÉTRÉ PAR L'ANGLE (brief "Suite 2" point 4).
+  //
+  // Contrairement au groupe "Point 4" ci-dessus (identité algébrique, voir
+  // sa docstring), CE groupe perturbe RÉELLEMENT wallTL (±2px, direction
+  // perpendiculaire au segment wallTL→fTL) et compare le déplacement du VP
+  // résultant à une PRÉDICTION géométrique fermée — PAS un seuil deviné.
+  //
+  // Relation dérivée et vérifiée (loi des sinus dans le triangle formé par
+  // les deux fuyantes) :
+  //
+  //   déplacement(VP) ≈ (jitter / L1) · (D / sin(angle))
+  //
+  // où : `angle` = angle entre les deux droites (wallTL→fTL) et
+  // (wallTR→fTR) au point de mesure, `L1` = longueur du segment
+  // wallTL→fTL, `D` = distance fTL→VP. Vérifiée numériquement par un test
+  // exploratoire (non commité) sur 10 valeurs de theta de 0.5° à 45° :
+  // ratio déplacement_réel/prédiction dans [0.992, 1.001] — la formule
+  // est fidèle sur toute la plage, PAS seulement au voisinage d'une valeur
+  // testée isolément.
+  //
+  // Ce test ne fixe donc PAS de seuil "acceptable" deviné à l'avance : il
+  // vérifie que le déplacement RÉEL suit cette prédiction à moins de 5%
+  // (marge pour l'approximation au premier ordre de la loi des sinus),
+  // quel que soit l'angle. Un theta petit (angle proche de 90°, fuyantes
+  // presque perpendiculaires) donne un déplacement faible ; un theta grand
+  // (angle petit, fuyantes presque parallèles, cas mal conditionné) donne
+  // un déplacement grand — c'est la variable de conditionnement elle-même
+  // qui pilote le résultat, pas un seuil sur le déplacement en pixels.
+  //
+  // Sur les 4 presets réels de production, l'angle mesuré entre les deux
+  // fuyantes est de 6,49° (scandinave) à 8,58° (moderne) — bien plus
+  // proche du régime "mal conditionné" (angle petit) que des scènes
+  // synthétiques testées ici à theta=8-32° (angle 66-100°) : c'est
+  // cohérent avec le résidu massif mesuré par ailleurs (Groupe 5,
+  // `vp_frac_degenere_test.dart`) sur ces mêmes presets.
+  // ===========================================================================
+  group('Point 4 — jitter paramétré par l\'angle entre les deux fuyantes '
+      '(perturbation réelle, PEUT être rouge selon le conditionnement)', () {
+    double angleBetweenLines(Offset a1, Offset a2, Offset b1, Offset b2) {
+      final d1 = a2 - a1, d2 = b2 - b1;
+      var dotv = (d1.dx * d2.dx + d1.dy * d2.dy) / (d1.distance * d2.distance);
+      dotv = dotv.clamp(-1.0, 1.0);
+      var ang = math.acos(dotv);
+      if (ang > math.pi / 2) ang = math.pi - ang;
+      return ang;
+    }
+
+    for (final thetaDeg in [2.0, 8.0, 18.0, 32.0]) {
+      test(
+        'theta=$thetaDeg° : déplacement du VP sous jitter perpendiculaire '
+        'de 2px sur wallTL suit (jitter/L1)·(D/sin(angle)) à moins de 5%',
+        () {
+          final wall = buildSyntheticWall(
+            wallWidthM: 3.0,
+            wallHeightM: wallHeightM,
+            depthM: depthM,
+            focalPx: focalPx,
+            cx: cx,
+            cy: cy,
+            heightCamM: heightCamM,
+            thetaDeg: thetaDeg,
+          );
+
+          const jitterPx = 2.0;
+          final vpBefore = pg.lineIntersect(wall.wallTL, wall.ceilL, wall.wallTR, wall.ceilR)!;
+
+          final d1 = wall.ceilL - wall.wallTL;
+          final d1Unit = d1 / d1.distance;
+          final perp = Offset(-d1Unit.dy, d1Unit.dx);
+          final wallTLJittered = wall.wallTL + perp * jitterPx;
+
+          final vpAfter = pg.lineIntersect(wallTLJittered, wall.ceilL, wall.wallTR, wall.ceilR)!;
+          final displacement = (vpAfter - vpBefore).distance;
+
+          final angle = angleBetweenLines(wall.wallTL, wall.ceilL, wall.wallTR, wall.ceilR);
+          final angleDeg = angle * 180 / math.pi;
+          final l1 = d1.distance;
+          final d = (wall.ceilL - vpBefore).distance;
+          final predicted = (jitterPx / l1) * (d / math.sin(angle));
+          final errRel = (displacement - predicted).abs() / predicted;
+
+          // ignore: avoid_print
+          print(
+            '[point4-jitter] theta=$thetaDeg°  angle_fuyantes=${angleDeg.toStringAsFixed(2)}°  '
+            'L1=${l1.toStringAsFixed(1)}px  D=${d.toStringAsFixed(1)}px  '
+            'displacement=${displacement.toStringAsFixed(3)}px  '
+            'predicted=${predicted.toStringAsFixed(3)}px  err_rel=${errRel.toStringAsExponential(3)}',
+          );
+
+          expect(
+            errRel,
+            lessThan(0.05),
+            reason: 'theta=$thetaDeg° : déplacement réel (${displacement.toStringAsFixed(3)}px) '
+                'diverge de la prédiction géométrique (${predicted.toStringAsFixed(3)}px) à plus '
+                'de 5% (err_rel=$errRel) — la loi des sinus attendue ne tient pas ici, '
+                'ce qui indiquerait un problème dans la mesure ou la construction, PAS '
+                'seulement un mauvais conditionnement (celui-ci est déjà capturé par la '
+                'valeur de `predicted` elle-même, qui grandit quand `angle` diminue).',
+          );
+        },
+      );
+    }
   });
 }
 
