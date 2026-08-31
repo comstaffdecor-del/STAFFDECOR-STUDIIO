@@ -51,16 +51,28 @@ import 'package:staff_decor_studio/models/persp_calib.dart';
 class _SyntheticWallCorners {
   final Camera3D camera;
   final Offset ceilL, ceilR, floorL, floorR;
+  final Offset wallTL, wallTR, wallBL, wallBR;
   const _SyntheticWallCorners({
     required this.camera,
     required this.ceilL,
     required this.ceilR,
     required this.floorL,
     required this.floorR,
+    required this.wallTL,
+    required this.wallTR,
+    required this.wallBL,
+    required this.wallBR,
   });
 }
 
-/// Construit la scène synthétique et projette ses 4 coins.
+/// Construit la scène synthétique et projette ses 4 coins du mur du fond,
+/// PLUS 4 points de mur latéral (wallTL/wallTR/wallBL/wallBR), situés à
+/// [nearOffsetM] mètres plus proches de la caméra que le mur du fond, le
+/// long de l'axe de PROFONDEUR (direction normale au mur, dans le plan
+/// horizontal) — nécessaires pour alimenter `VanishingPoint.compute` (qui
+/// requiert désormais ces 4 points, voir Étape C) et pour construire
+/// [expectedDepthVpClosedForm] par intersection réelle indépendante
+/// (double projection, voir plus bas).
 ///
 /// [thetaDeg] : azimut du mur du fond par rapport au plan image (0 =
 /// strictement frontal). [pitchDeg] : tangage caméra (0 = configuration de
@@ -75,6 +87,7 @@ _SyntheticWallCorners buildSyntheticWall({
   required double heightCamM,
   required double thetaDeg,
   double pitchDeg = 0.0,
+  double nearOffsetM = 1.0,
 }) {
   final theta = thetaDeg * math.pi / 180.0;
   final pitch = pitchDeg * math.pi / 180.0;
@@ -83,12 +96,27 @@ _SyntheticWallCorners buildSyntheticWall({
   // par rapport à l'axe X (theta=0 -> mur strictement parallèle au plan
   // image, perpendiculaire à l'axe de visée -Z).
   final u = Vector3(math.cos(theta), 0.0, math.sin(theta));
+  // Direction normale au mur (axe de PROFONDEUR), dans le plan horizontal,
+  // orientée vers la caméra (s'éloigne du mur du fond en direction de
+  // l'objectif) : u et n sont orthogonales par construction
+  // (u·n = cosθ·sinθ + sinθ·(-cosθ) = 0), propriété utilisée plus bas pour
+  // valider [expectedDepthVpClosedForm] par l'identité d'orthogonalité
+  // Caprile-Torre.
+  final n = Vector3(math.sin(theta), 0.0, -math.cos(theta));
   final center = Vector3(0.0, 0.0, -depthM);
 
   final ceilLWorld = center + u * (-wallWidthM / 2) + Vector3(0, wallHeightM, 0);
   final ceilRWorld = center + u * (wallWidthM / 2) + Vector3(0, wallHeightM, 0);
   final floorLWorld = center + u * (-wallWidthM / 2);
   final floorRWorld = center + u * (wallWidthM / 2);
+
+  // Points de mur latéral : mêmes coins, translatés de nearOffsetM le long
+  // de n (vers la caméra) — modélise un mur latéral réel qui rejoint le
+  // mur du fond à angle droit.
+  final wallTLWorld = ceilLWorld + n * nearOffsetM;
+  final wallTRWorld = ceilRWorld + n * nearOffsetM;
+  final wallBLWorld = floorLWorld + n * nearOffsetM;
+  final wallBRWorld = floorRWorld + n * nearOffsetM;
 
   final eye = Vector3(0.0, heightCamM, 0.0);
   final forward = Vector3(0.0, -math.sin(pitch), -math.cos(pitch));
@@ -110,6 +138,10 @@ _SyntheticWallCorners buildSyntheticWall({
     ceilR: proj(ceilRWorld),
     floorL: proj(floorLWorld),
     floorR: proj(floorRWorld),
+    wallTL: proj(wallTLWorld),
+    wallTR: proj(wallTRWorld),
+    wallBL: proj(wallBLWorld),
+    wallBR: proj(wallBRWorld),
   );
 }
 
@@ -134,6 +166,87 @@ Offset expectedVpClosedForm({
   final theta = thetaDeg * math.pi / 180.0;
   final pitch = pitchDeg * math.pi / 180.0;
   final vpX = cx - focalPx * math.cos(theta) / (math.cos(pitch) * math.sin(theta));
+  final vpY = cy - focalPx * math.tan(pitch);
+  return Offset(vpX, vpY);
+}
+
+/// Point de fuite de l'axe de PROFONDEUR (celui de `VanishingPoint.compute`
+/// depuis le correctif Étape C, et le seul pertinent pour `toward()`/
+/// `frac()`) — forme fermée dérivée, PAS un script jetable.
+///
+/// ## Dérivation 1 — identité d'orthogonalité (Caprile-Torre)
+///
+/// L'axe horizontal du mur du fond (azimut theta par rapport au plan
+/// image) et l'axe de profondeur (normal à ce mur, dans le plan
+/// horizontal) sont ORTHOGONAUX dans le monde réel — par construction,
+/// [buildSyntheticWall] définit `u = (cosθ, 0, sinθ)` (direction du mur)
+/// et `n = (sinθ, 0, -cosθ)` (normale, axe de profondeur) : `u·n =
+/// cosθ·sinθ − sinθ·cosθ = 0`, exactement orthogonaux quel que soit theta.
+///
+/// La méthode des points de fuite orthogonaux (Caprile-Torre, déjà
+/// implémentée côté production dans
+/// `lib/core/geometry/camera.dart::estimateFocalFromBackWallRectangle`)
+/// donne, pour deux directions orthogonales du monde projetées en deux VP
+/// image `v_h` (horizontal) et `v_d` (profondeur), à point principal `c` :
+///
+///   (v_h − c) · (v_d − c) = −f²
+///
+/// À tangage nul, `expectedVpClosedForm` donne `v_h.x − cx = −f·cosθ/sinθ`
+/// (et `v_h.y = cy`, sur l'axe horizontal de l'image, orthogonal à l'axe Y
+/// de l'image donc son produit scalaire avec l'axe profondeur ne porte que
+/// sur x). En posant `v_d.y = cy` (l'axe de profondeur reste, comme
+/// l'horizontal, dans le plan Y=heightCamM de la caméra à tangage nul —
+/// pas de composante verticale) :
+///
+///   (v_h.x − cx)(v_d.x − cx) = −f²
+///   v_d.x − cx = −f² / (v_h.x − cx) = −f² / (−f·cosθ/sinθ) = f·sinθ/cosθ
+///   v_d.x = cx + f·tanθ
+///
+/// Exemple numérique cité dans le brief (theta=8°, f=1400, cx=960) :
+/// `v_h.x = -9001.5` (donné par `expectedVpClosedForm`), `v_d.x = 1156.76`
+/// (donné par la formule ci-dessus) → `(−9001.5−960)(1156.76−960) =
+/// −9961.5 × 196.76 = −1 960 274 ≈ −1400² = −1 960 000` (écart ≈0.014%,
+/// arrondi des deux facteurs) — c'est la vérification numérique du brief.
+///
+/// ## Dérivation 2 — limite de projection directe (avec tangage), pour
+/// généraliser à `pitch != 0` sans re-passer par l'identité ci-dessus
+/// (qui suppose `v_d.y = cy`, vrai seulement à tangage nul)
+///
+/// Pour la caméra construite par `Camera3D.lookingAt(eye, eye+forward)`
+/// avec `forward = (0, −sinp, −cosp)`, `worldUp = (0,1,0)` : l'axe `right`
+/// de la caméra est TOUJOURS `(1,0,0)` exactement (le produit vectoriel
+/// `worldUp × back` reste colinéaire à X quel que soit le tangage, car
+/// `back` n'a pas de composante X) — `up = (0, cosp, −sinp)`, `back =
+/// (0, sinp, cosp)`. En projetant un point `P0 + n·t` le long de l'axe de
+/// profondeur `n` et en prenant la limite `t → ∞` (où le rapport des
+/// coefficients dominants de `t` donne le point de fuite, par définition) :
+///
+///   pixel.x → cx + f·(right·n) / (−(back·n))
+///   pixel.y → cy − f·(up·n) / (−(back·n))
+///
+/// Avec `n = (sinθ, 0, −cosθ)` : `right·n = sinθ`, `back·n = −cosp·cosθ`,
+/// `up·n = sinp·cosθ`, d'où :
+///
+///   vp.x = cx + f·sinθ / (cosp·cosθ) = cx + f·tanθ / cosp
+///   vp.y = cy − f·sinp·cosθ / (cosp·cosθ) = cy − f·tanp
+///
+/// Identique à la dérivation 1 à tangage nul (`cosp=1` → `vp.x = cx +
+/// f·tanθ`), et la généralise à tangage non nul — les deux méthodes sont
+/// indépendantes (l'une algébrique via l'identité d'orthogonalité, l'autre
+/// géométrique via la limite de projection) et convergent bit pour bit
+/// (voir groupe de test "Point 4a" ci-dessous, qui vérifie CETTE
+/// convergence explicitement, en plus de la comparer à `lineIntersect` sur
+/// les points synthétiques projetés).
+Offset expectedDepthVpClosedForm({
+  required double focalPx,
+  required double cx,
+  required double cy,
+  required double thetaDeg,
+  double pitchDeg = 0.0,
+}) {
+  final theta = thetaDeg * math.pi / 180.0;
+  final pitch = pitchDeg * math.pi / 180.0;
+  final vpX = cx + focalPx * math.tan(theta) / math.cos(pitch);
   final vpY = cy - focalPx * math.tan(pitch);
   return Offset(vpX, vpY);
 }
