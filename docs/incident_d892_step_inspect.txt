@@ -1,0 +1,100 @@
+step_text_inspect.py — inspection texte brute (sans OCP)
+Genere le : 2026-08-31T09:06:21
+Methode : comptage d'occurrences de mots-cles topologiques + distribution des tailles de courbes B-spline. Voir docstring du script pour la limite explicite (lecture declarative, pas une preuve geometrique formelle).
+
+=== D615.stp ===
+  chemin        : assets/step/D615.stp
+  taille        : 2298785 octets
+  sha256        : ed38a2661bb33f373e74b04e53279c3f8ea32ec7f396425141120e290110145b
+  nb entites    : 29397
+  mots-cles topologiques (occurrences, pas des lignes) :
+    MANIFOLD_SOLID_BREP            1
+    BREP_WITH_VOIDS                0
+    SHELL_BASED_SURFACE_MODEL      0
+    CLOSED_SHELL                   1
+    OPEN_SHELL                     0
+    ADVANCED_FACE                  552
+    B_SPLINE_SURFACE_WITH_KNOTS    528
+  B_SPLINE_CURVE_WITH_KNOTS : 1204 courbes, mediane=7 points de controle (proxy via refs '#N')
+    -> aucune courbe aberrante detectee au seuil choisi
+
+=== D629.stp ===
+  chemin        : assets/step/D629.stp
+  taille        : 1045858 octets
+  sha256        : a4f3e521fea635a38958883481fdba550986efb3efba55939401d612b4ecef86
+  nb entites    : 20781
+  mots-cles topologiques (occurrences, pas des lignes) :
+    MANIFOLD_SOLID_BREP            1
+    BREP_WITH_VOIDS                0
+    SHELL_BASED_SURFACE_MODEL      0
+    CLOSED_SHELL                   1
+    OPEN_SHELL                     0
+    ADVANCED_FACE                  667
+    B_SPLINE_SURFACE_WITH_KNOTS    0
+  B_SPLINE_CURVE_WITH_KNOTS : 956 courbes, mediane=4 points de controle (proxy via refs '#N')
+    -> aucune courbe aberrante detectee au seuil choisi
+
+=== D802.stp ===
+  chemin        : assets/step/D802.stp
+  taille        : 37189 octets
+  sha256        : d350b286c023f32dbfd4b9d897c9c89f0026dc699b1e686ad1b1dd125622b7dd
+  nb entites    : 704
+  mots-cles topologiques (occurrences, pas des lignes) :
+    MANIFOLD_SOLID_BREP            1
+    BREP_WITH_VOIDS                0
+    SHELL_BASED_SURFACE_MODEL      0
+    CLOSED_SHELL                   1
+    OPEN_SHELL                     0
+    ADVANCED_FACE                  19
+    B_SPLINE_SURFACE_WITH_KNOTS    0
+  B_SPLINE_CURVE_WITH_KNOTS : 41 courbes, mediane=4 points de controle (proxy via refs '#N')
+    -> aucune courbe aberrante detectee au seuil choisi
+
+=== D880.stp ===
+  chemin        : assets/step/D880.stp
+  taille        : 265811 octets
+  sha256        : fa985adb5c0c5d52696c4736fd38640edf70fe465870c603f56b007371f46048
+  nb entites    : 4507
+  mots-cles topologiques (occurrences, pas des lignes) :
+    MANIFOLD_SOLID_BREP            1
+    BREP_WITH_VOIDS                0
+    SHELL_BASED_SURFACE_MODEL      0
+    CLOSED_SHELL                   1
+    OPEN_SHELL                     0
+    ADVANCED_FACE                  85
+    B_SPLINE_SURFACE_WITH_KNOTS    0
+  B_SPLINE_CURVE_WITH_KNOTS : 51 courbes, mediane=28 points de controle (proxy via refs '#N')
+    -> aucune courbe aberrante detectee au seuil choisi
+
+=== D887.step ===
+  chemin        : assets/step/D887.step
+  taille        : 750302 octets
+  sha256        : 6590dc202157fa76b1cf087e3c35a38674eb7c9cc978a5bc45e29a8df3564f01
+  nb entites    : 11676
+  mots-cles topologiques (occurrences, pas des lignes) :
+    MANIFOLD_SOLID_BREP            1
+    BREP_WITH_VOIDS                0
+    SHELL_BASED_SURFACE_MODEL      0
+    CLOSED_SHELL                   1
+    OPEN_SHELL                     0
+    ADVANCED_FACE                  262
+    B_SPLINE_SURFACE_WITH_KNOTS    41
+  B_SPLINE_CURVE_WITH_KNOTS : 114 courbes, mediane=6 points de controle (proxy via refs '#N')
+    -> aucune courbe aberrante detectee au seuil choisi
+
+=== D892.stp ===
+  chemin        : assets/step/D892.stp
+  taille        : 10315135 octets
+  sha256        : d4fa64dc2fc056404328271c63ddb6a19d085a8ccfe032e416dfe76e0cf3f94a
+  nb entites    : 103995
+  mots-cles topologiques (occurrences, pas des lignes) :
+    MANIFOLD_SOLID_BREP            1
+    BREP_WITH_VOIDS                0
+    SHELL_BASED_SURFACE_MODEL      0
+    CLOSED_SHELL                   1
+    OPEN_SHELL                     0
+    ADVANCED_FACE                  273
+    B_SPLINE_SURFACE_WITH_KNOTS    3
+  B_SPLINE_CURVE_WITH_KNOTS : 545 courbes, mediane=34 points de controle (proxy via refs '#N')
+    -> 4 courbe(s) aberrante(s) (> 1000 points) : [6894, 6828, 6826, 5032]
+    -> ces courbes concentrent 25580/42465 references de points (60.2%)
