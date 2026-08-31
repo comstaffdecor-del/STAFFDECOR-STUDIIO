@@ -1,116 +1,218 @@
-/// Modèle de point de fuite (VP) — perspective à 1 point de fuite.
+/// Modèle de point de fuite (VP) — perspective à 1 point de fuite,
+/// axe de PROFONDEUR (celui utilisé par [toward]/[frac] pour faire reculer
+/// une face plafond/sol de corniche/plinthe vers l'intérieur de la pièce).
 ///
-/// ⚠️ CORRECTION Bug #4/#5 (audit rendering) : l'ancienne version avait
-/// TROIS moteurs de perspective incompatibles :
-///   1. `_drawSliderCornicePlinth` — bandes plates, AUCUNE perspective
-///      (STATE.corniceYPct / STATE.plinthYPct, `_ctx.fillRect` horizontal)
-///   2. `renderProductOnPhoto` — VP heuristique approximatif
-///      (`vpX = milieu(fTL,fTR)`, `vpY = fTL.y - 0.10*(fBL.y-fTL.y)`,
-///      jamais un vrai point d'intersection géométrique)
-///   3. `comparateur.js/_perspPoints` — VP à pourcentages FIXES
-///      (`vpX = w*0.50`, `vpY = h*0.40`), sans lien avec la calibration
+/// Le VP est calculé par intersection des deux droites qui portent
+/// RÉELLEMENT l'axe de profondeur dans l'image : la ligne mur-latéral-
+/// gauche → coin-haut-gauche-du-fond (wallTL→fTL) et son symétrique côté
+/// droit (wallTR→fTR) — ces deux droites sont les images de deux droites
+/// parallèles du monde réel (toutes deux orientées selon l'axe qui
+/// s'enfonce dans la pièce, perpendiculairement au mur du fond), donc leur
+/// intersection est, par construction géométrique (pas une approximation),
+/// le point de fuite de CET axe. Le couple bas (wallBL→fBL / wallBR→fBR)
+/// donne la même droite de fuite et sert de repli si le couple haut est
+/// dégénéré.
 ///
-/// ⚠️ CORRECTION (conflation double-VP, ce commit) — la version
-/// précédente de cette factory calculait `vp` par
-/// `lineIntersect(fTL, fTR, fBL, fBR)` : l'intersection de la ligne
-/// plafond et de la ligne sol. Ces deux droites sont COPLANAIRES dans le
-/// mur du fond — leur intersection est le point de fuite de l'AXE
-/// HORIZONTAL du mur du fond (le point vers lequel convergeraient des
-/// lignes horizontales de CE mur si la photo n'était pas frontale), pas
-/// celui de l'axe de PROFONDEUR (l'axe qui s'enfonce dans la pièce,
-/// perpendiculaire au mur du fond — c'est CET axe que `toward()`/`frac()`
-/// doivent utiliser pour faire reculer la face plafond/sol d'une
-/// corniche/plinthe vers l'intérieur de la pièce). Sur les 4 photos démo,
-/// mur du fond quasi-frontal, ces deux droites sont quasi-parallèles :
-/// `lineIntersect` renvoyait soit `null` (repli sur le milieu de
-/// `fTL→fTR`, un point qui ne dépend d'aucune fuyante réelle), soit un
-/// point à des dizaines de milliers de pixels hors cadre (petit écart de
-/// pente réel, intersection qui explose) — les deux régimes dégénérés
-/// documentés par `test/core/perspective/vp_frac_degenere_test.dart`.
-///
-/// Le VP de profondeur correct, pour une prise quasi-frontale à un seul
-/// point de fuite (cas des 4 scènes démo — vérifié : AUCUN vrai coin de
-/// mur latéral n'y est mesurable, voir plus bas), est le CENTRE
-/// géométrique du mur du fond photographié : centre horizontal (moyenne
-/// des 4 abscisses `fTL/fTR/fBL/fBR`) et mi-hauteur entre la ligne
-/// plafond et la ligne sol (l'horizon, au niveau des yeux de la caméra).
-/// C'est la construction standard de la perspective à un point quand
-/// l'axe optique est aligné avec l'axe de profondeur : aucune fuyante
-/// latérale n'est nécessaire pour la déterminer.
-///
-/// Un VP de profondeur par intersection de vraies fuyantes latérales
-/// (utilisant les points `wallTL/wallTR/wallBL/wallBR` de `PerspCalib`)
-/// resterait pertinent pour une photo avec un VRAI coin de mur oblique
-/// visible — non implémenté ici : mesure pixel précise (grilles 5%,
-/// détection de gradient sous-pixel) effectuée sur les 4 photos démo
-/// actuelles, AUCUNE ne présente de coin latéral réel exploitable (les
-/// candidats visuels — ébrasements de porte/fenêtre, tuyaux de plafond,
-/// bord de rideau, cloison de séparation — sont soit des plans sans
-/// récession mesurable, soit des arêtes incohérentes selon la hauteur,
-/// jamais une seule arête convergente cohérente). Ce cas n'a donc aucune
-/// donnée réelle pour être écrit ni validé maintenant ; la signature de
-/// [compute] reste volontairement à 4 points tant qu'aucun call site réel
-/// n'en a besoin.
+/// Représentation en coordonnées homogènes `(x, y, w)` : `w = 1` pour un
+/// point fini (cas courant, mur du fond avec un angle réel même faible),
+/// `w = 0` pour un point à l'infini (mur strictement frontal : les deux
+/// droites ci-dessus sont exactement parallèles dans l'image — cas normal
+/// de la perspective, pas une erreur). Dans ce dernier cas, `(x, y)` porte
+/// la DIRECTION unitaire de l'axe de profondeur (plutôt que des
+/// coordonnées de position), et [toward] devient une simple translation
+/// selon cette direction au lieu d'une interpolation vers un point fini.
 library;
 
 import 'dart:ui';
-import 'persp_geometry.dart' show dist;
+import 'persp_geometry.dart' show dist, lineIntersect;
 
 /// Point de fuite réel + repères architecturaux dérivés de la
 /// calibration (mur du fond en pixels canvas).
 class VanishingPoint {
-  final Offset vp;
+  /// Coordonnées homogènes du VP : position finie si [w] == 1
+  /// (`vp == Offset(x, y)`), direction unitaire de l'axe de profondeur si
+  /// [w] == 0 (point à l'infini — mur strictement frontal).
+  final double x;
+  final double y;
+  final double w;
+
   final Offset fTL, fTR, fBL, fBR;
 
-  const VanishingPoint({
-    required this.vp,
+  const VanishingPoint._({
+    required this.x,
+    required this.y,
+    required this.w,
     required this.fTL,
     required this.fTR,
     required this.fBL,
     required this.fBR,
   });
 
-  /// Calcule le VP de profondeur comme le centre géométrique du mur du
-  /// fond : abscisse moyenne des 4 coins, ordonnée à mi-hauteur entre la
-  /// ligne plafond (`fTL`/`fTR`) et la ligne sol (`fBL`/`fBR`). Voir la
-  /// docstring de la classe ci-dessus pour la justification complète
-  /// (correction de la conflation VP-horizontal / VP-profondeur).
+  /// Construction directe à partir d'un point FINI (`w = 1`) — pour les
+  /// sites d'appel (tests, démonstrations) qui connaissent déjà la
+  /// position du VP sans passer par [compute].
+  VanishingPoint({required Offset vp, required this.fTL, required this.fTR, required this.fBL, required this.fBR})
+    : x = vp.dx,
+      y = vp.dy,
+      w = 1.0;
+
+  /// Position du VP en coordonnées cartésiennes — valide seulement si
+  /// [w] != 0 (point fini). Lève une [StateError] explicite sinon : un
+  /// point à l'infini n'a pas de position, seulement une direction
+  /// ([direction]) — accéder à [vp] dans ce cas serait un bug d'appelant,
+  /// jamais silencieusement transformé en NaN/Infinity.
+  Offset get vp {
+    if (w == 0) {
+      throw StateError(
+        'VanishingPoint.vp : ce point de fuite est à l\'infini (w=0, mur '
+        'strictement frontal) — il n\'a pas de position finie, seulement '
+        'une direction (VanishingPoint.direction). Utiliser toward()/frac() '
+        'directement : ils gèrent nativement les deux cas (fini/infini).',
+      );
+    }
+    return Offset(x / w, y / w);
+  }
+
+  /// Direction unitaire de l'axe de profondeur — valide seulement si
+  /// [w] == 0 (point à l'infini). Pour un point fini, la direction locale
+  /// dépend du point de départ (voir [toward]) : pas de direction globale
+  /// unique, donc pas d'accesseur ici dans ce cas.
+  Offset get direction {
+    if (w != 0) {
+      throw StateError(
+        'VanishingPoint.direction : ce point de fuite est fini (w=$w) — '
+        'il n\'a pas de direction globale unique, utiliser toward()/frac() '
+        'qui calculent la direction locale (vers vp) point par point.',
+      );
+    }
+    return Offset(x, y);
+  }
+
+  /// `true` si ce VP est un point à l'infini (mur strictement frontal —
+  /// cas normal de la perspective, pas un cas d'erreur).
+  bool get isAtInfinity => w == 0;
+
+  /// Calcule le VP de PROFONDEUR par intersection des deux droites qui
+  /// portent réellement cet axe dans l'image : (wallTL→fTL) et
+  /// (wallTR→fTR) pour le couple haut, (wallBL→fBL) et (wallBR→fBR) pour
+  /// le couple bas (utilisé en repli si le couple haut est dégénéré). Ces
+  /// quatre points de mur latéral sont l'ENTRÉE DE PROFONDEUR requise :
+  /// [compute] ne peut renvoyer un VP de profondeur sans eux (contrairement
+  /// à l'ancienne version qui prenait la moyenne des 4 coins du mur du
+  /// fond — VP de l'axe horizontal conflaté avec celui de profondeur, ou
+  /// centre géométrique sans aucune fuyante réelle, voir historique dans
+  /// `docs/logs/` pour le diagnostic complet).
   ///
-  /// Ce point ne peut jamais être indéfini (contrairement à l'ancienne
-  /// version basée sur `lineIntersect`, qui pouvait renvoyer `null` sur
-  /// des droites parallèles) : c'est une simple moyenne, toujours
-  /// calculable, y compris quand le mur du fond est parfaitement
-  /// frontal — cas qui n'est plus un cas dégénéré à contourner par un
-  /// repli, mais le cas normal que cette formule traite nativement.
+  /// Lève un [ArgumentError] explicite si [wallTL]/[wallTR]/[wallBL]/
+  /// [wallBR] sont tous `null` (aucune entrée de profondeur fournie —
+  /// impossible de déterminer ni une position, ni même une direction).
+  ///
+  /// Lève un [ArgumentError] si une entrée de profondeur est fournie mais
+  /// que les deux couples (haut ET bas) sont dégénérés par coïncidence de
+  /// points (mur latéral de longueur nulle des deux côtés à la fois haut
+  /// ET bas — aucune direction n'est alors déductible, ce n'est pas un
+  /// point à l'infini valide, c'est une absence totale d'information de
+  /// profondeur malgré la présence des paramètres).
+  ///
+  /// Si les droites sont parallèles (mur strictement frontal, cas non
+  /// dégénéré et fréquent) : retourne un VP à l'infini (`w = 0`) portant
+  /// la direction unitaire de l'axe de profondeur.
   factory VanishingPoint.compute({
     required Offset fTL,
     required Offset fTR,
     required Offset fBL,
     required Offset fBR,
+    Offset? wallTL,
+    Offset? wallTR,
+    Offset? wallBL,
+    Offset? wallBR,
   }) {
-    final cx = (fTL.dx + fTR.dx + fBL.dx + fBR.dx) / 4;
-    final ceilY = (fTL.dy + fTR.dy) / 2;
-    final floorY = (fBL.dy + fBR.dy) / 2;
-    final cy = (ceilY + floorY) / 2;
-    final vp = Offset(cx, cy);
-    return VanishingPoint(vp: vp, fTL: fTL, fTR: fTR, fBL: fBL, fBR: fBR);
+    if (wallTL == null || wallTR == null || wallBL == null || wallBR == null) {
+      throw ArgumentError(
+        'VanishingPoint.compute : aucune entrée de profondeur fournie '
+        '(wallTL/wallTR/wallBL/wallBR requis, tous non-null) — sans ces '
+        'points de mur latéral, ni la position ni la direction de l\'axe '
+        'de profondeur ne peuvent être déterminées. Passer les 8 points '
+        'de la calibration complète (voir CalibCanvasPoints.fromCalib).',
+      );
+    }
+
+    // Couple haut, puis repli sur le couple bas si dégénéré (parallèles).
+    final vpTop = lineIntersect(wallTL, fTL, wallTR, fTR);
+    final vpBottom = lineIntersect(wallBL, fBL, wallBR, fBR);
+    final vpFinite = vpTop ?? vpBottom;
+    if (vpFinite != null) {
+      return VanishingPoint._(x: vpFinite.dx, y: vpFinite.dy, w: 1.0, fTL: fTL, fTR: fTR, fBL: fBL, fBR: fBR);
+    }
+
+    // Les deux couples sont parallèles (ou dégénérés) : tenter de
+    // reconstruire une direction à partir de l'un des deux segments
+    // latéraux (haut ou bas), le premier de longueur non nulle.
+    final dirTop = _directionOf(wallTL, fTL);
+    if (dirTop != null) {
+      return VanishingPoint._(x: dirTop.dx, y: dirTop.dy, w: 0.0, fTL: fTL, fTR: fTR, fBL: fBL, fBR: fBR);
+    }
+    final dirBottom = _directionOf(wallBL, fBL);
+    if (dirBottom != null) {
+      return VanishingPoint._(x: dirBottom.dx, y: dirBottom.dy, w: 0.0, fTL: fTL, fTR: fTR, fBL: fBL, fBR: fBR);
+    }
+
+    throw ArgumentError(
+      'VanishingPoint.compute : entrée de profondeur fournie mais '
+      'totalement dégénérée — wallTL coïncide avec fTL ET wallBL coïncide '
+      'avec fBL (segments latéraux de longueur nulle des deux côtés) : '
+      'aucune direction de profondeur n\'est déductible. Ce n\'est pas un '
+      'point à l\'infini valide (qui nécessite une direction connue), '
+      'c\'est une absence de calibration de mur latéral exploitable.',
+    );
+  }
+
+  /// Direction unitaire de `a`→`b`, ou `null` si `a` et `b` coïncident
+  /// (segment de longueur nulle, aucune direction déductible).
+  static Offset? _directionOf(Offset a, Offset b) {
+    final dx = b.dx - a.dx, dy = b.dy - a.dy;
+    final len = dist(a, b);
+    if (len < 1e-9) return null;
+    return Offset(dx / len, dy / len);
   }
 
   /// Hauteur perspective réelle du mur du fond (repère d'échelle pour
   /// dimensionner tous les produits, indépendant du letterboxing).
   double get pH => fBL.dy - fTL.dy;
 
-  /// Projette [p] vers le VP d'une fraction [frac] (0 = p, 1 = VP).
-  /// Port exact de `vpToward`.
-  Offset toward(Offset p, double frac) =>
-      Offset(p.dx + (vp.dx - p.dx) * frac, p.dy + (vp.dy - p.dy) * frac);
+  /// Projette [p] vers le VP d'une fraction [frac] (0 = p, 1 = VP pour un
+  /// point fini). Pour un VP à l'infini (`w = 0`), devient une TRANSLATION
+  /// pure de [p] selon la direction de l'axe de profondeur, sur une
+  /// distance de [frac] pixels (voir [VanishingPoint.frac], qui renvoie
+  /// alors directement `depthPx`, pas un ratio positionnel) — c'est la
+  /// projection parallèle correcte pour un mur strictement frontal (les
+  /// lignes de profondeur y sont réellement parallèles dans l'image, pas
+  /// convergentes).
+  Offset toward(Offset p, double frac) {
+    if (w == 0) {
+      return Offset(p.dx + x * frac, p.dy + y * frac);
+    }
+    final vpPos = Offset(x / w, y / w);
+    return Offset(p.dx + (vpPos.dx - p.dx) * frac, p.dy + (vpPos.dy - p.dy) * frac);
+  }
 
-  /// Convertit une profondeur en pixels canvas en fraction de
-  /// convergence vers le VP, plafonnée à 0.45 — port exact de `vpFrac`.
+  /// Convertit une profondeur en pixels canvas en fraction de convergence
+  /// vers le VP — port de `vpFrac`, SANS le plafonnement à 0.45 de
+  /// l'ancienne version (artefact d'origine, retiré : rien dans la
+  /// géométrie ne justifie de tronquer la convergence à cette valeur
+  /// précise, voir brief définitif Étapes B/C point 7).
+  ///
+  /// Pour un VP à l'infini (`w = 0`), il n'y a pas de "distance au VP"
+  /// (infinie par définition) : la valeur renvoyée est directement
+  /// [depthPx], interprétée par [toward] comme une magnitude de
+  /// translation en pixels selon la direction de l'axe de profondeur —
+  /// c'est la sémantique de projection parallèle attendue pour un mur
+  /// strictement frontal.
   double frac(Offset p, double depthPx) {
-    final d = dist(p, vp);
+    if (w == 0) return depthPx;
+    final vpPos = Offset(x / w, y / w);
+    final d = dist(p, vpPos);
     final distVp = d == 0 ? 1.0 : d;
-    final f = depthPx / distVp;
-    return f > 0.45 ? 0.45 : f;
+    return depthPx / distVp;
   }
 }

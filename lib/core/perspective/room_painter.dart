@@ -141,6 +141,10 @@ class RoomPainter extends CustomPainter {
       fTR: cp.ceilR,
       fBL: cp.floorL,
       fBR: cp.floorR,
+      wallTL: cp.wallTL,
+      wallTR: cp.wallTR,
+      wallBL: cp.wallBL,
+      wallBR: cp.wallBR,
     );
     final pH = vp.pH;
 

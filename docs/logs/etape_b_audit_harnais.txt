@@ -1,0 +1,111 @@
+Étape B — audit de test/core/perspective/_synth_vp_harness_test.dart
+(2331 lignes, 25 assertions/test, toutes vertes sur HEAD 4a01dc7).
+
+CONFIRMATION STRUCTURELLE (grep exhaustif) :
+  imports du fichier -> dart:math, flutter_test, vector_math_64,
+  core/geometry/camera.dart, core/perspective/persp_geometry.dart (as pg,
+  pour lineIntersect), models/persp_calib.dart.
+  AUCUN import de core/perspective/vanishing_point.dart.
+  Seules mentions de "VanishingPoint" dans le fichier : 3 commentaires
+  (lignes 161, 1829, 2307) et une classe locale _MiniVp (ligne ~2322,
+  réplique manuelle de toward(), PAS la classe réelle).
+
+  => Le solveur de production (VanishingPoint.compute) n'est appelé NULLE
+  PART dans ce fichier. Toutes les assertions comparent :
+    - pg.lineIntersect(...) [le solveur PARTIEL générique, pas
+      VanishingPoint] contre expectedVpClosedForm (analytique)
+    - Camera3D.project/unproject (analytique) contre lui-même ou contre
+      des faits de conception documentés (wallNormal fixe, plan frontal)
+    - des fonctions de classification pures (classifyOnSigmaMax,
+      classifyOnSigmaMaxRange) contre des seuils qu'elles définissent
+      elles-mêmes
+  C'est pour cette raison structurelle que la réécriture de
+  VanishingPoint.compute (lineIntersect+repli -> VP-centre, commit
+  47c17eca) n'a fait échouer AUCUNE assertion de ce fichier : aucune
+  n'observe le code qui a changé.
+
+LISTE DES 25 TEST() AVEC VERDICT "teste le solveur / ne teste pas le solveur" :
+
+Groupe "Point 1 — générateur direct : lineIntersect vs forme fermée" (l.415)
+  1. theta=1.0° : vp(lineIntersect)==vp(forme fermée)     -- NE TESTE PAS
+  2. theta=2.0° : idem                                     -- NE TESTE PAS
+  3. theta=5.0° : idem                                     -- NE TESTE PAS
+  4. theta=10.0° : idem                                     -- NE TESTE PAS
+  5. theta=20.0° : idem                                     -- NE TESTE PAS
+  6. theta=30.0° : idem                                     -- NE TESTE PAS
+     (les 6 comparent pg.lineIntersect, PAS VanishingPoint.compute, à
+     l'analytique -- lineIntersect est un utilitaire générique de
+     persp_geometry.dart, pas le solveur de production)
+  7. contrôle indépendant : vp.y==cy à pitch nul            -- NE TESTE PAS
+  8. contrôle : vp.y se déplace de f*tan(pitch)             -- NE TESTE PAS
+
+Groupe "Point 2 — balayage de sensibilité"  (l.545)
+  9. (dans _runTrials / tests internes au balayage Monte-Carlo,
+     reconstruction theta_hat via lineIntersect)             -- NE TESTE PAS
+  10. idem (IC95%, dispersion)                                -- NE TESTE PAS
+     (2 test() top-level repérés aux lignes 684 et 911 -- mêmes
+     dépendances : lineIntersect + forme fermée, jamais VanishingPoint)
+
+Groupe "Point 3 — cas dégénéré et frontal"  (l.983)
+  11. theta=0e0° : ceilL.y vs ceilR.y, lineIntersect, repli   -- NE TESTE PAS
+  12. theta=1e-6° : idem                                      -- NE TESTE PAS
+  13. theta=1e-3° : idem                                      -- NE TESTE PAS
+  14. theta=1e-2° : idem                                      -- NE TESTE PAS
+     (les 4 appellent pg.lineIntersect directement + reconstituent le
+     repli MANUELLEMENT dans le corps du test, PAS via
+     VanishingPoint.compute -- documente le comportement de
+     lineIntersect seul, jamais celui du solveur réellement appelé par
+     room_painter.dart)
+  15. buildCalibratedScene : wallNormal fixé, indépendant de theta -- NE
+      TESTE PAS (documente calib_to_camera.dart, module distinct)
+  16. buildCalibratedScene : backWallDepthM, plan frontal     -- NE TESTE PAS
+      (même module distinct)
+  17. synthèse factuelle point 3 (note, "pas de NaN")          -- NE TESTE
+      PAS (agrège les faits ci-dessus, toujours via lineIntersect brut)
+
+Groupe "Phase C — Point 1 : k depend de pH"  (l.1250)
+  18. dispersion de k (constante unique) >>5%                 -- NE TESTE
+      PAS (buildSyntheticWall + _analyticalSigmaMaxGeneric, fonctions
+      analytiques pures, aucune trace de VanishingPoint)
+  19. dispersion de k/pH (coefficient corrigé) <<5%            -- NE TESTE PAS
+  20. axe f/largeur-image : kappa=k*f/pH stable                -- NE TESTE PAS
+
+Groupe "Phase C — Point 2 : sigma_placement, trichotomie"  (l.1595)
+  21. 3 seuils strictement croissants                          -- NE TESTE
+      PAS (fonction seuilBrut() pure, aucune donnée géométrique réelle)
+  22. trichotomie GARDEE/ECARTEE/INDECIDABLE bien définie       -- NE TESTE
+      PAS (fonction classify() pure, testée contre ses propres seuils)
+
+Groupe "Phase C — Point 3 (refait, 3e passe) : enveloppe sigma_placement" (l.1835)
+  23. seuils (facteur opérationnel) strictement croissants      -- NE TESTE PAS
+  24. monotonie de classifyOnSigmaMax/Range                     -- NE TESTE
+      PAS (fonctions pures testées contre leurs propres seuils, la
+      définition même d'une assertion circulaire au sens du brief)
+  25. tableau : 4 scènes, enveloppe, verdict INDECIDABLE x4      -- NE TESTE
+      PAS (utilise pg.lineIntersect + un balayage de bruit synthétique
+      sur les 4 presets démo -- jamais VanishingPoint.compute -- conclut
+      lui-même en fin de fichier "aucune escalade de priorité sur
+      vanishing_point.dart n'est proposée à partir de ce résultat")
+
+BILAN : 25/25 assertions NE TESTENT PAS le solveur de production
+(VanishingPoint.compute). 0/25 le testent. Toutes comparent l'analytique
+(expectedVpClosedForm, Camera3D) à un solveur générique partiel
+(pg.lineIntersect, qui n'est qu'UNE composante de l'ancien
+VanishingPoint.compute, jamais le point d'entrée réel utilisé par
+room_painter.dart:139) ou à des fonctions de classification qui se
+testent contre leurs propres seuils.
+
+SIGNATURE DU REPLI QUI A SURVÉCU (point 6 du brief, confirmée) :
+  Dans la sonde vp_current_state_probe.dart (Étape A), vp.x = 700.00 pour
+  les 4 presets -- exactement le milieu du canevas 1400px. C'est la
+  MÊME valeur que produisait l'ancien repli (milieu de fTL->fTR, dont
+  l'abscisse est indépendante de wallTL/wallTR par construction -- cf.
+  rouge archéologique ci-dessus, où l'assertion "estRepliMilieu isFalse"
+  échouait avec vp=(700.0, 92.6)/(700.0, 151.4)/(700.0, 150.3) : même x
+  qu'aujourd'hui, seul le y diffère (repli->milieu vertical de la ligne
+  haute ; VP-centre->mi-hauteur plafond/sol)). L'assertion actuelle
+  "estRepliMilieu isFalse" du test vp_frac_degenere_test.dart ne passe
+  DONC que grâce au décalage vertical -- sa composante x reste
+  structurellement identique au signal qu'elle était censée détecter.
+  Ce test ne discrimine plus la nouvelle implémentation de l'ancienne
+  sur cette dimension.

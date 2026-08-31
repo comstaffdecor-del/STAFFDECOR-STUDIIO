@@ -218,7 +218,16 @@ void main() {
       printPoint('floorR', cp.floorR, size.width, size.height);
 
       // ── Appel PUBLIC direct, identique room_painter.dart:137-142 ──
-      final vp = VanishingPoint.compute(fTL: cp.ceilL, fTR: cp.ceilR, fBL: cp.floorL, fBR: cp.floorR);
+      final vp = VanishingPoint.compute(
+        fTL: cp.ceilL,
+        fTR: cp.ceilR,
+        fBL: cp.floorL,
+        fBR: cp.floorR,
+        wallTL: cp.wallTL,
+        wallTR: cp.wallTR,
+        wallBL: cp.wallBL,
+        wallBR: cp.wallBR,
+      );
       final pH = vp.pH;
 
       // ── BLOC 3 : point de fuite ──

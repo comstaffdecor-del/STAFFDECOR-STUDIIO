@@ -1,0 +1,84 @@
+=== Point 4 (brief définitif Étapes B/C) — LE ROUGE QUI COMPTE ===
+Capturé AVANT tout correctif Étape C, sur HEAD=4a01dc71 (VP-centre actuel).
+Commande : flutter test test/core/perspective/_synth_vp_harness_test.dart --plain-name "Point 4"
+
+Contexte : ce groupe de test appelle pour la première fois le VRAI solveur
+de production `VanishingPoint.compute` (import ajouté à ce fichier, absent
+de tout le reste du harnais synthétique — voir docs/logs/etape_b_audit_harnais.txt
+qui documente que 0/25 assertions précédentes du même fichier ne le font).
+Les 4 coins passés à `compute` sont les coins EXACTS projetés par
+`buildSyntheticWall`, comparés à `expectedVpClosedForm` (même fonction déjà
+utilisée par le groupe "Point 1" pour valider `lineIntersect`).
+
+RÉSULTAT : 3/3 assertions théta échouent comme prédit par le brief (point 4 :
+"Un VP-centre échoue immédiatement, et échoue sur les trois") :
+
+  theta=8°  : vp_reel(compute)=(1008.5, 516.6)  vp_closedform=(-9001.5, 540.0)  err_rel=1.110
+  theta=18° : vp_reel(compute)=(1065.4, 516.1)  vp_closedform=(-3348.8, 540.0)  err_rel=1.301
+  theta=32° : vp_reel(compute)=(1129.2, 514.9)  vp_closedform=(-1280.5, 540.0)  err_rel=1.734
+
+Seuil d'acceptation du brief : err_rel < 0.02 (2%). Observé : 1.11 à 1.73,
+soit 55x à 87x le seuil — pas un écart numérique fin, une absence totale de
+dépendance à l'obliquité theta (le VP-centre est une moyenne des 4 coins,
+invariante au premier ordre pour une scène symétrique en theta).
+
+NOTE IMPORTANTE (à ne pas dissimuler) : `expectedVpClosedForm` calcule le VP
+de l'AXE HORIZONTAL du mur du fond (même axe que `lineIntersect(ceilL,ceilR,
+floorL,floorR)`, cf. groupe "Point 1" du même fichier) — PAS l'axe de
+PROFONDEUR que `toward()`/`frac()` doivent utiliser en production (qui
+nécessite les points latéraux wallTL/wallTR, absents de `buildSyntheticWall`
+dans sa forme actuelle). Ce test point 4, tel qu'écrit, démontre donc que
+compute() ne calcule PAS le VP horizontal attendu par lineIntersect — ce qui
+suffit à documenter que le VP-centre est déconnecté de toute géométrie de
+fuyante réelle (aucun des deux VP, horizontal ou profondeur, n'est produit) —
+mais N'EST PAS EN SOI la preuve directe que le futur VP de profondeur (basé
+sur wallTL/wallTR) convergera correctement. Cette preuve-là sera apportée
+après le correctif Étape C, par un test séparé utilisant les points latéraux
+synthétiques et une formule fermée dédiée à l'axe de profondeur (vp.x = cx +
+f*tan(theta)/cos(pitch) à cette convention d'azimut — dérivation vérifiée
+numériquement par script jetable, non commité, avant transcription : erreur
+< 1e-9 entre lineIntersect(wallTL,ceilL,wallTR,ceilR) et cette formule sur
+theta∈{8°,18°,32°}×pitch∈{0°,5°}).
+
+Contrôle de monotonie (frac(theta) doit varier avec theta) : PASSE déjà
+accidentellement sur le VP-centre actuel — frac(theta)={8°: 0.1132, 18°:
+0.1181, 32°: 0.1276} varie techniquement (via pH, qui dépend légèrement de
+theta dans cette scène), mais cette variation n'est PAS le signal utile :
+elle vient de la projection de wallHeightM/depthM à azimut variable, pas
+d'un vrai terme d'obliquité dans la formule de frac. Ce n'est pas un signal
+substitut acceptable — seul le rouge des 3 assertions theta ci-dessus est
+le "seul rouge qui compte" au sens du brief.
+
+=== SORTIE BRUTE flutter test (extrait pertinent) ===
+[point4] theta=8.0°  vp_reel(compute)=Offset(1008.5, 516.6)  vp_closedform=Offset(-9001.5, 540.0)  err_rel=1.110e+0
+00:03 +0 -1: Point 4 — VanishingPoint.compute (le vrai solveur) vs forme fermée (le seul rouge qui compte, brief définitif Étapes B/C) theta=8.0° : VanishingPoint.compute(4 coins synthétiques) doit converger vers expectedVpClosedForm (axe horizontal) à moins de 2% — ROUGE attendu avec le VP-centre actuel [E]
+  Expected: a value less than <0.02>
+    Actual: <1.1100409140162015>
+     Which: is not a value less than <0.02>
+  theta=8.0° : VanishingPoint.compute (VP-centre) renvoie Offset(1008.5, 516.6), loin de expectedVpClosedForm Offset(-9001.5, 540.0) (err_rel=1.1100409140162015 >> 2%). Le VP-centre est une moyenne des 4 coins, sans terme dépendant de theta : ce n'est pas le point de fuite de l'axe qui converge réellement dans cette scène synthétique.
+  
+  package:matcher                                            expect
+  package:flutter_test/src/widget_tester.dart 473:18         expect
+--
+[point4] theta=18.0°  vp_reel(compute)=Offset(1065.4, 516.1)  vp_closedform=Offset(-3348.8, 540.0)  err_rel=1.301e+0
+00:03 +0 -2: Point 4 — VanishingPoint.compute (le vrai solveur) vs forme fermée (le seul rouge qui compte, brief définitif Étapes B/C) theta=18.0° : VanishingPoint.compute(4 coins synthétiques) doit converger vers expectedVpClosedForm (axe horizontal) à moins de 2% — ROUGE attendu avec le VP-centre actuel [E]
+  Expected: a value less than <0.02>
+    Actual: <1.3013498939081027>
+     Which: is not a value less than <0.02>
+  theta=18.0° : VanishingPoint.compute (VP-centre) renvoie Offset(1065.4, 516.1), loin de expectedVpClosedForm Offset(-3348.8, 540.0) (err_rel=1.3013498939081027 >> 2%). Le VP-centre est une moyenne des 4 coins, sans terme dépendant de theta : ce n'est pas le point de fuite de l'axe qui converge réellement dans cette scène synthétique.
+  
+  package:matcher                                            expect
+  package:flutter_test/src/widget_tester.dart 473:18         expect
+--
+[point4] theta=32.0°  vp_reel(compute)=Offset(1129.2, 514.9)  vp_closedform=Offset(-1280.5, 540.0)  err_rel=1.734e+0
+00:03 +0 -3: Point 4 — VanishingPoint.compute (le vrai solveur) vs forme fermée (le seul rouge qui compte, brief définitif Étapes B/C) theta=32.0° : VanishingPoint.compute(4 coins synthétiques) doit converger vers expectedVpClosedForm (axe horizontal) à moins de 2% — ROUGE attendu avec le VP-centre actuel [E]
+  Expected: a value less than <0.02>
+    Actual: <1.7340474284729532>
+     Which: is not a value less than <0.02>
+  theta=32.0° : VanishingPoint.compute (VP-centre) renvoie Offset(1129.2, 514.9), loin de expectedVpClosedForm Offset(-1280.5, 540.0) (err_rel=1.7340474284729532 >> 2%). Le VP-centre est une moyenne des 4 coins, sans terme dépendant de theta : ce n'est pas le point de fuite de l'axe qui converge réellement dans cette scène synthétique.
+  
+  package:matcher                                            expect
+  package:flutter_test/src/widget_tester.dart 473:18         expect
+--
+[point4-monotonie] frac(theta) = {8.0: 0.11316524348562633, 18.0: 0.11811984905900205, 32.0: 0.12759893550232024}
+00:03 +1 -3: Point ... fermée (le seul rouge qui compte, brief définitif Étapes B/C) contrôle de monotonie : frac(theta) doit varier avec theta (pas une constante indépendante de l'obliquité du mur) 00:03 +1 -3: Some tests failed.                                                                                                                                                                        

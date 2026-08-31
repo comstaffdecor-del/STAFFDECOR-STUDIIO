@@ -28,6 +28,7 @@ import 'package:vector_math/vector_math_64.dart';
 
 import 'package:staff_decor_studio/core/geometry/camera.dart';
 import 'package:staff_decor_studio/core/perspective/persp_geometry.dart' as pg;
+import 'package:staff_decor_studio/core/perspective/vanishing_point.dart';
 import 'package:staff_decor_studio/models/persp_calib.dart';
 
 // Note : le type `Offset` utilisé partout dans ce fichier (celui attendu par
@@ -2316,6 +2317,132 @@ void main() {
       );
     },
   );
+
+  // ===========================================================================
+  // POINT 4 (brief définitif Étapes B/C) — LE SEUL ROUGE QUI COMPTE.
+  //
+  // Contrairement à TOUS les groupes ci-dessus (0/25 assertions n'appellent
+  // le vrai solveur — voir docs/logs/etape_b_audit_harnais.txt), ce groupe
+  // appelle réellement `VanishingPoint.compute` (import ajouté ci-dessus,
+  // absent du reste de ce fichier) avec les 4 coins EXACTS projetés par
+  // `buildSyntheticWall` — donc directement comparable à la vérité terrain
+  // analytique `expectedVpClosedForm` déjà utilisée par le groupe "Point 1".
+  //
+  // Écrit et exécuté AVANT le correctif Étape C (signature actuelle de
+  // `compute` : 4 coins nommés fTL/fTR/fBL/fBR, sans paramètre de
+  // profondeur) — donc contre le VP-centre actuellement sur disque. Ce
+  // design échoue nécessairement : `expectedVpClosedForm` est le VP de
+  // l'axe HORIZONTAL du mur du fond (même axe que `lineIntersect(ceilL,
+  // ceilR, floorL, floorR)`, voir groupe "Point 1"), alors que le VP-centre
+  // ne calcule ni une intersection de fuyantes ni une fonction de theta —
+  // c'est une moyenne des 4 coins, indépendante de l'azimut au premier
+  // ordre pour une scène symétrique. La différence attendue croît avec
+  // theta (voir table numérique imprimée ci-dessous) : ce n'est pas un
+  // simple écart numérique mais une absence totale de dépendance à
+  // l'obliquité — exactement le diagnostic du brief.
+  group('Point 4 — VanishingPoint.compute (le vrai solveur) vs forme fermée '
+      '(le seul rouge qui compte, brief définitif Étapes B/C)', () {
+    for (final thetaDeg in [8.0, 18.0, 32.0]) {
+      test(
+        'theta=$thetaDeg° : VanishingPoint.compute(4 coins synthétiques) '
+        'doit converger vers expectedVpClosedForm (axe horizontal) à moins '
+        'de 2% — ROUGE attendu avec le VP-centre actuel',
+        () {
+          final wall = buildSyntheticWall(
+            wallWidthM: 3.0,
+            wallHeightM: wallHeightM,
+            depthM: depthM,
+            focalPx: focalPx,
+            cx: cx,
+            cy: cy,
+            heightCamM: heightCamM,
+            thetaDeg: thetaDeg,
+          );
+
+          // Appel RÉEL du solveur de production — jamais fait ailleurs
+          // dans ce fichier ni dans aucun autre test de ce dossier avant
+          // ce groupe (voir audit `docs/logs/etape_b_audit_harnais.txt`).
+          final vpReal = VanishingPoint.compute(
+            fTL: wall.ceilL,
+            fTR: wall.ceilR,
+            fBL: wall.floorL,
+            fBR: wall.floorR,
+          );
+
+          final vpClosed = expectedVpClosedForm(
+            focalPx: focalPx,
+            cx: cx,
+            cy: cy,
+            thetaDeg: thetaDeg,
+          );
+
+          final errRel = _dist(vpReal.vp, vpClosed) / _norm(vpClosed);
+
+          // ignore: avoid_print
+          print(
+            '[point4] theta=$thetaDeg°  vp_reel(compute)=${vpReal.vp}  '
+            'vp_closedform=$vpClosed  err_rel=${errRel.toStringAsExponential(3)}',
+          );
+
+          expect(
+            errRel,
+            lessThan(0.02),
+            reason:
+                'theta=$thetaDeg° : VanishingPoint.compute (VP-centre) '
+                'renvoie ${vpReal.vp}, loin de expectedVpClosedForm '
+                '$vpClosed (err_rel=$errRel >> 2%). Le VP-centre est une '
+                'moyenne des 4 coins, sans terme dépendant de theta : ce '
+                "n'est pas le point de fuite de l'axe qui converge "
+                'réellement dans cette scène synthétique.',
+          );
+        },
+      );
+    }
+
+    test(
+      'contrôle de monotonie : frac(theta) doit varier avec theta (pas '
+      'une constante indépendante de l\'obliquité du mur)',
+      () {
+        const depthPx = 100.0;
+        final fracs = <double, double>{};
+        for (final thetaDeg in [8.0, 18.0, 32.0]) {
+          final wall = buildSyntheticWall(
+            wallWidthM: 3.0,
+            wallHeightM: wallHeightM,
+            depthM: depthM,
+            focalPx: focalPx,
+            cx: cx,
+            cy: cy,
+            heightCamM: heightCamM,
+            thetaDeg: thetaDeg,
+          );
+          final vpReal = VanishingPoint.compute(
+            fTL: wall.ceilL,
+            fTR: wall.ceilR,
+            fBL: wall.floorL,
+            fBR: wall.floorR,
+          );
+          fracs[thetaDeg] = vpReal.frac(wall.ceilL, depthPx);
+        }
+
+        // ignore: avoid_print
+        print('[point4-monotonie] frac(theta) = $fracs');
+
+        final values = fracs.values.toList();
+        final allEqual = values.every((v) => (v - values.first).abs() < 1e-9);
+        expect(
+          allEqual,
+          isFalse,
+          reason:
+              'frac(theta) est identique ($values) pour theta=8°/18°/32° : '
+              "le VP ne dépend pas de l'azimut du mur, alors qu'un vrai VP "
+              "de profondeur doit répondre à l'obliquité réelle de la "
+              'scène (theta croissant -> VP horizontal plus proche -> '
+              'convergence plus rapide pour une même profondeur en px).',
+        );
+      },
+    );
+  });
 }
 
 /// Reproduction minimale de `toward()` de `VanishingPoint`

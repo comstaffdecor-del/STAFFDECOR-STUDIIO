@@ -55,17 +55,29 @@ void main() {
       final (srcW, srcH) = kDemoSceneNativeSize[key]!;
       final imgDraw = imgDrawFor(srcW, srcH);
       final cp = CalibCanvasPoints.fromCalib(calib, imgDraw: imgDraw, w: kCanvasW, h: kCanvasH);
-      final vp = VanishingPoint.compute(fTL: cp.ceilL, fTR: cp.ceilR, fBL: cp.floorL, fBR: cp.floorR);
+      final vp = VanishingPoint.compute(
+        fTL: cp.ceilL,
+        fTR: cp.ceilR,
+        fBL: cp.floorL,
+        fBR: cp.floorR,
+        wallTL: cp.wallTL,
+        wallTR: cp.wallTR,
+        wallBL: cp.wallBL,
+        wallBR: cp.wallBR,
+      );
       final depthPx = corniceDefaultPx(vp.pH).faceHorizFondPx;
       final frac = vp.frac(cp.ceilL, depthPx);
-      final distVp = dist(cp.ceilL, vp.vp);
+      final vpDesc = vp.isAtInfinity
+          ? 'infini(dir=(${vp.direction.dx.toStringAsFixed(4)}, ${vp.direction.dy.toStringAsFixed(4)}))'
+          : '(${vp.vp.dx.toStringAsFixed(2)}, ${vp.vp.dy.toStringAsFixed(2)})';
+      final distVp = vp.isAtInfinity ? double.infinity : dist(cp.ceilL, vp.vp);
       // ignore: avoid_print
       print(
         '$key : '
         'imgDraw(dx=${imgDraw.dx.toStringAsFixed(2)}, dy=${imgDraw.dy.toStringAsFixed(2)}, '
         'dw=${imgDraw.dw.toStringAsFixed(2)}, dh=${imgDraw.dh.toStringAsFixed(2)}, '
         'scale=${imgDraw.scale.toStringAsFixed(6)}) | '
-        'vp=(${vp.vp.dx.toStringAsFixed(2)}, ${vp.vp.dy.toStringAsFixed(2)}) | '
+        'vp=$vpDesc | '
         'pH=${vp.pH.toStringAsFixed(3)} | depthPx=${depthPx.toStringAsFixed(3)} | '
         'distVp=${distVp.toStringAsFixed(2)} | frac=${frac.toStringAsFixed(5)}',
       );
