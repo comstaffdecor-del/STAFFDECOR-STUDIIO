@@ -2533,10 +2533,6 @@ void main() {
             wallBL: wall.wallBL,
             wallBR: wall.wallBR,
           );
-          // eslint-disable-next-line
-          // (aucun print de debug ici : la valeur exacte est déjà tracée
-          // dans le test suivant, ce test-ci vérifie seulement le seuil
-          // de précision machine, pas la valeur elle-même)
           expect(vp.residualPx, isNotNull, reason: 'les deux couples doivent produire une intersection finie sur cette scène (non parallèles)');
           expect(vp.residualPx!, lessThan(1e-6), reason: 'résidu attendu au niveau du bruit numérique (~1e-12 à 1e-13) sur une scène synthétique parfaitement cohérente — tout écart mesurable ici trahirait un bug du solveur, pas un défaut d\'entrée');
           print('[point3bis-synth-controle-negatif] theta=$thetaDeg°  residualPx=${vp.residualPx}  residualFrac=${vp.residualFrac}');
@@ -2584,11 +2580,11 @@ void main() {
       'couple produit une intersection finie (mur frontal ou dégénéré '
       'd\'un seul côté) — pas de comparaison fabriquée à partir de rien',
       () {
-        // Mur strictement frontal (theta=0) : les deux couples sont
-        // parallèles dans l'image (aucune intersection finie, VP à
-        // l'infini) — mais on force ARTIFICIELLEMENT un couple haut fini
-        // en construisant un point wallTL non aligné, pour vérifier le
-        // cas "une seule estimation" du contrat (residualPx == null).
+        // Construction : le couple haut (wallTL→fTL / wallTR→fTR) reste
+        // celui de la scène cohérente normale (intersection finie). Le
+        // couple bas est rendu explicitement parallèle par construction,
+        // pour vérifier le cas "une seule estimation" du contrat
+        // (residualPx == null).
         final wall = buildSyntheticWall(
           wallWidthM: 3.0,
           wallHeightM: wallHeightM,
@@ -2599,13 +2595,6 @@ void main() {
           heightCamM: heightCamM,
           thetaDeg: 18.0,
         );
-        // On dégrade le couple bas en un segment de longueur quasi nulle
-        // (wallBL confondu avec fBL) : lineIntersect(wallBL, fBL, ...)
-        // reste défini géométriquement (deux points quasi confondus ne
-        // rendent pas `denom` nul ici, car wallBR/fBR restent distincts)
-        // -- on choisit plutôt de rendre le couple bas explicitement
-        // parallèle en alignant wallBL/fBL et wallBR/fBR sur une même
-        // direction horizontale, pour forcer lineIntersect(...) == null.
         final vp = VanishingPoint.compute(
           fTL: wall.ceilL,
           fTR: wall.ceilR,
@@ -2613,13 +2602,13 @@ void main() {
           fBR: wall.floorR,
           wallTL: wall.wallTL,
           wallTR: wall.wallTR,
-          // Couple bas rendu parallèle : translation horizontale pure
-          // depuis fBL/fBR (même dy), donc lineIntersect(...) parallèle
-          // à lineIntersect(fBL,fBR-based) seulement si les deux droites
-          // (wallBL->fBL) et (wallBR->fBR) sont elles-mêmes parallèles
-          // entre elles -- ce qui est le cas si on leur donne la même
-          // direction (dx, dy) en construisant wallBL/wallBR par la même
-          // translation appliquée à fBL/fBR.
+          // Couple bas rendu parallèle par construction : wallBL et wallBR
+          // sont obtenus par la MÊME translation horizontale (dx=-200,
+          // dy=0) appliquée respectivement à fBL et fBR. Les deux droites
+          // (wallBL→fBL) et (wallBR→fBR) sont donc strictement parallèles
+          // (même direction (dx,dy)=(200,0)) : lineIntersect(...) renvoie
+          // null pour ce couple, laissant le couple haut comme seule
+          // estimation finie disponible.
           wallBL: Offset(wall.floorL.dx - 200.0, wall.floorL.dy),
           wallBR: Offset(wall.floorR.dx - 200.0, wall.floorR.dy),
         );

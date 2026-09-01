@@ -417,4 +417,118 @@ void main() {
       });
     }
   });
+
+  // =========================================================================
+  // GROUPE 6 — brief "Suite 2" point 5 : garantir qu'aujourd'hui, sur les 4
+  // presets réels, AUCUN appel de `VanishingPoint.frac(p, depthPx)` ne lève
+  // (donc `_safeToward`, dans `cornice_plinth_painter.dart`, n'emprunte
+  // aucune de ses branches `on ArgumentError` / `on StateError` en
+  // production actuelle).
+  //
+  // Chemin réel reproduit (voir `room_painter.dart`, cases 'Corniches' /
+  // 'Plinthes') : `_drawCorniceStrip`/`_drawPlinthStrip` appellent
+  // `_safeToward(vp, p, depthPx)` avec :
+  //   - `p` ∈ {fTL, fTR, wallTL, wallTR} pour les corniches (arête haute
+  //     des 3 segments : latéral G, fond, latéral D — voir
+  //     `paintCorniceSet`) et {fBL, fBR, wallBL, wallBR} pour les plinthes
+  //     (`paintPlintheSet`) ;
+  //   - `depthPx` = `th.faceHorizFond` ou `th.faceHorizLat` selon le
+  //     segment, où `th` vient de `corniceFor(stripPx, pH)` /
+  //     `StripThickness.plintheDefault(pH)`. `stripPx` (dimensions réelles
+  //     mm→px) est `null` pour 275 des 283 références catalogue (pas de
+  //     profil JSON) : c'est donc `StripThickness.corniceDefault(pH)` /
+  //     `.plintheDefault(pH)` — les coefficients fixes 0.055/0.140/0.080/
+  //     0.200 (corniche) et 0.065/0.115/0.095/0.165 (plinthe) — qui est le
+  //     chemin RÉELLEMENT empruntable aujourd'hui pour la quasi-totalité
+  //     du catalogue, reproduit ici tel quel plutôt qu'un cas de profil
+  //     JSON minoritaire.
+  //
+  // Note : `frac()` ne dépend PAS de la position de `p` autrement que par
+  // sa distance au VP fini (`w=1`) — l'appel est donc bien fait avec les 8
+  // points de calibration réels du preset (fTL/fTR/fBL/fBR/wallTL/wallTR/
+  // wallBL/wallBR), chacun combiné aux `depthPx` réellement utilisés
+  // (fond ET latéral, corniche ET plinthe) pour ce preset.
+  //
+  // Ce test constate un FAIT PRÉSENT ("aucun frac() ne lève aujourd'hui"),
+  // PAS une garantie permanente : le brief le note explicitement — la garde
+  // de conditionnement du Groupe 5 ci-dessus, une fois câblée en amont
+  // (décision produit, brief "Suite 2" point 7, non tranchée ici), peut
+  // changer cette situation en rejetant des presets entiers AVANT que
+  // `compute()` ne renvoie même un VP fini. Ce test sert de FILET : s'il
+  // devient rouge après une modification future de `frac()`/`compute()`,
+  // c'est le signal qu'un des 4 presets réels a changé de régime.
+  group('Groupe 6 — aucun des 4 presets réels n\'emprunte aujourd\'hui les '
+      'branches catch de _safeToward (frac() ne lève pour aucun point '
+      'réel × depthPx réel)', () {
+    for (final key in kDemoSceneNativeSize.keys) {
+      test('$key : frac(p, depthPx) ne lève pour aucune combinaison '
+          'réelle (8 points de calibration × 4 profondeurs par défaut '
+          'corniche/plinthe, fond et latéral)', () {
+        final cp = calibPointsFor(key);
+        final vp = VanishingPoint.compute(
+          fTL: cp.ceilL,
+          fTR: cp.ceilR,
+          fBL: cp.floorL,
+          fBR: cp.floorR,
+          wallTL: cp.wallTL,
+          wallTR: cp.wallTR,
+          wallBL: cp.wallBL,
+          wallBR: cp.wallBR,
+        );
+        final pH = vp.pH;
+
+        // Profondeurs réellement utilisées par room_painter.dart quand
+        // aucun profil JSON n'est en cache (cas majoritaire du catalogue,
+        // voir corniceDefaultPx/StripThickness.plintheDefault) : 4
+        // valeurs distinctes (fond/latéral × corniche/plinthe).
+        final corniceDefault = corniceDefaultPx(pH);
+        final depthsReels = <String, double>{
+          'corniche.faceHorizFond': corniceDefault.faceHorizFondPx,
+          'corniche.faceHorizLat': corniceDefault.faceHorizLatPx,
+          'plinthe.faceHorizFond': pH * 0.115,
+          'plinthe.faceHorizLat': pH * 0.165,
+        };
+
+        // Les 8 points de calibration réels — mêmes points passés à
+        // `compute()` ci-dessus, réutilisés ici comme `p` dans
+        // `frac(p, depthPx)` (exactement ce que fait `_safeToward` pour
+        // chaque coin de chaque segment de corniche/plinthe).
+        final pointsReels = <String, Offset>{
+          'fTL': cp.ceilL,
+          'fTR': cp.ceilR,
+          'fBL': cp.floorL,
+          'fBR': cp.floorR,
+          'wallTL': cp.wallTL,
+          'wallTR': cp.wallTR,
+          'wallBL': cp.wallBL,
+          'wallBR': cp.wallBR,
+        };
+
+        final leves = <String>[];
+        for (final pEntry in pointsReels.entries) {
+          for (final dEntry in depthsReels.entries) {
+            try {
+              vp.frac(pEntry.value, dEntry.value);
+            } catch (e) {
+              // ignore: avoid_print
+              leves.add('${pEntry.key} × ${dEntry.key} : $e');
+            }
+          }
+        }
+
+        expect(
+          leves,
+          isEmpty,
+          reason: "preset '$key' : frac() a levé pour au moins une "
+              'combinaison point×profondeur réellement utilisée en '
+              'production ($leves) — cela signifie qu\'aujourd\'hui, '
+              '_safeToward emprunte déjà une de ses branches catch pour '
+              'ce preset (face plafond/sol silencieusement absente pour '
+              'le segment concerné). Ce n\'est PAS le comportement '
+              'attendu tant que la garde de conditionnement (Groupe 5) '
+              'n\'a pas été câblée en amont de compute().',
+        );
+      });
+    }
+  });
 }
