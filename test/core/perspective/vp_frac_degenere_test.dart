@@ -56,6 +56,7 @@ import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:staff_decor_studio/core/perspective/calib_canvas.dart';
+import 'package:staff_decor_studio/core/perspective/cornice_plinth_painter.dart';
 import 'package:staff_decor_studio/core/perspective/persp_geometry.dart' as pg;
 import 'package:staff_decor_studio/core/perspective/strip_px_from_dims.dart';
 import 'package:staff_decor_studio/core/perspective/vanishing_point.dart';
@@ -253,54 +254,138 @@ void main() {
 
   // =========================================================================
   // GROUPE 3 — Non-coïncidence avec le centre géométrique du mur du fond
-  // (cible le régime dégénéré #3 spécifiquement — VP-centre, commit
-  // `47c17eca` — de façon directe et nommée, en complément du test de
-  // dépendance causale du Groupe 2).
-  // =========================================================================
-  group('Groupe 3 — compute() ne doit pas coïncider avec le centre '
-      'géométrique des 4 coins du mur du fond (régime VP-centre)', () {
+  // (cible le régime dégénéré #3 — VP-centre, commit `47c17eca` — en
+  // complément du test de dépendance causale du Groupe 2).
+  //
+  // ⚠️ RÉÉCRITURE (relecture externe, brief "Suite 2" point 6) — l'ancienne
+  // version de ce groupe testait `d = (vp.vp - wallCenter).distance >
+  // 50.0` : une norme euclidienne globale, avec un seuil de 50px jamais
+  // justifié.
+  //
+  // CONSTAT PAR LECTURE/EXÉCUTION (log `docs/logs/groupe3_avant_split.txt`,
+  // sondes jetables supprimées après usage, chiffres reproduits ci-dessous
+  // par le code committé) :
+  //   - Sur moderne/provencal/scandinave : vp.x == centre_mur_fond.x ==
+  //     700.0 EXACTEMENT (dx = 0.0). Toute la "distance" de l'ancien test
+  //     passait donc PAR LA SEULE composante verticale (dy) — l'assertion
+  //     `d > 50.0` ne prouvait RIEN sur l'axe horizontal pour ces 3
+  //     presets, qui ne l'exerçaient pas.
+  //   - Sur haussmann : vp.x = 742.0, centre_mur_fond.x = 700.0 (dx =
+  //     42.0). C'est le seul des 4 presets où dx ≠ 0.
+  //
+  // HYPOTHÈSE TESTÉE ET INFIRMÉE PAR LA MESURE (haussmann) : "les 42px de
+  // vp.x viennent d'une asymétrie de wallTL/wallTR par rapport à l'axe
+  // médian du canvas (x=700)". Mesure : wallTL.dx - 700 = -699.944,
+  // wallTR.dx - 700 = +699.944 — somme EXACTEMENT nulle (symétrie parfaite
+  // en x, à 3e-13 de la précision machine). L'asymétrie x de wallTL/wallTR
+  // NE PEUT PAS être la source des 42px : elle est nulle par construction.
+  // La vraie source, isolée en annulant séparément chaque pente (sonde
+  // jetable) : `ceilL.dy ≠ ceilR.dy` (87.75 vs 82.875) ET `wallTL.dy ≠
+  // wallTR.dy` (97.5 vs 92.625) simultanément — aucune des deux pentes
+  // seule ne reproduit x=742.0 (annuler l'une donne x=571.1, annuler
+  // l'autre donne x=876.1) : c'est leur COMBINAISON qui produit le
+  // décalage. Ce lien-ci est démontré ; le lien "asymétrie dx" ne l'est
+  // pas — il est réfuté.
+  //
+  // SEUIL DE 50px SUPPRIMÉ, remplacé par : (a) deux assertions séparées
+  // x/y, (b) l'écart vertical rapporté en fraction de `pH` (invariant
+  // d'échelle — un écart de 300px n'a pas le même sens à pH=600 qu'à
+  // pH=6000), avec une borne choisie et documentée comme telle (PAS
+  // dérivée), décision de rejet renvoyée au point 7.
+  group('Groupe 3 — VP vs centre géométrique du mur du fond, composantes '
+      'x et y séparées (régime VP-centre)', () {
     for (final key in kDemoSceneNativeSize.keys) {
-      test(
-        '$key : VP calculé ≠ centre géométrique de (ceilL,ceilR,floorL,floorR)',
-        () {
-          final cp = calibPointsFor(key);
+      test('$key : composante y (verticale) — écart rapporté en '
+          'fraction de pH, borne choisie explicitement (pas dérivée)', () {
+        final cp = calibPointsFor(key);
+        final vp = VanishingPoint.compute(
+          fTL: cp.ceilL,
+          fTR: cp.ceilR,
+          fBL: cp.floorL,
+          fBR: cp.floorR,
+          wallTL: cp.wallTL,
+          wallTR: cp.wallTR,
+          wallBL: cp.wallBL,
+          wallBR: cp.wallBR,
+        );
+        expect(vp.isAtInfinity, isFalse);
+        final pH = vp.pH;
+        final wallCenterY =
+            (cp.ceilL.dy + cp.ceilR.dy + cp.floorL.dy + cp.floorR.dy) / 4;
+        final dy = (vp.vp.dy - wallCenterY).abs();
+        final dyOverPh = dy / pH;
 
-          final vp = VanishingPoint.compute(
-            fTL: cp.ceilL,
-            fTR: cp.ceilR,
-            fBL: cp.floorL,
-            fBR: cp.floorR,
-            wallTL: cp.wallTL,
-            wallTR: cp.wallTR,
-            wallBL: cp.wallBL,
-            wallBR: cp.wallBR,
-          );
-          expect(vp.isAtInfinity, isFalse);
+        print('[groupe3-y] $key : vp.y=${vp.vp.dy.toStringAsFixed(1)}  '
+            'centre_y=${wallCenterY.toStringAsFixed(1)}  '
+            'dy=${dy.toStringAsFixed(1)}px  pH=${pH.toStringAsFixed(1)}  '
+            'dy/pH=${dyOverPh.toStringAsFixed(4)}');
 
-          final wallCenter = Offset(
-            (cp.ceilL.dx + cp.ceilR.dx + cp.floorL.dx + cp.floorR.dx) / 4,
-            (cp.ceilL.dy + cp.ceilR.dy + cp.floorL.dy + cp.floorR.dy) / 4,
-          );
-          final d = (vp.vp - wallCenter).distance;
+        // Borne CHOISIE (pas dérivée d'une propriété géométrique) : 0.3·pH
+        // — mesuré à 0.54-0.56 sur les 4 presets réels, largement au-delà.
+        // Sert de filet de non-régression sur ce test précis, PAS de
+        // critère de qualité de calibration (voir point 7 pour cette
+        // décision-là).
+        expect(
+          dyOverPh,
+          greaterThan(0.3),
+          reason: "preset '$key' : écart vertical VP/centre "
+              '(${dyOverPh.toStringAsFixed(4)}·pH) sous la borne choisie '
+              '0.3·pH — signature du régime dégénéré #3 (VP-centre) non '
+              'détectée sur la composante verticale pour ce preset.',
+        );
+      });
 
-          // ignore: avoid_print
-          print('[groupe3] $key : vp=${vp.vp}  centre_mur_fond=$wallCenter  '
-              'distance=${d.toStringAsFixed(1)}px');
+      test('$key : composante x (horizontale) — assertion POSITIVE de '
+          'sous-détermination, pas un skip', () {
+        final cp = calibPointsFor(key);
+        final vp = VanishingPoint.compute(
+          fTL: cp.ceilL,
+          fTR: cp.ceilR,
+          fBL: cp.floorL,
+          fBR: cp.floorR,
+          wallTL: cp.wallTL,
+          wallTR: cp.wallTR,
+          wallBL: cp.wallBL,
+          wallBR: cp.wallBR,
+        );
+        final wallCenterX =
+            (cp.ceilL.dx + cp.ceilR.dx + cp.floorL.dx + cp.floorR.dx) / 4;
 
-          expect(
-            d,
-            greaterThan(50.0),
-            reason:
-                "preset '$key' : VanishingPoint.compute (${vp.vp}) est à "
-                'seulement ${d.toStringAsFixed(1)}px du centre géométrique '
-                'des 4 coins du mur du fond ($wallCenter) — signature du '
-                'régime dégénéré #3 (VP-centre, diagnostiqué au commit '
-                '47c17eca comme un correctif insuffisant : terme '
-                "d'obliquité nul, VP indépendant de la géométrie réelle "
-                'des murs latéraux).',
-          );
-        },
-      );
+        print('[groupe3-x] $key : vp.x=${vp.vp.dx}  '
+            'centre_x=${wallCenterX.toStringAsFixed(1)}');
+
+        if (key == 'haussmann') {
+          // Seul preset où vp.x ≠ 700.0 (742.0) — voir le docstring de
+          // ce groupe : le lien "asymétrie dx de wallTL/wallTR" a été
+          // TESTÉ ET INFIRMÉ (dx symétrique à 3e-13 près). La source
+          // réelle démontrée est la combinaison des deux pentes ceilL/
+          // ceilR et wallTL/wallTR (voir docstring) — pas une asymétrie
+          // horizontale simple. On ne réaffirme donc PAS x==700.0 ici,
+          // mais on ne prétend pas non plus avoir une explication
+          // dérivée à assertionner : ce test rapporte seulement la
+          // valeur mesurée.
+          expect(vp.vp.dx, closeTo(742.0, 0.5), reason: 'valeur mesurée, '
+              'source démontrée = combinaison des pentes ceilL/ceilR et '
+              'wallTL/wallTR (voir docstring du groupe), PAS une '
+              "asymétrie dx (infirmée par la mesure : dx de wallTL/wallTR "
+              'symétrique à 3e-13 près).');
+        } else {
+          // Assertion POSITIVE affirmant la sous-détermination actuelle :
+          // vp.x == 700.0 (centre canvas imposé par calibration, PAS une
+          // mesure d'obliquité) à 0.5px près sur moderne/provencal/
+          // scandinave. Volontairement PAS un skip() (un test sauté ne
+          // signale rien) : cette assertion devient ROUGE le jour où
+          // l'axe horizontal portera enfin de l'information — c'est le
+          // comportement attendu, pas un test à "réparer" à ce moment.
+          expect(vp.vp.dx, closeTo(700.0, 0.5), reason: "preset '$key' : "
+              'vp.x doit rester égal au centre canvas (700.0) tant que '
+              "l'axe horizontal ne porte aucune information de "
+              "profondeur pour ce preset -- si cette assertion échoue, "
+              "c'est que la calibration a changé et QUE L'AXE HORIZONTAL "
+              'PORTE MAINTENANT UNE INFORMATION RÉELLE : ce test doit '
+              'alors être retiré, pas relâché.');
+        }
+      });
     }
   });
 
@@ -457,13 +542,30 @@ void main() {
   // `compute()` ne renvoie même un VP fini. Ce test sert de FILET : s'il
   // devient rouge après une modification future de `frac()`/`compute()`,
   // c'est le signal qu'un des 4 presets réels a changé de régime.
-  group('Groupe 6 — aucun des 4 presets réels n\'emprunte aujourd\'hui les '
-      'branches catch de _safeToward (frac() ne lève pour aucun point '
-      'réel × depthPx réel)', () {
+  // Corrections apportees apres relecture externe (3 defauts signales) :
+  //   1. _safeToward execute vp.toward(p, vp.frac(p, depthPx)) -- DEUX
+  //      appels. toward() accede au getter vp (position x/w, y/w) qui
+  //      peut lui-meme lever StateError quand w == 0 (VP a l'infini, voir
+  //      vanishing_point.dart), independamment de frac(). La version
+  //      precedente de ce test n'appelait que frac() : elle ne couvrait
+  //      que la moitie de ce que _safeToward protege. Corrige ci-dessous :
+  //      l'expression complete vp.toward(p, vp.frac(p, depthPx)) est
+  //      executee dans le try.
+  //   2. Les profondeurs de plinthe (pH * 0.115, pH * 0.165) etaient
+  //      recopiees en dur depuis cornice_plinth_painter.dart au lieu
+  //      d'etre lues depuis StripThickness.plintheDefault(pH) -- un
+  //      changement de coefficient dans lib/ aurait laisse ce test vert
+  //      sans plus couvrir le chemin reel. Corrige : lecture directe de
+  //      StripThickness.plintheDefault(pH).
+  //   3. Un faux "// ignore: avoid_print" avait ete pose au-dessus d'un
+  //      leves.add(...) qui n'est pas un print -- supprime.
+  group('Groupe 6 - aucun des 4 presets reels n emprunte aujourd hui les '
+      'branches catch de _safeToward (vp.toward(p, vp.frac(p, depthPx)) '
+      'ne leve pour aucun point reel x depthPx reel)', () {
     for (final key in kDemoSceneNativeSize.keys) {
-      test('$key : frac(p, depthPx) ne lève pour aucune combinaison '
-          'réelle (8 points de calibration × 4 profondeurs par défaut '
-          'corniche/plinthe, fond et latéral)', () {
+      test('$key : vp.toward(p, vp.frac(p, depthPx)) ne leve pour '
+          'aucune combinaison reelle (8 points de calibration x 4 '
+          'profondeurs par defaut corniche/plinthe, fond et lateral)', () {
         final cp = calibPointsFor(key);
         final vp = VanishingPoint.compute(
           fTL: cp.ceilL,
@@ -479,20 +581,24 @@ void main() {
 
         // Profondeurs réellement utilisées par room_painter.dart quand
         // aucun profil JSON n'est en cache (cas majoritaire du catalogue,
-        // voir corniceDefaultPx/StripThickness.plintheDefault) : 4
-        // valeurs distinctes (fond/latéral × corniche/plinthe).
+        // 275/283 réf. sans profil JSON) : 4 valeurs distinctes
+        // (fond/latéral × corniche/plinthe), LUES depuis les mêmes
+        // factories que room_painter.dart appelle réellement — pas
+        // recopiées en dur.
         final corniceDefault = corniceDefaultPx(pH);
+        final plintheDefault = StripThickness.plintheDefault(pH);
         final depthsReels = <String, double>{
           'corniche.faceHorizFond': corniceDefault.faceHorizFondPx,
           'corniche.faceHorizLat': corniceDefault.faceHorizLatPx,
-          'plinthe.faceHorizFond': pH * 0.115,
-          'plinthe.faceHorizLat': pH * 0.165,
+          'plinthe.faceHorizFond': plintheDefault.faceHorizFond,
+          'plinthe.faceHorizLat': plintheDefault.faceHorizLat,
         };
 
         // Les 8 points de calibration réels — mêmes points passés à
         // `compute()` ci-dessus, réutilisés ici comme `p` dans
-        // `frac(p, depthPx)` (exactement ce que fait `_safeToward` pour
-        // chaque coin de chaque segment de corniche/plinthe).
+        // `vp.toward(p, vp.frac(p, depthPx))` (exactement l'expression
+        // évaluée par `_safeToward` pour chaque coin de chaque segment
+        // de corniche/plinthe).
         final pointsReels = <String, Offset>{
           'fTL': cp.ceilL,
           'fTR': cp.ceilR,
@@ -508,9 +614,8 @@ void main() {
         for (final pEntry in pointsReels.entries) {
           for (final dEntry in depthsReels.entries) {
             try {
-              vp.frac(pEntry.value, dEntry.value);
+              vp.toward(pEntry.value, vp.frac(pEntry.value, dEntry.value));
             } catch (e) {
-              // ignore: avoid_print
               leves.add('${pEntry.key} × ${dEntry.key} : $e');
             }
           }
@@ -519,14 +624,15 @@ void main() {
         expect(
           leves,
           isEmpty,
-          reason: "preset '$key' : frac() a levé pour au moins une "
-              'combinaison point×profondeur réellement utilisée en '
-              'production ($leves) — cela signifie qu\'aujourd\'hui, '
-              '_safeToward emprunte déjà une de ses branches catch pour '
-              'ce preset (face plafond/sol silencieusement absente pour '
-              'le segment concerné). Ce n\'est PAS le comportement '
-              'attendu tant que la garde de conditionnement (Groupe 5) '
-              'n\'a pas été câblée en amont de compute().',
+          reason: "preset '$key' : vp.toward(p, vp.frac(p, depthPx)) a "
+              'levé pour au moins une combinaison point×profondeur '
+              'réellement utilisée en production ($leves) — cela '
+              'signifie qu\'aujourd\'hui, _safeToward emprunte déjà une '
+              'de ses branches catch pour ce preset (face plafond/sol '
+              'silencieusement absente pour le segment concerné). Ce '
+              'n\'est PAS le comportement attendu tant que la garde de '
+              'conditionnement (Groupe 5) n\'a pas été câblée en amont '
+              'de compute().',
         );
       });
     }

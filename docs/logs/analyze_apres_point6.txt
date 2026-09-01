@@ -1,0 +1,157 @@
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  exif_reader 4.1.0 (4.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  http 1.5.0 (1.6.0 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+21 available)
+  image_picker_ios 0.8.13+3 (0.8.13+7 available)
+  intl 0.19.0 (0.20.3 available)
+  iso_base_media 6.3.2 (6.3.3 available)
+  lints 5.1.1 (6.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.16.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  random_access_source 4.2.1 (4.3.1 available)
+  share_plus 12.0.2 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  shared_preferences 2.5.3 (2.5.5 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.6 (0.7.13 available)
+  url_launcher 6.3.1 (6.3.2 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.3.6 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_web 2.4.1 (2.4.3 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.2.0 (15.3.0 available)
+  win32 5.15.0 (6.4.0 available)
+Got dependencies!
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Analyzing flutter_app...                                        
+
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:85:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:88:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:89:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:90:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:95:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:99:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:100:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:101:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:105:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:106:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:110:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:113:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:114:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:115:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:118:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:121:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:122:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:123:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:124:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:125:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:128:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:129:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:131:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:132:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:138:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_origin_vs_path_test.dart:140:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:39:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:52:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:57:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:58:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:59:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:60:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:61:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:62:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:63:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:64:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:65:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:67:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:68:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:69:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:70:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:71:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:72:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:74:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:75:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:76:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:77:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:78:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:79:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:81:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:82:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:83:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:84:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:87:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:88:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:93:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:94:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:95:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:96:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:122:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:123:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:135:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:136:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:137:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:138:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:139:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:141:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:144:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:145:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:155:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:156:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:157:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:160:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:161:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:166:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:167:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:168:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:169:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_placement_check_test.dart:170:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:63:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:64:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:65:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:66:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:78:7 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:90:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:91:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:96:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:97:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:105:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:106:5 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/geometry/_debug_ring0_points_test.dart:119:7 • avoid_print
+warning • The value of the local variable 'srcH' isn't used • test/core/perspective/_debug_grid_zoom_test.dart:38:9 • unused_local_variable
+   info • Invalid use of a private type in a public API • test/core/perspective/_synth_vp_harness_test.dart:80:1 • library_private_types_in_public_api
+   info • The local variable '_runTrials' starts with an underscore • test/core/perspective/_synth_vp_harness_test.dart:664:18 • no_leading_underscores_for_local_identifiers
+   info • The local variable '_ci95ContainsZero' starts with an underscore • test/core/perspective/_synth_vp_harness_test.dart:712:10 • no_leading_underscores_for_local_identifiers
+   info • The local variable '_analyticalSigmaMax' starts with an underscore • test/core/perspective/_synth_vp_harness_test.dart:742:12 • no_leading_underscores_for_local_identifiers
+   info • The local variable '_findSigmaMax' starts with an underscore • test/core/perspective/_synth_vp_harness_test.dart:761:13 • no_leading_underscores_for_local_identifiers
+   info • Use interpolation to compose strings and values • test/core/perspective/_synth_vp_harness_test.dart:809:15 • prefer_interpolation_to_compose_strings
+   info • The local variable '_mean' starts with an underscore • test/core/perspective/_synth_vp_harness_test.dart:1426:14 • no_leading_underscores_for_local_identifiers
+   info • The local variable '_std' starts with an underscore • test/core/perspective/_synth_vp_harness_test.dart:1427:14 • no_leading_underscores_for_local_identifiers
+   info • Don't invoke 'print' in production code • test/core/perspective/_synth_vp_harness_test.dart:2538:11 • avoid_print
+   info • The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter_test/flutter_test.dart' • test/core/perspective/vp_frac_degenere_test.dart:55:8 • unnecessary_import
+   info • Don't invoke 'print' in production code • test/core/perspective/vp_frac_degenere_test.dart:318:9 • avoid_print
+   info • Don't invoke 'print' in production code • test/core/perspective/vp_frac_degenere_test.dart:354:9 • avoid_print
+
+104 issues found. (ran in 2.6s)
