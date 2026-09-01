@@ -989,6 +989,27 @@ void main() {
     // des PAIRES DE POINTS IDENTIQUES, ce qui implique l'égalité des
     // distances sans qu'il soit nécessaire de la re-mesurer avec un
     // second `sqrt`).
+    //
+    // Compte du périmètre, décomposé pour que rien ne se redérive au
+    // tour suivant : 4 presets × 10 δ non dégénérés = 40 vérifications
+    // de (a), PLUS 4 presets × 1 δ_deg = 4 vérifications de (b) —
+    // total 40 + 4 = 44 (`totalPointsVerifies`, verrouillé ci-dessous
+    // par `expect(..., equals(44))`, jamais laissé comme nombre nu).
+    //
+    // ⚠️ Ce test rejoue VOLONTAIREMENT `pg.lineIntersect` sur les MÊMES
+    // entrées que celles que `VanishingPoint.compute` utilise en
+    // interne (mêmes 8 points de calibration canvas, mêmes paires
+    // wallTL/ceilL/wallTR/ceilR et wallBL/floorL/wallBR/floorR) : c'est
+    // un MIROIR DÉLIBÉRÉ de l'implémentation actuelle de la sélection
+    // de branche (`vpTop ?? vpBottom`), pas une spécification
+    // indépendante du comportement attendu. Consequence explicite :
+    // ce test CASSERA PAR CONSTRUCTION dès que le Point 7b introduira
+    // une troisième branche (`VpFallbackMode.projectionParallele`) ou
+    // changera la condition de sélection — ce cassage sera le signe
+    // attendu que la sélection de branche a changé, PAS une
+    // régression à corriger en modifiant `pg.lineIntersect` pour le
+    // faire réussir de nouveau. Quiconque touche la bifurcation au
+    // Point 7b doit lire cette note avant de "réparer" ce test.
     // -----------------------------------------------------------------
     test(
       'les 4 presets, sur les 10 δ retenus (residualPx != null) : '
@@ -1119,16 +1140,20 @@ void main() {
           totalPointsVerifies++;
         }
 
-        // Sanity de périmètre : 4 presets × (10 points non dégénérés +
-        // 1 point dégénéré) = 44 vérifications Offset attendues.
+        // Sanity de périmètre, décomposée (brief Point 7a) : 4 presets
+        // × 10 δ non dégénérés = 40 vérifications de (a), PLUS 4
+        // presets × 1 δ_deg = 4 vérifications de (b) — 40 + 4 = 44,
+        // jamais laissé comme nombre nu.
         expect(
           totalPointsVerifies,
           equals(44),
-          reason: 'périmètre attendu : 4 presets × (10 δ non dégénérés '
-              '+ 1 δ_deg) = 44 — si ce nombre change, la garde '
-              '`residualPx != null` a exclu un nombre différent de '
-              'points pour au moins un preset, et le commentaire de '
-              "périmètre ci-dessus doit être mis à jour en conséquence.",
+          reason: 'périmètre attendu : 40 vérifications de (a) '
+              '(4 presets × 10 δ non dégénérés) + 4 vérifications de '
+              '(b) (4 presets × 1 δ_deg) = 44 — si ce nombre change, '
+              'la garde `residualPx != null` a exclu un nombre '
+              'différent de points pour au moins un preset, et le '
+              'commentaire de périmètre ci-dessus doit être mis à '
+              'jour en conséquence.',
         );
       },
     );

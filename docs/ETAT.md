@@ -10,10 +10,33 @@ AVEC les changements qu'il décrit — le SHA qu'il cite au prochain tour sera
 donc toujours celui du commit PRÉCÉDENT le tour en cours, jamais le commit
 courant, puisqu'on ne peut pas s'auto-référencer avant `git commit`).
 
-Dernier SHA vérifié local==remote avant ce tour : `3d3c9b1`. Un commit
-bot intercalé (`449e664`, "genspark auto-backup", un seul fichier de
-sonde jetable) a été nettoyé en début de ce tour (§0 du brief Point
-6bis) — voir Notes de méthode.
+Dernier SHA vérifié local==remote avant ce tour : `ec36eb0` (tree
+`9e114d3`, parent `449e664`). Base du Point 7a : arbre `ec36eb0` +
+uniquement §B (fusion 4→1 des tests d'identité, suppression de la
+scorie `isNotNull` et de `baseCp`, retouches docstring §B ci-dessous),
+229/229, `flutter analyze` 0 erreur. `docs/logs/point7.txt` encore
+untracked avant ce commit.
+
+## Errata (SHA `ec36eb0`)
+
+`ec36eb0` est poussé — jamais d'`--amend`/`rebase` sur lui. Les deux
+corrections suivantes, identifiées PENDANT le Point 7a, sont donc
+consignées ici plutôt que réécrites dans l'historique :
+- La formulation « L'écart de 0,128 est intégralement produit par le
+  repli » (section Point 6bis, "Résultat central" telle qu'écrite dans
+  `ec36eb0`) est **numériquement fausse** : l'écart signé exact est
+  **−0,872** (extrapolation −0,500 moins valeur observée +0,372), pas
+  0,128 — voir « Résultat central, chiffres signés » ci-dessous pour la
+  chaîne complète et sa source versionnée
+  (`docs/logs/derivation_haussmann_min.txt`).
+- L'explication « Écart -78,0px expliqué » par arithmétique de grille
+  (8×4,875, 16×4,875=2×39,0) écrite dans `ec36eb0` est **retirée comme
+  argument** (pas seulement complétée) : -78,0px est un artefact de
+  `.abs()` sur une comparaison entre deux mesures non signées de nature
+  différente, la grandeur géométrique réelle et signée sur moderne est
+  531,375px, et la divisibilité par 4,875 est une CONSÉQUENCE de la
+  grille `yPct` du balayage, jamais une explication causale — voir
+  « Le −78,0 en une ligne » ci-dessous.
 
 ## ⚠️ Correction de méthode : comptage de tests
 
@@ -29,21 +52,22 @@ historiques, supprimés après usage) :
   hérite de l'erreur** (arithmétique sur un départ déjà faux 211≠210).
 - Tour précédent : log `+220` → JSON **220**, confirmé. Log :
   `docs/logs/suite_complete_apres_point6_corrections2.txt`.
-- Ce tour (Point 6bis, +12 tests Groupe 3bis nets : 8 tests initiaux
-  remplacés/complétés par 8 (affinité+discontinuité ×4 presets) + 4
-  (identité universelle ×4 presets) = 12, contre 220+8=228 attendu avant
-  correction — l'ancien test haussmann unique (1) a été remplacé par 4
-  tests par preset (+3 net) : 220+8+4=232) : log `+232` → JSON **232**
-  (`testDone` avec `hidden:false`, tous `result:success`), confirmé. Log :
-  `docs/logs/point6bis.txt`.
+- Point 6bis (tour précédent, commit `ec36eb0`) : log `+232` → JSON
+  **232** (`testDone` avec `hidden:false`, tous `result:success`),
+  confirmé. Log : `docs/logs/point6bis.txt`.
+- Ce tour (Point 7a, §B.1 — fusion des 4 tests d'identité universelle
+  ×4 presets en 1 seul test paramétré, net **−3**) : 232−4+1=229
+  attendu. Log : `+229` → JSON **229** (`testDone` avec
+  `hidden:false`, zéro `result` non-success), confirmé. Log :
+  `docs/logs/point7.txt`.
 
 Pas d'amend/rebase sur du poussé (bot parallèle) — erreur actée ici, pas
 corrigée dans l'historique.
 
 ## Suite complète
 
-**232 tests, "All tests passed!", exit code 0.**
-Log : `docs/logs/point6bis.txt`.
+**229 tests, "All tests passed!", exit code 0.**
+Log : `docs/logs/point7.txt`.
 `flutter analyze` (projet complet) : 0 `error •`, 1 `warning •` préexistant
 non lié (`unused_local_variable`,
 `test/core/perspective/_debug_grid_zoom_test.dart:38`), reste `info`.
@@ -81,90 +105,207 @@ tenu selon la mesure, pas par convention) :
 - **moderne/provencal/scandinave** (symétriques en x) : les deux fuyantes
   hautes deviennent **CONFONDUES** (même droite) — position indéterminée,
   pas de direction bien définie. `residualPx` décroît de façon monotone et
-  BORNÉE en approchant δ_deg (moderne : 570,4 à δ=0 → 531,8 à δ=-0.0099),
-  puis s'éteint d'un coup à δ_deg exact.
+  BORNÉE en approchant δ_deg (moderne : 570,375 à δ=0 → 531,765 à
+  δ=-0.0099, limite exacte 531,375 — voir chaîne signée ci-dessous), puis
+  s'éteint d'un coup à δ_deg exact.
 - **haussmann** (asymétrique) : les deux fuyantes deviennent **PARALLÈLES**
   au sens strict (droites distinctes, jamais confondues) — direction bien
-  définie, position à l'infini. `residualPx` DIVERGE en approchant δ_deg
-  (696,5 à δ=0 → 4224,5 à δ=-0.0099), puis s'éteint d'un coup à δ_deg exact.
+  définie, position à l'infini. `residualPx` NE DIVERGE PAS MONOTONEMENT en
+  approchant δ_deg — voir « Prédiction haussmann » ci-dessous pour la
+  séquence mesurée complète et le minimum — puis s'éteint d'un coup à
+  δ_deg exact.
 Dans les deux cas, `lineIntersect` renvoie `null` identiquement — mais la
 géométrie sous-jacente diffère, d'où la distinction terminologique.
 
-**Résultat central** : dy/pH est affine et continue en δ, INCLUDING à la
-limite δ_deg — sur moderne, la limite prédite par la droite affine
-(extrapolation depuis les points non dégénérés, signe constant vérifié)
-vaut EXACTEMENT 0,500, alors que la valeur observée (via le repli `??`)
-vaut 0,372. **L'écart de 0,128 est intégralement produit par le repli**,
-pas par la géométrie. Il n'y a AUCUNE singularité dans la géométrie ; il y
-en a une dans le code.
+### Prédiction haussmann : confirmée sur le régime, falsifiée sur l'ordonnancement
 
-**Écart -78,0px expliqué (coïncidence arithmétique de grille, close, rien à
-construire dessus)** : sur moderne, `dy` évolue par incréments EXACTS de
-39,0px par pas de balayage de 0.01 sur `yPct`, soit 8×4,875 (4,875 =
-0,005 × 975px, le pas natif de calibration `yPct` × la hauteur du canvas).
-L'écart entre la valeur affine extrapolée à δ_deg et la valeur observée via
-le repli vaut exactement 78,0 = 16×4,875 = 2×39,0 : deux pas de grille
-entiers, produits par la distance (en pas de 0.01) entre le point
-d'extrapolation et le point de repli. Vérifié par calcul direct sur les
-valeurs mesurées, pas par coïncidence apparente.
+Le régime lui-même (bornée/monotone sur les 3 presets symétriques,
+divergente sur haussmann à l'approche immédiate de δ_deg) est confirmé.
+Ce qui est FAUX dans la prédiction initiale (Point 6bis) : l'hypothèse
+d'une divergence MONOTONE sur tout l'intervalle balayé. Ordre mesuré à
+δ = 0 / −0,0025 / −0,005 / −0,0075 / −0,009 / −0,0095 / −0,0099 :
+**696,453 → 689,163 → 683,174 → 687,558 → 774,961 → 1050,763 →
+4224,454** — `residualPx(0) = 696,453`, pas 696,5 (arrondi fautif du
+tour précédent). La valeur 683,174 à δ=−0,005 est le point de balayage
+le plus proche au pas 0,0025 d'un minimum réel, PAS le minimum lui-même
+(interdiction du brief : jamais dérivé le minimum par grep sur un
+balayage grossier).
 
-**Décision `??` (écrite avant tout code Point 7)** — deux voies honnêtes,
-pas trois. La voie "VP à l'infini, w=0" est FACTUELLEMENT FAUSSE sur 3
-presets/4 : quand les droites sont confondues, le VP n'est pas à l'infini,
-il est INDÉTERMINÉ (tout point de la droite convient) — renvoyer w=0
-affirmerait une direction que la donnée ne contient pas. Restent : (i) un
-drapeau de bascule exposé à l'appelant, (ii) l'exception remontant dans
-`_safeToward`. Seul (i) ne modifie ni le rendu ni le comportement
-observable — donc seul lui est committable avant le Point 7, sans
-préempter ce que le Point 7 doit mesurer (le Point 7 tranchera entre
-Voie A/Voie B sur la base d'un enum `VpFallbackMode` explicite, sans
-valeur par défaut).
+**Minimum exact, par calcul** (dérivée `d/dδ[residualPx²]=0`, racine
+réelle retenue dans le domaine physique du balayage [−0,05 ; 0,05] — une
+seconde racine réelle, −0,2256, existe mais est hors domaine, rejetée) :
+**δ_min = −0,0060411, residualPx(δ_min) = 682,1444**. Script et sortie
+complète, quatre presets, dans `docs/logs/derivation_haussmann_min.txt`
+(sympy, arithmétique rationnelle exacte sur les points de calibration,
+jamais un flottant en entrée).
+
+**Origine de l'approximation fautive du tour précédent, écrite
+explicitement** : le terme approché `(2,4375/s)²` mesurait
+`X(δ) − 700`, alors que la distance qui compte porte sur
+`X(δ) − vpBottom.x`. Sur haussmann, `vpBottom.x = 1298020/1783 =
+727,998`, PAS 700 — le couple bas y est asymétrique (wallBL 0,900 /
+wallBR 0,890, floorL 0,870 / floorR 0,860) exactement comme le couple
+haut. La constante 700 (centre canvas, valide sur les 3 presets
+symétriques où `vpBottom.x` vaut effectivement `kCanvasW/2`) avait été
+réutilisée par erreur sur le seul preset qui n'est pas symétrique. Terme
+corrigé : `(2,4375/s − 27,998)² + (665,5 + 532s)²` → minimum ≈ −0,00602 /
+682,2 (vérifié numériquement, cohérent à l'ordre de grandeur avec le
+calcul exact ci-dessus — l'écart résiduel entre −0,00602 et −0,0060411
+vient de l'approximation `s ≈ 5,81(δ+0,01)` elle-même, pas de la
+structure du terme corrigé). **L'approximation −0,0056 / 686 du tour
+précédent est retirée**, remplacée par le calcul exact ci-dessus.
+
+**Mécanisme de la remontée** (rend tout artefact inutile à invoquer) :
+`|dy|` décroît de 696,3125 (δ=0) à 677,661 (δ_min) à 665,746 (δ=−0,0099)
+— soit **−18,652px sur l'intervalle [0 ; δ_min]** et **−30,566px sur
+l'intervalle [0 ; −0,0099]** (les deux intervalles sont distincts,
+toujours écrits explicitement à chaque mention de ce chiffre — l'un
+n'est pas un raccourci de l'autre). Pendant ce temps `dx` passe de
+13,999 (δ=0) à 78,083 (δ_min) à 4171,666 (δ=−0,0099), STRICTEMENT
+croissant en valeur absolue sur tout l'intervalle. La non-monotonie de
+`residualPx` est donc portée ENTIÈREMENT par la composante x — la
+composante y est monotone (décroissante) sur tout le balayage, minimum
+compris.
+
+**`dx(δ_min) = 78,083px` — étiqueté explicitement comme coïncidence
+NUMÉRIQUE avec l'artefact −78,0px de moderne, sans lien causal** :
+`dx(δ_min)` est une composante horizontale sur haussmann, dérivée de la
+non-monotonie de `residualPx` ; l'artefact −78,0px de moderne est un
+`.abs()` sur la composante verticale signée d'un `??` — autre preset,
+autre grandeur, autre mécanisme, et les deux nombres ne sont même pas
+égaux (78,083 ≠ 78,0 exactement). Sans cette étiquette, ce rapprochement
+serait « découvert » comme un motif au tour suivant — ce n'en est pas
+un.
+
+### Résultat central, chiffres signés (moderne, exact)
+
+`(vp.dy − wallCenterY)/pH` sur la branche `vpTop` (qui se prolonge
+CONTINÛMENT en δ, y compris à travers δ_deg — c'est la valeur RENVOYÉE
+par `compute()`, via le repli `??`, qui est discontinue, pas la fonction
+mathématique `vpTop(δ)` elle-même) : forme close exacte
+`−32δ/5 − 141/250`. Valeurs : **−0,564 à δ=0** ; **−0,500 en
+prolongement affine à δ_deg** (extrapolation de la droite, pas une
+mesure directe — δ_deg est hors du domaine où `vpTop` est défini comme
+intersection finie) ; **+0,372 réellement renvoyé** via le repli sur
+`vpBottom` ; **écart signé = extrapolé − observé = −0,500 − 0,372 =
+−0,872 = −109/125 exactement**. Discontinuité en pixels : **531,375 =
+4251/8 en limite exacte** (`lim residualPx(δ→δ_deg⁻)`), **531,765
+mesuré à δ=−0,0099** (le point de balayage le plus proche, pas la
+limite elle-même). Source versionnée de toute cette chaîne :
+`docs/logs/derivation_haussmann_min.txt` (section moderne).
+
+### Le −78,0 en une ligne
+
+Artefact de `.abs()` sur une comparaison entre deux mesures non signées
+de nature différente ; la grandeur géométrique réelle est **531,375px,
+SIGNÉE**, sur moderne ; la divisibilité par 4,875 (pas natif `yPct` ×
+hauteur canvas) est une CONSÉQUENCE de la grille de balayage, jamais une
+explication causale — les deux arguments antérieurs (probabilité 1/8,
+arithmétique de grille comme explication) sont retirés, pas seulement
+complétés.
+
+### Deux formulations à verrouiller
+
+**`residualPx` est un indicateur A PRIORI, jamais un déclencheur** : il
+vaut `null` exactement à l'instant où il faudrait qu'il parle (à
+δ_deg, où la bascule se produit). Toute phrase du type « residualPx
+mesure le saut » est supprimée, remplacée par « écart baseline/repli » —
+avec le contre-exemple explicite : 4224,454px à δ=−0,0099 sur haussmann,
+une grandeur qui n'a JAMAIS été un saut entre deux valeurs successives,
+seulement une distance à un δ fixe.
+
+**La discontinuité a deux régimes, ce qui est AUSSI la justification de
+`w=0`** : bornée à 531,375px sur les 3 presets symétriques ; non bornée
+sur haussmann. C'est la raison pour laquelle `w=0` (VP à l'infini) est
+géométriquement CORRECT sur haussmann (droites distinctes, jamais
+confondues, direction bien définie à l'approche de δ_deg) et
+FACTUELLEMENT REJETÉ sur les 3 autres (droites CONFONDUES, direction
+INDÉFINIE — `w=0` y affirmerait une direction que la donnée ne contient
+pas). Cette distinction géométrique, pas une convention de code, motive
+le choix Voie A/Voie B du Point 7b.
+
+### `frac()` — deux phrases séparées, à ne pas fusionner
+
+**Fait, vérifié par lecture du prédicat** (`vanishing_point.dart`, ligne
+333, `if (result > 1.0)`) : le prédicat exact est `result > 1.0`, où
+`result = depthPx / dist(p, vpPos)` ; le docstring (ligne ~338) nomme
+explicitement la « corniche/plinthe inversée » comme motif de cette
+garde.
+
+**Hypothèse NON VÉRIFIÉE, à ne pas confondre avec le fait ci-dessus** :
+que l'encadrement de `wallCenterY` par `vpTop`/`vpBottom` (le défaut
+identifié pour le Point 8, voir plus bas) déclencherait cette garde.
+Vérifié par calcul sur les 4 presets à δ=0 (calibration de production,
+sans balayage) : `wallCenterY` EST encadré par `vpTop.y`/`vpBottom.y`
+sur les 4 presets (haussmann 54,4375 ≤ 464,34375 ≤ 750,75 ; moderne
+53,625 ≤ 397,3125 ≤ 624 ; provencal 114,094 ≤ 473,497 ≤ 720,879 ;
+scandinave 118,6 ≤ 441,883 ≤ 669,967), ET la production ne lève AUCUNE
+exception à cette calibration. **L'encadrement de wallCenterY n'implique
+donc PAS `frac() > 1`** — c'est le troisième tour où une lecture de
+docstring aurait risqué d'être prise pour une démonstration de
+prédicat ; ce n'en est pas une ici non plus.
+
+### Décision `??` (écrite avant tout code Point 7b)
+
+Deux voies honnêtes, pas trois. La voie "VP à l'infini, w=0" est
+FACTUELLEMENT FAUSSE sur 3 presets/4 : quand les droites sont
+confondues, le VP n'est pas à l'infini, il est INDÉTERMINÉ (tout point
+de la droite convient) — renvoyer w=0 affirmerait une direction que la
+donnée ne contient pas. Restent : (i) un drapeau de bascule exposé à
+l'appelant, (ii) l'exception remontant dans `_safeToward`. **Aucune
+promesse par régime n'est faite ici** : distinguer "confondues" de
+"strictement parallèles" en code est une question de MESURE NULLE
+(mesure zéro au sens propre : tout seuil ε>0 introduit pour trancher
+recréerait exactement le défaut du `??` qu'on répare — un cas
+limite juste sous le seuil retomberait dans le même silence). L'analyse
+de régime reste dans ce rapport ; rien n'est promis comme branche
+choisie avant les mesures du Point 7b.
 
 **Couverture de la branche w=0** : vérifiée par grep sur tout `test/`
 (aucune occurrence de `isAtInfinity` suivie de `isTrue`) — AUCUN test ne
 l'atteint aujourd'hui. Le `??` la rend inatteignable dès qu'un seul des
 deux couples est fini, ce qui est le cas sur les 4 presets réels à tout δ
 testé (`vpBottom` toujours fini). C'est exactement le mécanisme que la
-voie A du Point 7 (projection parallèle) voudrait utiliser : jamais
+voie A du Point 7b (projection parallèle) voudrait utiliser : jamais
 exercée par la calibration réelle actuelle.
 
-**Conséquence pour le Point 7** : aucune garde continue sur `residualFrac`
-ne peut anticiper cette dégénérescence sur 3 presets/4 (bascule discrète,
-pas un seuil qui se rapprocherait progressivement) ; sur le 4e
-(haussmann), elle n'avertirait que sur l'axe horizontal déjà établi comme
-sous-déterminé au Groupe 3.
+**Conséquence pour le Point 7b** : aucune garde continue sur
+`residualFrac` ne peut anticiper cette dégénérescence sur 3 presets/4
+(bascule discrète, pas un seuil qui se rapprocherait progressivement) ;
+sur le 4e (haussmann), elle n'avertirait que sur l'axe horizontal déjà
+établi comme sous-déterminé au Groupe 3. Contrainte de conception pour
+le Point 7b : la garde ne peut PAS consulter `residualPx` au moment de
+la bascule (il y vaut `null`) — elle doit l'avoir lu sur la baseline non
+perturbée, en amont.
 
-**Correction d'une mesure publiée par erreur ce tour** : l'hypothèse
-initiale (brief) prévoyait que `residualPx(0)` vs l'écart entre VP baseline
-et VP de repli serait une "mesure non triviale" sur haussmann (asymétrique)
-et une identité algébrique triviale seulement sur les 3 presets symétriques
-(même abscisse). Mesuré à 10 décimales : **c'est une identité UNIVERSELLE,
-vraie sur les 4 presets sans exception**, y compris haussmann où les
-abscisses de VP baseline et VP de repli sont DIFFÉRENTES
-(741,9966... ≠ 727,9977...) — donc l'hypothèse "a-b vs |a-b| coïncident
-par symétrie" ne s'applique même pas à ce cas. La vraie raison, plus
-fondamentale que la symétrie : `residualPx` est PAR DÉFINITION
-`dist(vpTop, vpBottom)` (cas "couple haut fini"), et `vpBottom` est
-invariant sous une perturbation qui ne touche que le couple haut (vérifié
-bit à bit) — donc `écart(baseline,repli) = dist(vpTop(0), vpBottom(0)) =
-residualPx(0)`, algébriquement, sur tout preset. Corrigé dans
-`vp_frac_degenere_test.dart` (Groupe 3bis) avant commit — l'hypothèse
-initiale erronée n'a jamais été committée.
+**Correction d'une mesure publiée par erreur au tour Point 6bis** :
+l'hypothèse initiale (brief) prévoyait que `residualPx(0)` vs l'écart
+entre VP baseline et VP de repli serait une "mesure non triviale" sur
+haussmann (asymétrique) et une identité algébrique triviale seulement
+sur les 3 presets symétriques (même abscisse). Mesuré à 10 décimales :
+**c'est une identité UNIVERSELLE, vraie sur les 4 presets sans
+exception**, y compris haussmann où les abscisses de VP baseline et VP
+de repli sont DIFFÉRENTES (741,9966... ≠ 727,9977...) — donc l'hypothèse
+"a-b vs |a-b| coïncident par symétrie" ne s'applique même pas à ce cas.
+La vraie raison, plus fondamentale que la symétrie : `residualPx` est
+PAR DÉFINITION `dist(vpTop, vpBottom)` (cas "couple haut fini"), et
+`vpBottom` est invariant sous une perturbation qui ne touche que le
+couple haut (vérifié bit à bit) — donc `écart(baseline,repli) =
+dist(vpTop(0), vpBottom(0)) = residualPx(0)`, algébriquement, sur tout
+preset. Corrigé dans `vp_frac_degenere_test.dart` (Groupe 3bis) avant
+commit `ec36eb0` — l'hypothèse initiale erronée n'a jamais été
+committée.
 
-**Deux formulations imprécises retirées de ce document** (identifiées ce
-tour, présentes uniquement dans le docstring du test — jamais committées
-sous cette forme dans `ETAT.md`) :
-- "dy/pH bouge... de façon proportionnelle au sens physique (delta positif
-  ⇒ dy/pH augmente)" — généralisation à partir d'un seul signe de
-  perturbation testé (+0.01) ; ne permet pas de conclure à une
-  proportionnalité pour tout δ. Remplacée par le résultat plus précis et
-  vérifié : dy/pH est affine en δ (Groupe 3bis), hors du point de bascule
-  de branche.
-- Toute formulation du type "residualPx est l'amplitude du saut" —
-  imprécise : `residualPx(0)` est la distance entre VP-haut et VP-bas
-  mesurée à UN SEUL δ (=0), pas un saut entre deux δ différents. Le
-  "saut" observable (78,0px sur moderne) est un artefact de grille, voir
-  ci-dessus — distinct de `residualPx`.
+### Une ligne pour le Point 8, à ne pas laisser enterrer par le Point 7
+
+**L'encadrement de `wallCenterY` par `vpTop`/`vpBottom`, à la
+calibration de PRODUCTION (δ=0, sans balayage), sur les 4 presets,
+reste le seul défaut identifié à ce jour qui affecte réellement ce que
+l'application affiche** — tout le reste de ce rapport (bascule de
+branche à δ_deg, discontinuité, régimes) concerne un point de
+calibration synthétique (δ_deg=−0,01) jamais atteint par la calibration
+réelle des 4 presets. Point 8 : bloqué, accord explicite requis avant
+tout travail sur ce défaut précis.
 
 Logs : `docs/logs/sweep_diagnostic_delta.txt` (balayage 0.01, archive),
 `docs/logs/sweep_diagnostic_delta_fin.txt` (balayage fin, pas jusqu'à
@@ -216,32 +357,66 @@ Logs : `docs/logs/groupe3_apres_corrections2.txt` (14/14 verts : 8 x/y +
 
 ## Point en cours / suivant
 
-Point 6bis clos ce tour (diagnostic complet -78,0px, 2 tests permanents
-Groupe 3bis par preset, décision `??` documentée). **Point 7 après
-validation seulement** — constat de lecture déjà produit au tour
-précédent (bifurcation, appelants `residualFrac`, site de `_safeToward`,
-disponibilité de `metresHauteur`), 4 faits acquis à y verser :
-- early return `RoomPainter.paint()` avant le calcul VP ⇒ 2 sites/3
+Point 6bis clos au tour précédent (commit `ec36eb0`). **Point 7a clos ce
+tour** (§B : docstring de périmètre complété 40+4=44 et mise en garde
+"miroir intentionnel" ; vérification par mutation de l'assertion de
+signe, rouge confirmé puis restauration propre ; §A : prédiction
+haussmann confirmée/falsifiée avec minimum exact dérivé, chaîne signée
+moderne exacte, `.abs()`-artefact, `frac()` fait/hypothèse séparés,
+Errata `ec36eb0`, dérivation archivée dans
+`docs/logs/derivation_haussmann_min.txt`). Commit unique §B+§A, push
+immédiat après le commit (règle explicite : jamais de vert non poussé
+dans un arbre partagé avec le bot `genspark auto-backup`).
+
+**Point 7b — après le push, PAS encore commencé** — arbitrage explicite
+à trancher avant tout code : le paramètre requis (`VpFallbackMode`)
+porte-t-il sur `VanishingPoint.compute` (24 sites d'appel à éditer en
+test + 1 site de production, refonte de signature qui noierait le diff)
+ou sur un point d'entrée dédié (`compute()` intact, documenté comme
+régime historique) ? Les deux se défendent, l'implicite ne se défend
+pas — raison du choix à écrire ici une fois tranché. Constat de lecture
+déjà produit (pas à refaire) :
+- bifurcation `vpFinite = vpTop ?? vpBottom` ligne 224 (`vpTop`/
+  `vpBottom` lignes 202-203) ;
+- `residualPx`/`residualFrac`/`residualExceeds` (lignes 56, 71-76,
+  85-89) sans aucun appelant hors du fichier (grep confirmé) ;
+- early return `RoomPainter.paint()` (`if (!withProducts ||
+  selectedProducts.isEmpty) return;` ligne 135) ⇒ 2 sites/3
   atteignent la bifurcation, pas 3 (`comparateur_screen.dart` pane
-  "avant" : `withProducts: false`, jamais atteint).
-- une exception dans `paint()` d'un `CustomPainter` produit une
-  `FlutterError` de frame — à MESURER, pas présupposer.
+  "avant" : `withProducts: false`, jamais atteint) ;
 - `metresHauteur` n'est aujourd'hui consommé que par `case 'Corniches'`
   (`room_painter.dart`) — la voie A élargit sa portée, hypothèse
-  géométrique à écrire explicitement.
-- ajouter la scène synthétique comme ligne témoin ("chemin nominal").
+  géométrique à écrire explicitement ;
+- `frac()` avec ses trois conditions (`depthPx < 0` → `ArgumentError`,
+  `d < 1e-9` → `StateError`, `result > 1` → `StateError`).
 
-Enum `VpFallbackMode{erreurExplicite,projectionParallele}` en paramètre
-requis (sans défaut). Livrable 4 presets × 2 modes, sans arbitrage.
+3 faits déjà acquis à intégrer au rapport plutôt qu'à redécouvrir : la
+branche "projection parallèle" n'est jamais atteinte aujourd'hui, donc
+non testée ; sur 3 presets/4 les droites sont confondues et non
+parallèles, donc la projection parallèle n'y a pas de direction
+définie — la branche est à la fois inatteignable et indéfinie là où
+elle serait sollicitée ; `residualPx(δ)` est utilisable comme garde a
+priori, lu sur la baseline (jamais au moment de la bascule, où il vaut
+`null`).
+
+Livrable Point 7b : 4 presets × 2 modes plus une scène synthétique
+témoin — nombre de faces, sommets de corniche, exception éventuelle,
+emprise en pixels via `PictureRecorder → toImage → toByteData`
+(comptage des pixels non transparents). Sans arbitrage.
+
 **Point 8 : ne rien commencer sans accord explicite utilisateur.**
 
 ## Points restants (ordre imposé)
 
-- **P7** — enum `VpFallbackMode{erreurExplicite,projectionParallele}` en
-  paramètre requis du constructeur de scène. Voie A (projection
-  parallèle, `metresHauteur` seul, hypothèse axe caméra⊥mur documentée
-  comme hypothèse). Voie B (erreur explicite, comportement observé
-  rapporté). Rapport mesurable 4 presets × 2 modes, sans arbitrer.
+- **P7a** — FAIT ce tour (§B + §A, commit unique, poussé). Voir
+  "Point en cours / suivant" ci-dessus.
+- **P7b** — arbitrage du site du paramètre requis (voir ci-dessus),
+  enum `VpFallbackMode{erreurExplicite,projectionParallele}` en
+  paramètre requis (sans défaut). Voie A (projection parallèle,
+  `metresHauteur` seul, hypothèse axe caméra⊥mur documentée comme
+  hypothèse). Voie B (erreur explicite, comportement observé rapporté).
+  Rapport mesurable 4 presets × 2 modes + scène synthétique, sans
+  arbitrer.
 - **P8** — bloqué, accord explicite requis.
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.

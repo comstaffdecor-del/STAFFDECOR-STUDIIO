@@ -1,0 +1,78 @@
+=== haussmann ===
+vpTop.x(delta)  = 20*(6240500*delta + 66149)/(1783*(100*delta + 1))
+vpTop.y(delta)  = 871/16 - 6175*delta/2
+vpBottom        = (1298020/1783, 3003/4) = (727.997757, 750.750000)
+pH              = 1521/2 = 760.5
+wallCenterY     = 14859/32 = 464.34375
+
+=== moderne ===
+vpTop.x(delta)  = 700
+vpTop.y(delta)  = 429/8 - 3900*delta
+vpBottom        = (700, 624) = (700.000000, 624.000000)
+pH              = 4875/8 = 609.375
+wallCenterY     = 6357/16 = 397.3125
+
+=== provencal ===
+vpTop.x(delta)  = 700
+vpTop.y(delta)  = 3651/32 - 59745*delta/16
+vpBottom        = (700, 184545/256) = (700.000000, 720.878906)
+pH              = 824481/1280 = 644.12578125
+wallCenterY     = 1212153/2560 = 473.497265625
+
+=== scandinave ===
+vpTop.x(delta)  = 700
+vpTop.y(delta)  = 593/5 - 9520*delta/3
+vpBottom        = (700, 20099/30) = (700.000000, 669.966667)
+pH              = 5831/10 = 583.1
+wallCenterY     = 26513/60 = 441.8833333333333
+
+======================================================================
+Chaîne signée MODERNE (vp.dy-wallCenterY)/pH, exacte
+======================================================================
+(vpTop.y(delta)-wallCenterY)/pH = -32*delta/5 - 141/250
+signed(0)                        = -141/250 = -0.564
+signed(delta_deg), extrapolation  = -1/2 = -0.5
+observed (repli sur vpBottom)     = 93/250 = 0.372
+ecart signe = extrapole - observe = -109/125 = -0.872
+residualPx(0)                     = 4563/8 = 570.375
+lim residualPx(delta->delta_deg)  = 4251/8 = 531.375
+residualPx(-0.0099) mesure        = 531.765
+
+======================================================================
+HAUSSMANN — sequence residualPx(delta) + minimum exact (derivee=0)
+======================================================================
+delta=       0  residualPx=696.453205
+delta= -0.0025  residualPx=689.162700
+delta=  -0.005  residualPx=683.173670
+delta= -0.0075  residualPx=687.558140
+delta=  -0.009  residualPx=774.961324
+delta= -0.0095  residualPx=1050.762740
+delta= -0.0099  residualPx=4224.454172
+
+vpBottom.x (haussmann) = 1298020/1783 = 727.997757
+residualPx(0) exact    = 13*sqrt(2335822455361)/28528 = 696.453205
+
+d/d(delta)[residualPx^2] (numerateur, apres mise au meme denominateur) — racines reelles :
+  racine reelle : -0.2255547097021878526587569
+  racine reelle : -0.006041080375209483150929288
+
+delta_min (domaine physique)     = -0.00604108037520948315
+dx(delta_min)                    = 78.0832929519966918216745422454
+dy(delta_min)                    = -677.660664341540720774375
+residualPx(delta_min)            = 682.144395736009587873497381399
+
+delta=         0  dy= -696.312500  |dy|=696.312500  dx=   13.998878
+delta= delta_min  dy= -677.660664  |dy|=677.660664  dx=   78.083293
+delta=   -0.0099  dy= -665.746250  |dy|=665.746250  dx= 4171.665732
+
+|dy| decroit de 696.312 a 665.746 sur [0 ; -0.0099] (delta = 30.566)
+|dy| decroit de 696.312 a 677.661 sur [0 ; delta_min] (delta = 18.652)
+
+dx(delta_min) = 78.083 px — coincidence NUMERIQUE avec l'artefact -78.0px (moderne, .abs() d'une AUTRE grandeur, sur un AUTRE preset) : les deux nombres ne sont MEME PAS EGAUX (78.083 != 78.0 exactement), aucune relation causale.
+
+======================================================================
+Verification de l'hypothese approximative du brief (s ~ 5.81*(delta+0.01),
+terme corrige (2.4375/s - 27.998)^2 + (665.5+532s)^2)
+======================================================================
+approximation corrigee : delta_min ~= -0.006046, residual ~= 682.2074
+(brief : ~-0.00602 / ~682.2 -- coherent, ecart residuel vient de l'approximation s~5.81(delta+0.01), pas de la structure du terme)
