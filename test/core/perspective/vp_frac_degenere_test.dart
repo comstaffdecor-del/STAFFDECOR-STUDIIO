@@ -262,36 +262,77 @@ void main() {
   // 50.0` : une norme euclidienne globale, avec un seuil de 50px jamais
   // justifié.
   //
+  // ⚠️ CORRECTION (relecture externe #2, brief "Suite 2" point 7-prélude) —
+  // `closeTo(700.0, 0.5)` était une TROISIÈME récurrence d'une constante
+  // recopiée : 700.0 = `kCanvasW / 2` (kCanvasW = 1400.0, voir ligne 70 de
+  // ce fichier), pas une grandeur propre au problème géométrique. Corrigé
+  // ci-dessous : l'assertion x compare désormais explicitement à
+  // `kCanvasW / 2`, jamais au littéral 700.0.
+  //
   // CONSTAT PAR LECTURE/EXÉCUTION (log `docs/logs/groupe3_avant_split.txt`,
   // sondes jetables supprimées après usage, chiffres reproduits ci-dessous
   // par le code committé) :
-  //   - Sur moderne/provencal/scandinave : vp.x == centre_mur_fond.x ==
-  //     700.0 EXACTEMENT (dx = 0.0). Toute la "distance" de l'ancien test
-  //     passait donc PAR LA SEULE composante verticale (dy) — l'assertion
-  //     `d > 50.0` ne prouvait RIEN sur l'axe horizontal pour ces 3
-  //     presets, qui ne l'exerçaient pas.
-  //   - Sur haussmann : vp.x = 742.0, centre_mur_fond.x = 700.0 (dx =
-  //     42.0). C'est le seul des 4 presets où dx ≠ 0.
+  //   - Sur moderne/provencal/scandinave : vp.x == kCanvasW/2 EXACTEMENT
+  //     (dx = 0.0). Toute la "distance" de l'ancien test passait donc PAR
+  //     LA SEULE composante verticale (dy) — l'assertion `d > 50.0` ne
+  //     prouvait RIEN sur l'axe horizontal pour ces 3 presets.
+  //   - Sur haussmann : vp.x = 742.0 ≠ kCanvasW/2. C'est le seul des 4
+  //     presets où dx ≠ 0.
   //
   // HYPOTHÈSE TESTÉE ET INFIRMÉE PAR LA MESURE (haussmann) : "les 42px de
   // vp.x viennent d'une asymétrie de wallTL/wallTR par rapport à l'axe
-  // médian du canvas (x=700)". Mesure : wallTL.dx - 700 = -699.944,
-  // wallTR.dx - 700 = +699.944 — somme EXACTEMENT nulle (symétrie parfaite
-  // en x, à 3e-13 de la précision machine). L'asymétrie x de wallTL/wallTR
-  // NE PEUT PAS être la source des 42px : elle est nulle par construction.
-  // La vraie source, isolée en annulant séparément chaque pente (sonde
-  // jetable) : `ceilL.dy ≠ ceilR.dy` (87.75 vs 82.875) ET `wallTL.dy ≠
-  // wallTR.dy` (97.5 vs 92.625) simultanément — aucune des deux pentes
-  // seule ne reproduit x=742.0 (annuler l'une donne x=571.1, annuler
-  // l'autre donne x=876.1) : c'est leur COMBINAISON qui produit le
-  // décalage. Ce lien-ci est démontré ; le lien "asymétrie dx" ne l'est
-  // pas — il est réfuté.
+  // médian du canvas". Mesure : (wallTL.dx - kCanvasW/2) +
+  // (wallTR.dx - kCanvasW/2) = 0.0 EXACTEMENT (à ~3e-13 de la précision
+  // machine, voir le test "haussmann : asymétrie dx de wallTL/wallTR
+  // infirmée" ci-dessous) — symétrie parfaite en x. L'asymétrie x de
+  // wallTL/wallTR NE PEUT PAS être la source des 42px : elle est nulle par
+  // construction, démontré par une assertion PERMANENTE (pas une sonde
+  // jetable supprimée).
+  //
+  // ⚠️ CORRECTION (relecture externe #2) — le mécanisme causal réel
+  // (combinaison des pentes ceilL/ceilR et wallTL/wallTR) n'existait
+  // auparavant que dans ce commentaire, chiffres recopiés de sondes
+  // jetables supprimées (87.75/82.875/97.5/92.625). Corrigé : le test
+  // "haussmann : décomposition causale de dx par isolement des pentes"
+  // ci-dessous exécute cette décomposition EN PERMANENCE à partir des
+  // valeurs réelles de `cp` (aucun chiffre recopié) et vérifie par
+  // assertion que (a) aplatir les DEUX pentes simultanément fait
+  // s'effondrer vp.x sur kCanvasW/2 exactement, (b) aplatir une seule
+  // pente à la fois NE restaure PAS ce centrage — ce qui démontre que la
+  // combinaison des deux pentes est nécessaire pour expliquer le
+  // décalage, sans prétendre à une décomposition additive précise (non
+  // démontrée, non assertionnée).
   //
   // SEUIL DE 50px SUPPRIMÉ, remplacé par : (a) deux assertions séparées
   // x/y, (b) l'écart vertical rapporté en fraction de `pH` (invariant
   // d'échelle — un écart de 300px n'a pas le même sens à pH=600 qu'à
   // pH=6000), avec une borne choisie et documentée comme telle (PAS
   // dérivée), décision de rejet renvoyée au point 7.
+  //
+  // ⚠️ FALSIFICATION (relecture externe #2, brief "Suite 2" point 7-
+  // prélude) — les 4 valeurs dy/pH mesurées tiennent dans 0.5390-0.5640
+  // (±2.3%), une plage resserrée qui pourrait suggérer que dy/pH est
+  // FORCÉ par construction (identité algébrique déguisée) plutôt qu'une
+  // vraie mesure sensible à la calibration. Le conditionnement (Groupe 5)
+  // varie lui d'un facteur 13 (98%-121%) sur les mêmes presets — mais
+  // conditionnement (angle entre fuyantes, horizontal) et dy/pH (vertical)
+  // ne sont pas nécessairement corrélés, donc cette variation ne suffit
+  // PAS à trancher.
+  //
+  // Test tranché par FALSIFICATION DIRECTE (voir test "falsification :
+  // dy/pH réagit à une perturbation de yPct" ci-dessous, permanent) :
+  // perturber wallTL.yPct et wallTR.yPct de +0.01 (symétrique) sur les 4
+  // presets fait BOUGER dy/pH de façon non nulle et proportionnelle au
+  // sens physique (delta positif ⇒ dy/pH augmente) :
+  //   haussmann  : 0.5390 → 0.5796 (Δ=+0.0406)
+  //   moderne    : 0.5640 → 0.6280 (Δ=+0.0640)
+  //   provencal  : 0.5580 → 0.6159 (Δ=+0.0580)
+  //   scandinave : 0.5544 → 0.6088 (Δ=+0.0544)
+  // dy/pH N'EST DONC PAS une identité algébrique déguisée : c'est une
+  // mesure réelle, sensible à la calibration d'entrée. La borne 0.3
+  // choisie ci-dessous a une marge d'environ ×1.8 sur les valeurs
+  // observées (0.539/0.3 ≈ 1.80), documentée comme telle — CHOISIE, PAS
+  // DÉRIVÉE, décision de rejet renvoyée au point 7.
   group('Groupe 3 — VP vs centre géométrique du mur du fond, composantes '
       'x et y séparées (régime VP-centre)', () {
     for (final key in kDemoSceneNativeSize.keys) {
@@ -354,37 +395,215 @@ void main() {
         print('[groupe3-x] $key : vp.x=${vp.vp.dx}  '
             'centre_x=${wallCenterX.toStringAsFixed(1)}');
 
+        final canvasCenterX = kCanvasW / 2;
+
         if (key == 'haussmann') {
-          // Seul preset où vp.x ≠ 700.0 (742.0) — voir le docstring de
-          // ce groupe : le lien "asymétrie dx de wallTL/wallTR" a été
-          // TESTÉ ET INFIRMÉ (dx symétrique à 3e-13 près). La source
-          // réelle démontrée est la combinaison des deux pentes ceilL/
-          // ceilR et wallTL/wallTR (voir docstring) — pas une asymétrie
-          // horizontale simple. On ne réaffirme donc PAS x==700.0 ici,
-          // mais on ne prétend pas non plus avoir une explication
-          // dérivée à assertionner : ce test rapporte seulement la
-          // valeur mesurée.
+          // Seul preset où vp.x ≠ kCanvasW/2 (742.0, valeur mesurée) —
+          // voir le docstring de ce groupe et le test de décomposition
+          // causale ci-après : le lien "asymétrie dx de wallTL/wallTR" a
+          // été TESTÉ ET INFIRMÉ (dx symétrique à 3e-13 près, assertion
+          // permanente ci-dessous). On ne réaffirme donc PAS
+          // x==kCanvasW/2 ici, mais on ne prétend pas non plus avoir une
+          // décomposition additive précise à assertionner : ce test
+          // rapporte seulement la valeur mesurée.
           expect(vp.vp.dx, closeTo(742.0, 0.5), reason: 'valeur mesurée, '
               'source démontrée = combinaison des pentes ceilL/ceilR et '
-              'wallTL/wallTR (voir docstring du groupe), PAS une '
-              "asymétrie dx (infirmée par la mesure : dx de wallTL/wallTR "
-              'symétrique à 3e-13 près).');
+              'wallTL/wallTR (voir test de décomposition causale '
+              'ci-dessous), PAS une asymétrie dx (infirmée par la mesure '
+              'permanente : dx de wallTL/wallTR symétrique à 3e-13 près).');
         } else {
           // Assertion POSITIVE affirmant la sous-détermination actuelle :
-          // vp.x == 700.0 (centre canvas imposé par calibration, PAS une
-          // mesure d'obliquité) à 0.5px près sur moderne/provencal/
+          // vp.x == kCanvasW/2 (centre canvas imposé par calibration, PAS
+          // une mesure d'obliquité) à 0.5px près sur moderne/provencal/
           // scandinave. Volontairement PAS un skip() (un test sauté ne
           // signale rien) : cette assertion devient ROUGE le jour où
           // l'axe horizontal portera enfin de l'information — c'est le
           // comportement attendu, pas un test à "réparer" à ce moment.
-          expect(vp.vp.dx, closeTo(700.0, 0.5), reason: "preset '$key' : "
-              'vp.x doit rester égal au centre canvas (700.0) tant que '
-              "l'axe horizontal ne porte aucune information de "
+          expect(vp.vp.dx, closeTo(canvasCenterX, 0.5), reason: "preset "
+              "'$key' : vp.x doit rester égal au centre canvas "
+              '(kCanvasW/2 = ${canvasCenterX.toStringAsFixed(1)}) tant '
+              "que l'axe horizontal ne porte aucune information de "
               "profondeur pour ce preset -- si cette assertion échoue, "
               "c'est que la calibration a changé et QUE L'AXE HORIZONTAL "
               'PORTE MAINTENANT UNE INFORMATION RÉELLE : ce test doit '
               'alors être retiré, pas relâché.');
         }
+      });
+    }
+
+    // -----------------------------------------------------------------
+    // Décomposition causale de dx sur haussmann (relecture externe #2) :
+    // remplace l'ancienne explication qui n'existait que dans un
+    // commentaire avec des chiffres recopiés de sondes jetables
+    // supprimées. Ici, TOUT est recalculé à partir des points de
+    // calibration réels de `cp` — aucun chiffre en dur.
+    // -----------------------------------------------------------------
+    test('haussmann : asymétrie dx de wallTL/wallTR infirmée comme '
+        'source du décalage (assertion permanente, pas une sonde '
+        'jetable)', () {
+      final cp = calibPointsFor('haussmann');
+      final canvasCenterX = kCanvasW / 2;
+      final asymSum =
+          (cp.wallTL.dx - canvasCenterX) + (cp.wallTR.dx - canvasCenterX);
+
+      print('[groupe3-x-asym] haussmann : wallTL.dx-centre='
+          '${(cp.wallTL.dx - canvasCenterX).toStringAsFixed(6)}  '
+          'wallTR.dx-centre=${(cp.wallTR.dx - canvasCenterX).toStringAsFixed(6)}  '
+          'somme=${asymSum.toStringAsFixed(6)}');
+
+      expect(
+        asymSum.abs(),
+        lessThan(1e-9),
+        reason: "preset 'haussmann' : la somme des écarts (wallTL.dx - "
+            'centre) + (wallTR.dx - centre) devrait être exactement '
+            'nulle par symétrie de construction si cette assertion '
+            'échoue, la calibration a changé et l\'hypothèse '
+            "d'asymétrie dx redevient recevable comme source des 42px "
+            '- elle est pour l\'instant infirmée par cette mesure.',
+      );
+    });
+
+    test('haussmann : décomposition causale de dx par isolement des '
+        'pentes ceilL/ceilR et wallTL/wallTR (aucun chiffre recopié '
+        "d'une sonde supprimée)", () {
+      final cp = calibPointsFor('haussmann');
+      final canvasCenterX = kCanvasW / 2;
+
+      Offset compute(Offset ceilL, Offset ceilR, Offset wallTL, Offset wallTR) =>
+          VanishingPoint.compute(
+            fTL: ceilL,
+            fTR: ceilR,
+            fBL: cp.floorL,
+            fBR: cp.floorR,
+            wallTL: wallTL,
+            wallTR: wallTR,
+            wallBL: cp.wallBL,
+            wallBR: cp.wallBR,
+          ).vp;
+
+      final vpReal = compute(cp.ceilL, cp.ceilR, cp.wallTL, cp.wallTR);
+
+      final avgCeilY = (cp.ceilL.dy + cp.ceilR.dy) / 2;
+      final ceilLFlat = Offset(cp.ceilL.dx, avgCeilY);
+      final ceilRFlat = Offset(cp.ceilR.dx, avgCeilY);
+      final vpCeilFlat = compute(ceilLFlat, ceilRFlat, cp.wallTL, cp.wallTR);
+
+      final avgWallY = (cp.wallTL.dy + cp.wallTR.dy) / 2;
+      final wallTLFlat = Offset(cp.wallTL.dx, avgWallY);
+      final wallTRFlat = Offset(cp.wallTR.dx, avgWallY);
+      final vpWallFlat = compute(cp.ceilL, cp.ceilR, wallTLFlat, wallTRFlat);
+
+      final vpBothFlat = compute(ceilLFlat, ceilRFlat, wallTLFlat, wallTRFlat);
+
+      print('[groupe3-x-decomp] haussmann : reel.x=${vpReal.dx}  '
+          'ceilAplati.x=${vpCeilFlat.dx}  wallAplati.x=${vpWallFlat.dx}  '
+          'lesDeuxAplatis.x=${vpBothFlat.dx}  '
+          'centre=${canvasCenterX.toStringAsFixed(1)}');
+
+      // (a) Aplatir les DEUX pentes simultanément fait s'effondrer vp.x
+      // exactement sur le centre canvas.
+      expect(
+        vpBothFlat.dx,
+        closeTo(canvasCenterX, 0.5),
+        reason: 'aplatir simultanément ceilL/ceilR.dy ET wallTL/wallTR.dy '
+            'devrait ramener vp.x sur le centre canvas — si ce n\'est '
+            'plus le cas, la décomposition causale documentée ici n\'est '
+            'plus valide.',
+      );
+
+      // (b) Aplatir UNE SEULE pente à la fois ne restaure PAS le
+      // centrage — preuve que la combinaison des deux est nécessaire,
+      // sans affirmer de décomposition additive précise.
+      expect(
+        vpCeilFlat.dx,
+        isNot(closeTo(canvasCenterX, 5.0)),
+        reason: 'aplatir seulement la pente du plafond ne doit PAS '
+            'suffire à ramener vp.x sur le centre canvas — sinon la '
+            'pente du plafond seule expliquerait le décalage, ce qui '
+            'contredirait la décomposition causale documentée.',
+      );
+      expect(
+        vpWallFlat.dx,
+        isNot(closeTo(canvasCenterX, 5.0)),
+        reason: 'aplatir seulement la pente du mur latéral ne doit PAS '
+            'suffire à ramener vp.x sur le centre canvas — sinon la '
+            'pente du mur seule expliquerait le décalage, ce qui '
+            'contredirait la décomposition causale documentée.',
+      );
+    });
+
+    // -----------------------------------------------------------------
+    // Falsification (relecture externe #2) : dy/pH est-il une mesure
+    // sensible à la calibration, ou une identité algébrique déguisée qui
+    // ne bougerait jamais quel que soit l'input ? Tranché en perturbant
+    // wallTL.yPct/wallTR.yPct de +0.01 (symétrique) sur les 4 presets et
+    // en vérifiant que dy/pH bouge d'une quantité NON NULLE dans le sens
+    // physiquement attendu (perturbation positive vers le bas ⇒ dy/pH
+    // augmente). Si dy/pH restait strictement identique à la baseline
+    // quel que soit l'input, l'assertion `dyOverPh > 0.3` ci-dessus ne
+    // testerait qu'une propriété de la formule, jamais la calibration
+    // réelle — ce n'est PAS le cas ici (voir chiffres dans le docstring
+    // du groupe, reproduits par ce test).
+    // -----------------------------------------------------------------
+    for (final key in kDemoSceneNativeSize.keys) {
+      test('$key : falsification — dy/pH réagit à une perturbation de '
+          'yPct (pas une identité algébrique déguisée)', () {
+        final base = PerspCalib.forDemoScene(key);
+        final (srcW, srcH) = kDemoSceneNativeSize[key]!;
+
+        double dyOverPhFor(PerspCalib calib) {
+          final imgDraw = imgDrawFor(srcW, srcH);
+          final cp = CalibCanvasPoints.fromCalib(
+            calib,
+            imgDraw: imgDraw,
+            w: kCanvasW,
+            h: kCanvasH,
+          );
+          final vp = VanishingPoint.compute(
+            fTL: cp.ceilL,
+            fTR: cp.ceilR,
+            fBL: cp.floorL,
+            fBR: cp.floorR,
+            wallTL: cp.wallTL,
+            wallTR: cp.wallTR,
+            wallBL: cp.wallBL,
+            wallBR: cp.wallBR,
+          );
+          final wallCenterY =
+              (cp.ceilL.dy + cp.ceilR.dy + cp.floorL.dy + cp.floorR.dy) / 4;
+          final dy = (vp.vp.dy - wallCenterY).abs();
+          return dy / vp.pH;
+        }
+
+        final baseline = dyOverPhFor(base);
+        const perturbationDelta = 0.01;
+        final perturbed = base.copyWith(
+          wallTL: base.wallTL.copyWith(
+            yPct: base.wallTL.yPct + perturbationDelta,
+          ),
+          wallTR: base.wallTR.copyWith(
+            yPct: base.wallTR.yPct + perturbationDelta,
+          ),
+        );
+        final perturbedValue = dyOverPhFor(perturbed);
+        final delta = perturbedValue - baseline;
+
+        print('[groupe3-y-falsification] $key : baseline=$baseline  '
+            'perturbe(+$perturbationDelta)=$perturbedValue  delta=$delta');
+
+        expect(
+          delta,
+          greaterThan(0.001),
+          reason: "preset '$key' : perturber wallTL/wallTR.yPct de "
+              '+$perturbationDelta ne fait bouger dy/pH que de '
+              '${delta.toStringAsFixed(6)} — si ce delta était nul ou '
+              'quasi nul, dy/pH serait une identité algébrique déguisée '
+              '(forcée par la construction, indépendante de la '
+              "calibration réelle), et l'assertion `dyOverPh > 0.3` du "
+              'test y ci-dessus devrait être requalifiée comme telle au '
+              'lieu de rester présentée comme une mesure de '
+              'conditionnement.',
+        );
       });
     }
   });
