@@ -1,4 +1,4 @@
-# Extrait curé — 6 lignes utiles issues des CSV run_step non versionnés
+# Extrait curé — 5 lignes utiles issues des CSV run_step non versionnés
 # (tools/dxf_pipeline/logs/, ignoré par .gitignore), citées par
 # docs/COURRIER_A_STEP_5SKU_NON_TRAITABLES.md. Ceci N'EST PAS un log :
 # c'est un extrait ponctuel curé dans docs/, ne contourne donc pas la
@@ -8,12 +8,15 @@
 #   run_step_20260826_150323.csv -> D629
 #   run_step_20260826_150426.csv -> D802
 #   run_step_20260826_150531.csv -> D880
-#   run_step_20260826_150634.csv -> D887 (second essai, .step)
-#   run_step_20260826_145936.csv -> D887 (premier essai, ligne D887 uniquement)
+#   run_step_20260826_145936.csv (premier essai) ET
+#   run_step_20260826_150634.csv (second essai) -> D887 : deux tentatives,
+#   résultat identique (ligne D887 dédupliquée ci-dessous, une seule
+#   occurrence conservée — la répétition sur 6 tours n'ajoutait aucune
+#   information, le message et tous les champs étaient strictement
+#   identiques entre les deux essais).
 sku,fichier,mapping_absent,statut,nb_sommets,nb_sommets_dedup_retires,bbox_w_mm,bbox_h_mm,hauteur_mur_mm,projection_plafond_mm,motif_type,motif_periode_mm,nb_solides,unite_ocp,unite_kind_brut,unite_facteur_brut,origine_unite,message
 D615,D615.stp,True,ERREUR_SELECTION,0,0,,,,,,,1,MM,CONVERSION_BASED_UNIT,1.0,step_header,Aucune coupe valide sur le balayage dense de D615.stp (85 positions testees). Solide non ferme (non watertight) ou axe long mal identifie.
 D629,D629.stp,True,ERREUR_SELECTION,0,0,,,,,,,1,MM,CONVERSION_BASED_UNIT,1.0,step_header,Aucune coupe valide sur le balayage dense de D629.stp (97 positions testees). Solide non ferme (non watertight) ou axe long mal identifie.
 D802,D802.stp,True,ERREUR_SELECTION,0,0,,,,,,,1,MM,CONVERSION_BASED_UNIT,1.0,step_header,Aucune coupe valide sur le balayage dense de D802.stp (96 positions testees). Solide non ferme (non watertight) ou axe long mal identifie.
 D880,D880.stp,True,ERREUR_SELECTION,0,0,,,,,,,1,MM,CONVERSION_BASED_UNIT,1.0,step_header,Aucune coupe valide sur le balayage dense de D880.stp (97 positions testees). Solide non ferme (non watertight) ou axe long mal identifie.
-D887,D887.step,True,ERREUR_SELECTION,0,0,,,,,,,1,MM,SI_UNIT,,step_header,Aucune coupe valide sur le balayage dense de D887.step (97 positions testees). Solide non ferme (non watertight) ou axe long mal identifie. [second essai]
-D887,D887.step,True,ERREUR_SELECTION,0,0,,,,,,,1,MM,SI_UNIT,,step_header,Aucune coupe valide sur le balayage dense de D887.step (97 positions testees). Solide non ferme (non watertight) ou axe long mal identifie. [premier essai]
+D887,D887.step,True,ERREUR_SELECTION,0,0,,,,,,,1,MM,SI_UNIT,,step_header,Aucune coupe valide sur le balayage dense de D887.step (97 positions testees). Solide non ferme (non watertight) ou axe long mal identifie.

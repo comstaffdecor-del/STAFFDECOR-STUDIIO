@@ -322,12 +322,19 @@ void main() {
   // Test tranché par FALSIFICATION DIRECTE (voir test "falsification :
   // dy/pH réagit à une perturbation de yPct" ci-dessous, permanent) :
   // perturber wallTL.yPct et wallTR.yPct de +0.01 (symétrique) sur les 4
-  // presets fait BOUGER dy/pH de façon non nulle et proportionnelle au
-  // sens physique (delta positif ⇒ dy/pH augmente) :
+  // presets fait BOUGER dy/pH d'une quantité non nulle :
   //   haussmann  : 0.5390 → 0.5796 (Δ=+0.0406)
   //   moderne    : 0.5640 → 0.6280 (Δ=+0.0640)
   //   provencal  : 0.5580 → 0.6159 (Δ=+0.0580)
   //   scandinave : 0.5544 → 0.6088 (Δ=+0.0544)
+  // ⚠️ CORRECTION (Point 6bis) — un seul signe de perturbation a été
+  // testé ici (+0.01 sur les 4 presets). "Δ positif" sur CE signe
+  // d'entrée ne permet PAS de conclure à une proportionnalité générale
+  // "delta positif ⇒ dy/pH augmente" pour tout δ : c'est une
+  // généralisation non vérifiée (le Groupe 3bis ci-dessous montre que
+  // dy/pH est affine en δ sur l'intervalle testé, ce qui est plus fort
+  // et plus précis que cette phrase, mais seulement hors du point de
+  // bascule de branche δ_deg — voir Groupe 3bis pour la portée exacte).
   // dy/pH N'EST DONC PAS une identité algébrique déguisée : c'est une
   // mesure réelle, sensible à la calibration d'entrée. La borne 0.3
   // choisie ci-dessous a une marge d'environ ×1.8 sur les valeurs
@@ -603,6 +610,449 @@ void main() {
               'test y ci-dessus devrait être requalifiée comme telle au '
               'lieu de rester présentée comme une mesure de '
               'conditionnement.',
+        );
+      });
+    }
+  });
+
+  // =========================================================================
+  // GROUPE 3bis — Diagnostic de l'anomalie -78.0px (relecture externe #2,
+  // tour suivant) : la falsification ci-dessus semblait montrer un point
+  // hors droite à δ=-0.01. Balayage fin exécuté (log
+  // `docs/logs/sweep_diagnostic_delta.txt` et
+  // `docs/logs/sweep_diagnostic_delta_fin.txt`) : le point n'est PAS une
+  // perturbation continue de la géométrie, c'est une BASCULE DE BRANCHE
+  // dans `VanishingPoint.compute` (`vanishing_point.dart` ligne 224,
+  // `vpFinite = vpTop ?? vpBottom`).
+  //
+  // Mécanisme, confirmé par exécution, pas supposé : à δ_deg = -0.01
+  // EXACTEMENT, sur les 4 presets simultanément, `wallTL.yPct ==
+  // ceilL.yPct` (et le pendant droit) — invariant de construction des 4
+  // presets démo (`lib/models/persp_calib.dart`), pas un hasard du pas de
+  // balayage choisi. `wallTL.dy` et `fTL.dy` coïncident alors exactement
+  // dans le canvas.
+  //
+  // Deux régimes géométriques DISTINCTS à cette coïncidence — vocabulaire
+  // tenu strictement selon la mesure, pas par convention :
+  //   - moderne/provencal/scandinave (symétriques en x, ceilL.dy ==
+  //     ceilR.dy et wallTL.dy == wallTR.dy) : les deux fuyantes
+  //     deviennent CONFONDUES (même droite, pas juste parallèles).
+  //     `residualPx` décroît de façon monotone et BORNÉE en approchant
+  //     δ_deg (moderne : 570.4 à δ=0 → 531.8 à δ=-0.0099), puis s'éteint
+  //     d'un coup à δ_deg exact.
+  //   - haussmann (asymétrique, ceilL.dy=87.75 ≠ ceilR.dy=82.875) : les
+  //     deux fuyantes deviennent PARALLÈLES au sens strict (droites
+  //     distinctes, jamais confondues). `residualPx` DIVERGE en
+  //     approchant δ_deg (696.5 à δ=0 → 4224.5 à δ=-0.0099), puis
+  //     s'éteint d'un coup à δ_deg exact.
+  // Dans les deux cas, `lineIntersect` renvoie `null` à δ_deg exact (angle
+  // nul entre les deux droites, `denom.abs() < 0.001` dans
+  // `persp_geometry.dart`) → `vpTop == null` → replis sur `vpBottom` (qui
+  // ne dépend que de wallBL/wallBR/floorL/floorR, jamais perturbés ici,
+  // donc constant sur tout le balayage) → `residualPx` devient `null`
+  // (un seul couple a produit une intersection, aucun résidu n'est
+  // mesurable — pas `0.0`, voir docstring de `residualPx`).
+  //
+  // Trois causes candidates, tranchées dans l'ordre de coût imposé :
+  //   1. Bug de sonde (liste de δ dupliquée / variable capturée) — ÉCARTÉ
+  //      : reproduit par une sonde neuve indépendante, comportement
+  //      identique sur les 4 presets, expliqué structurellement par (2).
+  //   2. `vpTop == null` → repli sur `vpBottom` — CONFIRMÉ : `residualPx`
+  //      == null exactement à δ_deg sur les 4 presets, sans exception.
+  //   3. Autre cause — sans objet, (2) épuise l'explication.
+  //
+  // Conséquence pour le Point 7 : aucune garde continue sur `residualFrac`
+  // ne peut anticiper cette dégénérescence sur 3 presets/4 (bascule
+  // discrète, pas un seuil continu qui se rapprocherait progressivement) ;
+  // sur le 4e (haussmann), elle n'avertirait que sur l'axe horizontal déjà
+  // établi comme sous-déterminé au Groupe 3.
+  //
+  // Couverture de la branche w=0 (VP à l'infini) — vérifiée par grep sur
+  // tout `test/` (aucune occurrence de `isAtInfinity` suivie de `isTrue`) :
+  // AUCUN test n'atteint cette branche aujourd'hui. Le `??` ligne 224 de
+  // `vanishing_point.dart` la rend inatteignable dès qu'un seul des deux
+  // couples (haut ou bas) est fini — ce qui est le cas sur les 4 presets
+  // réels à tout δ testé ici (`vpBottom` est toujours fini). C'est
+  // exactement le mécanisme que la voie A du Point 7 (projection
+  // parallèle) voudrait utiliser : elle n'est aujourd'hui jamais exercée
+  // par la calibration réelle.
+  // =========================================================================
+  group('Groupe 3bis — affinité de dy/pH (signée) et discontinuité de '
+      'branche à δ_deg, diagnostic complet', () {
+    for (final key in kDemoSceneNativeSize.keys) {
+      // -----------------------------------------------------------------
+      // Test 1 — affinité de la grandeur SIGNÉE (vp.dy - wallCenterY)/pH
+      // sur δ ∈ [-0.05, 0.05], δ_deg inclus dans l'intervalle balayé.
+      // L'exclusion du point dégénéré est pilotée par `residualPx !=
+      // null` (jamais par un δ écrit en dur) : c'est la garde qui décide,
+      // pas une connaissance a priori de la valeur -0.01.
+      //
+      // Grandeur SIGNÉE, pas sa valeur absolue : si le signe s'inversait
+      // dans l'intervalle, |x| replierait la droite en V et ce test
+      // mesurerait un pli au lieu d'une affinité. Assertion de constance
+      // du signe ajoutée explicitement sur les pas retenus.
+      // -----------------------------------------------------------------
+      test('$key : affinité de la grandeur signée (vp.dy-wallCenterY)/pH '
+          'en δ, hors point de bascule de branche', () {
+        final base = PerspCalib.forDemoScene(key);
+        final (srcW, srcH) = kDemoSceneNativeSize[key]!;
+        final imgDraw = imgDrawFor(srcW, srcH);
+
+        // (signedRatio, residualPx) pour chaque δ du balayage.
+        final points = <double, (double signed, double? residualPx)>{};
+        for (int i = -5; i <= 5; i++) {
+          final delta = i * 0.01;
+          final calib = base.copyWith(
+            wallTL: base.wallTL.copyWith(yPct: base.wallTL.yPct + delta),
+            wallTR: base.wallTR.copyWith(yPct: base.wallTR.yPct + delta),
+          );
+          final cp = CalibCanvasPoints.fromCalib(
+            calib,
+            imgDraw: imgDraw,
+            w: kCanvasW,
+            h: kCanvasH,
+          );
+          final vp = VanishingPoint.compute(
+            fTL: cp.ceilL,
+            fTR: cp.ceilR,
+            fBL: cp.floorL,
+            fBR: cp.floorR,
+            wallTL: cp.wallTL,
+            wallTR: cp.wallTR,
+            wallBL: cp.wallBL,
+            wallBR: cp.wallBR,
+          );
+          final wallCenterY =
+              (cp.ceilL.dy + cp.ceilR.dy + cp.floorL.dy + cp.floorR.dy) / 4;
+          final signed = (vp.vp.dy - wallCenterY) / vp.pH;
+          points[delta] = (signed, vp.residualPx);
+        }
+
+        // Exclusion du point dégénéré PILOTÉE PAR residualPx == null,
+        // jamais par un δ écrit en dur (δ_deg n'est lu nulle part ici).
+        final retenus = points.entries.where((e) => e.value.$2 != null).toList()
+          ..sort((a, b) => a.key.compareTo(b.key));
+
+        expect(
+          retenus.length,
+          lessThan(points.length),
+          reason: "preset '$key' : ce test suppose qu'au moins un δ du "
+              'balayage produit residualPx == null (bascule de branche) '
+              '— si tous les δ ont un residualPx fini, la garde exclut '
+              "zéro point et ce test ne couvre plus l'exclusion qu'il "
+              'prétend vérifier.',
+        );
+
+        // ignore: avoid_print
+        print('[groupe3bis-affine] $key : ${retenus.length}/${points.length} '
+            'points retenus (residualPx != null), exclu='
+            '${points.entries.where((e) => e.value.$2 == null).map((e) => e.key).toList()}');
+
+        // Constance du signe sur les pas retenus (pas de pli en V).
+        final signs = retenus.map((e) => e.value.$1.sign).toSet();
+        expect(
+          signs.length,
+          1,
+          reason: "preset '$key' : le signe de (vp.dy-wallCenterY)/pH "
+              'change sur les pas retenus ($signs) — la valeur absolue '
+              'replierait alors la droite affine en V, ce test doit '
+              'utiliser la grandeur signée pour rester valide.',
+        );
+
+        // Affinité EXACTE : les pas consécutifs retenus doivent avoir un
+        // incrément constant. Tolérance serrée (l'affinité est exacte
+        // dans ce modèle, mesurée à 0.0640/pas sur moderne).
+        final incs = <double>[];
+        for (int i = 1; i < retenus.length; i++) {
+          final dDelta = retenus[i].key - retenus[i - 1].key;
+          final dSigned = retenus[i].value.$1 - retenus[i - 1].value.$1;
+          incs.add(dSigned / dDelta);
+        }
+        for (final inc in incs) {
+          expect(
+            inc,
+            closeTo(incs.first, 1e-6),
+            reason: "preset '$key' : incrément non constant "
+                '(${incs.map((v) => v.toStringAsFixed(6)).toList()}) — '
+                "l'affinité mesurée dans cette configuration symétrique "
+                "ne tient plus, hors du point de bascule de branche.",
+          );
+        }
+      });
+
+      // -----------------------------------------------------------------
+      // Test 2 — discontinuité à δ_deg, en golden ASSUMÉ (les valeurs
+      // numériques ci-dessous sont mesurées, pas dérivées analytiquement
+      // pour tous les presets — seul haussmann a une dérivation propre,
+      // voir plus bas).
+      //
+      // Formulation NON CIRCULAIRE : on ne vérifie PAS `vp == vpBottom`
+      // en recalculant `lineIntersect(wallBL, fBL, wallBR, fBR)` (ce
+      // serait réimplémenter le chemin de production — défaut du Point
+      // 4a). À la place : on déplace le couple haut vers une AUTRE
+      // configuration dégénérée (même wallTL/wallTR translatés d'un delta
+      // supplémentaire qui préserve wallTL.dy == fTL.dy, donc reste
+      // dégénéré) et on vérifie que le résultat est INCHANGÉ — ça
+      // démontre que la sortie ne dépend plus que du couple bas, sans
+      // jamais recopier son calcul.
+      // -----------------------------------------------------------------
+      test('$key : discontinuité à δ_deg — residualPx==null, invariant '
+          'yPct, et repli sur le couple bas démontré sans réimplémenter '
+          "lineIntersect", () {
+        final base = PerspCalib.forDemoScene(key);
+        final (srcW, srcH) = kDemoSceneNativeSize[key]!;
+        final imgDraw = imgDrawFor(srcW, srcH);
+
+        // Invariant structurel des 4 presets démo (persp_calib.dart) :
+        // wallTL.yPct - ceilL.yPct == 0.01, et le pendant droit. Tolérance
+        // sur la représentation double (0.100-0.090 vaut
+        // 0.010000000000000009 en pratique), pas ==.
+        final baseCp = CalibCanvasPoints.fromCalib(
+          base,
+          imgDraw: imgDraw,
+          w: kCanvasW,
+          h: kCanvasH,
+        );
+        expect(
+          base.wallTL.yPct - base.ceilL.yPct,
+          closeTo(0.01, 1e-12),
+          reason: "preset '$key' : invariant wallTL.yPct-ceilL.yPct "
+              'attendu ≈0.01 (source de la dégénérescence à δ=-0.01) '
+              "absent — si cette calibration a changé, δ_deg n'est plus "
+              '-0.01 pour ce preset et ce test doit être adapté.',
+        );
+        expect(
+          base.wallTR.yPct - base.ceilR.yPct,
+          closeTo(0.01, 1e-12),
+          reason: "preset '$key' : invariant wallTR.yPct-ceilR.yPct "
+              'attendu ≈0.01 absent (pendant droit).',
+        );
+
+        const deltaDeg = -0.01;
+        final calibDeg = base.copyWith(
+          wallTL: base.wallTL.copyWith(yPct: base.wallTL.yPct + deltaDeg),
+          wallTR: base.wallTR.copyWith(yPct: base.wallTR.yPct + deltaDeg),
+        );
+        final cpDeg = CalibCanvasPoints.fromCalib(
+          calibDeg,
+          imgDraw: imgDraw,
+          w: kCanvasW,
+          h: kCanvasH,
+        );
+        final vpDeg = VanishingPoint.compute(
+          fTL: cpDeg.ceilL,
+          fTR: cpDeg.ceilR,
+          fBL: cpDeg.floorL,
+          fBR: cpDeg.floorR,
+          wallTL: cpDeg.wallTL,
+          wallTR: cpDeg.wallTR,
+          wallBL: cpDeg.wallBL,
+          wallBR: cpDeg.wallBR,
+        );
+
+        expect(
+          vpDeg.residualPx,
+          isNull,
+          reason: "preset '$key' : à δ_deg=$deltaDeg, residualPx devrait "
+              'être null (couple haut dégénéré, un seul couple produit '
+              "une intersection finie) — si ce n'est plus le cas, la "
+              "calibration de ce preset a changé et δ_deg n'est plus "
+              '-0.01.',
+        );
+
+        // Preuve NON CIRCULAIRE que le résultat ne dépend plus que du
+        // couple bas : on déplace le couple haut vers une configuration
+        // dégénérée DIFFÉRENTE (translation horizontale de wallTL/wallTR,
+        // qui préserve wallTL.dy==fTL.dy donc reste sur la même droite
+        // dégénérée mais change le point de départ du segment) — le
+        // résultat de compute() doit rester STRICTEMENT identique, sans
+        // jamais recalculer lineIntersect(wallBL,fBL,wallBR,fBR)
+        // nous-mêmes pour le vérifier.
+        final calibDegShifted = calibDeg.copyWith(
+          wallTL: calibDeg.wallTL.copyWith(
+            xPct: calibDeg.wallTL.xPct + 0.02,
+          ),
+          wallTR: calibDeg.wallTR.copyWith(
+            xPct: calibDeg.wallTR.xPct - 0.02,
+          ),
+        );
+        final cpDegShifted = CalibCanvasPoints.fromCalib(
+          calibDegShifted,
+          imgDraw: imgDraw,
+          w: kCanvasW,
+          h: kCanvasH,
+        );
+        final vpDegShifted = VanishingPoint.compute(
+          fTL: cpDegShifted.ceilL,
+          fTR: cpDegShifted.ceilR,
+          fBL: cpDegShifted.floorL,
+          fBR: cpDegShifted.floorR,
+          wallTL: cpDegShifted.wallTL,
+          wallTR: cpDegShifted.wallTR,
+          wallBL: cpDegShifted.wallBL,
+          wallBR: cpDegShifted.wallBR,
+        );
+
+        // ignore: avoid_print
+        print('[groupe3bis-discontinuite] $key : vp.vp(δ_deg)=${vpDeg.vp}  '
+            'vp.vp(δ_deg, wallTL/TR décalés en x)=${vpDegShifted.vp}  '
+            'residualPx(décalé)=${vpDegShifted.residualPx}');
+
+        expect(
+          vpDegShifted.residualPx,
+          isNull,
+          reason: "preset '$key' : la configuration décalée doit rester "
+              'dégénérée (translation horizontale du mur latéral ne '
+              "change pas son ordonnée) — sinon la démonstration n'est "
+              'plus valide.',
+        );
+        expect(
+          vpDegShifted.vp,
+          equals(vpDeg.vp),
+          reason: "preset '$key' : déplacer horizontalement wallTL/wallTR "
+              '(tout en gardant la dégénérescence verticale) ne doit '
+              'RIEN changer au résultat — cela démontre que compute() ne '
+              "dépend plus que du couple bas dans ce régime, sans qu'on "
+              'ait besoin de recalculer lineIntersect(wallBL,fBL,wallBR,'
+              'fBR) nous-mêmes pour le prouver (ce qui serait circulaire, '
+              'défaut du Point 4a).',
+        );
+
+        // Non-monotonie de dy/pH autour de δ_deg = signature du CHANGEMENT
+        // DE BRANCHE, pas une propriété de dy/pH elle-même — donc AUCUNE
+        // assertion de monotonie n'est écrite ici (ni verte, ni rouge) :
+        // la non-monotonie n'est pas ce que ce test mesure, c'est ce que
+        // le test 1 ci-dessus évite en excluant précisément δ_deg via
+        // residualPx != null.
+        expect(
+          baseCp.wallTL.dy,
+          isNotNull, // sanity : baseCp construit sans erreur.
+        );
+      });
+    }
+
+    // -----------------------------------------------------------------
+    // Mesure "residualPx(0) vs écart VP-baseline/VP-repli" — HYPOTHÈSE
+    // INITIALE (brief) RÉFUTÉE PAR MESURE, corrigée ici avant commit.
+    //
+    // Hypothèse écrite avant mesure : sur haussmann (asymétrique), les
+    // deux grandeurs seraient une "mesure non triviale" distincte, la
+    // composante x isolant l'asymétrie ; sur les 3 presets symétriques
+    // seulement, ce serait une identité algébrique triviale (même
+    // abscisse ⇒ a-b et |a-b| coïncident).
+    //
+    // Mesure exécutée (sonde `_tmp_probe_precision_haussmann*.dart`,
+    // 10 décimales, supprimée après usage) : sur les 4 presets, SANS
+    // EXCEPTION, `residualPx(0) == écart(baseline,repli)` bit à bit
+    // (`identical (==) = true`, `diff = 0.0`) — y compris sur haussmann
+    // où vpBaseline.vp.dx=741.9966... ≠ vpRepli.vp.dx=727.9977... (donc
+    // PAS la même abscisse, l'hypothèse "a-b vs |a-b|" ne s'applique
+    // même pas ici). L'hypothèse initiale est donc FAUSSE : ce n'est pas
+    // une coïncidence liée à la symétrie x, c'est une identité UNIVERSELLE,
+    // pour une raison plus fondamentale :
+    //   - `residualPx` est PAR DÉFINITION `dist(vpTop, vpBottom)` quand
+    //     les deux couples sont finis (`vanishing_point.dart`, cas
+    //     "both finite") ; à δ=0, vpTop est fini et TOUJOURS utilisé
+    //     comme position (relecture externe #2, tour N-1 : pas de
+    //     switch high/low), donc `vpBaseline.vp == vpTop(0)`.
+    //   - à δ_deg, `vpTop == null` ⇒ repli ⇒ `vpRepli.vp == vpBottom`.
+    //   - `vpBottom` ne dépend QUE de wallBL/wallBR/floorL/floorR, JAMAIS
+    //     perturbés ici (seul le couple haut est modifié par δ) : vérifié
+    //     bit à bit (`cp0.wallBL == cpDeg.wallBL`, etc., `identical=true`
+    //     sur les 4 champs), donc `vpBottom(δ_deg) == vpBottom(0)`.
+    //   - Conclusion algébrique : `écart(baseline,repli)
+    //     = dist(vpTop(0), vpBottom(0)) = residualPx(0)`. Exact, sur
+    //     TOUS les presets, indépendamment de toute symétrie en x.
+    //
+    // Ce test n'est PAS circulaire au sens du Point 4a : il compare deux
+    // sorties INDÉPENDANTES de `VanishingPoint.compute` (residualPx et
+    // la distance entre deux `.vp`), sans jamais réimplémenter
+    // `lineIntersect` nous-mêmes. L'assertion de l'invariance du couple
+    // bas (ci-dessous) EST la démonstration du mécanisme, pas une
+    // vérification redondante du chemin de production.
+    // -----------------------------------------------------------------
+    for (final key in kDemoSceneNativeSize.keys) {
+      test('$key : residualPx(0) == écart VP-baseline/VP-repli — '
+          "identité algébrique UNIVERSELLE (pas liée à la symétrie x, "
+          "hypothèse initiale du brief réfutée par mesure)", () {
+        final base = PerspCalib.forDemoScene(key);
+        final (srcW, srcH) = kDemoSceneNativeSize[key]!;
+        final imgDraw = imgDrawFor(srcW, srcH);
+
+        final cp0 = CalibCanvasPoints.fromCalib(
+          base,
+          imgDraw: imgDraw,
+          w: kCanvasW,
+          h: kCanvasH,
+        );
+        final vpBaseline = VanishingPoint.compute(
+          fTL: cp0.ceilL,
+          fTR: cp0.ceilR,
+          fBL: cp0.floorL,
+          fBR: cp0.floorR,
+          wallTL: cp0.wallTL,
+          wallTR: cp0.wallTR,
+          wallBL: cp0.wallBL,
+          wallBR: cp0.wallBR,
+        );
+
+        const deltaDeg = -0.01;
+        final calibDeg = base.copyWith(
+          wallTL: base.wallTL.copyWith(yPct: base.wallTL.yPct + deltaDeg),
+          wallTR: base.wallTR.copyWith(yPct: base.wallTR.yPct + deltaDeg),
+        );
+        final cpDeg = CalibCanvasPoints.fromCalib(
+          calibDeg,
+          imgDraw: imgDraw,
+          w: kCanvasW,
+          h: kCanvasH,
+        );
+        final vpRepli = VanishingPoint.compute(
+          fTL: cpDeg.ceilL,
+          fTR: cpDeg.ceilR,
+          fBL: cpDeg.floorL,
+          fBR: cpDeg.floorR,
+          wallTL: cpDeg.wallTL,
+          wallTR: cpDeg.wallTR,
+          wallBL: cpDeg.wallBL,
+          wallBR: cpDeg.wallBR,
+        );
+        expect(vpRepli.residualPx, isNull,
+            reason: "preset '$key' : précondition — vpRepli doit être le "
+                'VP de repli (couple haut dégénéré à δ_deg).');
+
+        // Démonstration du MÉCANISME (pas un aparté) : le couple bas
+        // n'est bit-à-bit pas affecté par la perturbation appliquée au
+        // couple haut. C'est CE fait, et non la symétrie en x, qui rend
+        // l'identité vraie.
+        expect(cpDeg.wallBL, equals(cp0.wallBL),
+            reason: "preset '$key' : wallBL doit être invariant sous une "
+                "perturbation qui ne touche que wallTL/wallTR.");
+        expect(cpDeg.wallBR, equals(cp0.wallBR),
+            reason: "preset '$key' : wallBR doit être invariant (idem).");
+        expect(cpDeg.floorL, equals(cp0.floorL),
+            reason: "preset '$key' : floorL doit être invariant (idem).");
+        expect(cpDeg.floorR, equals(cp0.floorR),
+            reason: "preset '$key' : floorR doit être invariant (idem).");
+
+        final ecartBaselineRepli = (vpBaseline.vp - vpRepli.vp).distance;
+
+        // ignore: avoid_print
+        print('[groupe3bis-identite-universelle] $key : residualPx(0)='
+            '${vpBaseline.residualPx!.toStringAsFixed(10)}  '
+            'écart(baseline,repli)='
+            '${ecartBaselineRepli.toStringAsFixed(10)}  '
+            'vpBaseline=${vpBaseline.vp}  vpRepli=${vpRepli.vp}');
+
+        expect(vpBaseline.residualPx, isNotNull);
+        expect(
+          ecartBaselineRepli,
+          closeTo(vpBaseline.residualPx!, 1e-6),
+          reason: "preset '$key' : écart(baseline,repli) doit être "
+              'EXACTEMENT residualPx(0) — identité algébrique universelle '
+              '(dist(vpTop,vpBottom) par définition, vpBottom invariant '
+              'sous cette perturbation), pas une propriété liée à la '
+              "symétrie x de ce preset en particulier.",
         );
       });
     }

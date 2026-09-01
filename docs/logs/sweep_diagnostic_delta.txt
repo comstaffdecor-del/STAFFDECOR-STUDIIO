@@ -1,0 +1,102 @@
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  exif_reader 4.1.0 (4.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  http 1.5.0 (1.6.0 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+21 available)
+  image_picker_ios 0.8.13+3 (0.8.13+7 available)
+  intl 0.19.0 (0.20.3 available)
+  iso_base_media 6.3.2 (6.3.3 available)
+  lints 5.1.1 (6.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.16.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  random_access_source 4.2.1 (4.3.1 available)
+  share_plus 12.0.2 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  shared_preferences 2.5.3 (2.5.5 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.6 (0.7.13 available)
+  url_launcher 6.3.1 (6.3.2 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.3.6 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_web 2.4.1 (2.4.3 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.2.0 (15.3.0 available)
+  win32 5.15.0 (6.4.0 available)
+Got dependencies!
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/flutter_app/test/core/perspective/_tmp_probe_sweep_diagnostic.dart                                                                                                        00:01 +0: loading /home/user/flutter_app/test/core/perspective/_tmp_probe_sweep_diagnostic.dart                                                                                                        00:02 +0: loading /home/user/flutter_app/test/core/perspective/_tmp_probe_sweep_diagnostic.dart                                                                                                        00:03 +0: loading /home/user/flutter_app/test/core/perspective/_tmp_probe_sweep_diagnostic.dart                                                                                                        00:03 +0: SWEEP haussmann                                                                                                                                                                              00:03 +0: SWEEP haussmann                                                                                                                                                                              
+=== SWEEP preset=haussmann ===
+delta=-0.05  wallTL=Offset(0.1, 48.8)  wallTR=Offset(1399.9, 43.9)  ceilL(fTL)=Offset(168.0, 87.8)  ceilR(fTR)=Offset(1232.0, 82.9)  vpTop=Offset(689.5, 208.8)  vpBottom=Offset(728.0, 750.8)  vp.vp=Offset(689.5, 208.8)  residualPx=543.3031072934641  residualFrac=1.0148998528762552  dy=255.5312  dy/pH=0.336004
+delta=-0.04  wallTL=Offset(0.1, 58.5)  wallTR=Offset(1399.9, 53.6)  ceilL(fTL)=Offset(168.0, 87.8)  ceilR(fTR)=Offset(1232.0, 82.9)  vpTop=Offset(686.0, 177.9)  vpBottom=Offset(728.0, 750.8)  vp.vp=Offset(686.0, 177.9)  residualPx=574.3499608234653  residualFrac=1.092435884740635  dy=286.4063  dy/pH=0.376603
+delta=-0.03  wallTL=Offset(0.1, 68.3)  wallTR=Offset(1399.9, 63.4)  ceilL(fTL)=Offset(168.0, 87.8)  ceilR(fTR)=Offset(1232.0, 82.9)  vpTop=Offset(679.0, 147.1)  vpBottom=Offset(728.0, 750.8)  vp.vp=Offset(679.0, 147.1)  residualPx=605.6725294471024  residualFrac=1.1774576908767798  dy=317.2813  dy/pH=0.417201
+delta=-0.02  wallTL=Offset(0.1, 78.0)  wallTR=Offset(1399.9, 73.1)  ceilL(fTL)=Offset(168.0, 87.8)  ceilR(fTR)=Offset(1232.0, 82.9)  vpTop=Offset(658.0, 116.2)  vpBottom=Offset(728.0, 750.8)  vp.vp=Offset(658.0, 116.2)  residualPx=638.4111380953589  residualFrac=1.3007951293530091  dy=348.1563  dy/pH=0.457799
+delta=-0.01  wallTL=Offset(0.1, 87.8)  wallTR=Offset(1399.9, 82.9)  ceilL(fTL)=Offset(168.0, 87.8)  ceilR(fTR)=Offset(1232.0, 82.9)  vpTop=NULL  vpBottom=Offset(728.0, 750.8)  vp.vp=Offset(728.0, 750.8)  residualPx=null  residualFrac=null  dy=286.4063  dy/pH=0.376603
+delta=0.00  wallTL=Offset(0.1, 97.5)  wallTR=Offset(1399.9, 92.6)  ceilL(fTL)=Offset(168.0, 87.8)  ceilR(fTR)=Offset(1232.0, 82.9)  vpTop=Offset(742.0, 54.4)  vpBottom=Offset(728.0, 750.8)  vp.vp=Offset(742.0, 54.4)  residualPx=696.4532046374462  residualFrac=1.211391649019275  dy=409.9063  dy/pH=0.538996
+delta=0.01  wallTL=Offset(0.1, 107.3)  wallTR=Offset(1399.9, 102.4)  ceilL(fTL)=Offset(168.0, 87.8)  ceilR(fTR)=Offset(1232.0, 82.9)  vpTop=Offset(721.0, 23.6)  vpBottom=Offset(728.0, 750.8)  vp.vp=Offset(721.0, 23.6)  residualPx=727.221185269399  residualFrac=1.3063806085851504  dy=440.7813  dy/pH=0.579594
+delta=0.02  wallTL=Offset(0.1, 117.0)  wallTR=Offset(1399.9, 112.1)  ceilL(fTL)=Offset(168.0, 87.8)  ceilR(fTR)=Offset(1232.0, 82.9)  vpTop=Offset(714.0, -7.3)  vpBottom=Offset(728.0, 750.8)  vp.vp=Offset(714.0, -7.3)  residualPx=758.1917452068233  residualFrac=1.368155720271197  dy=471.6563  dy/pH=0.620192
+delta=0.03  wallTL=Offset(0.1, 126.8)  wallTR=Offset(1399.9, 121.9)  ceilL(fTL)=Offset(168.0, 87.8)  ceilR(fTR)=Offset(1232.0, 82.9)  vpTop=Offset(710.5, -38.2)  vpBottom=Offset(728.0, 750.8)  vp.vp=Offset(710.5, -38.2)  residualPx=789.131535191455  residualFrac=1.417049332594091  dy=502.5313  dy/pH=0.660791
+delta=0.04  wallTL=Offset(0.1, 136.5)  wallTR=Offset(1399.9, 131.6)  ceilL(fTL)=Offset(168.0, 87.8)  ceilR(fTR)=Offset(1232.0, 82.9)  vpTop=Offset(708.4, -69.1)  vpBottom=Offset(728.0, 750.8)  vp.vp=Offset(708.4, -69.1)  residualPx=820.0467264732822  residualFrac=1.4574710293530448  dy=533.4063  dy/pH=0.701389
+delta=0.05  wallTL=Offset(0.1, 146.3)  wallTR=Offset(1399.9, 141.4)  ceilL(fTL)=Offset(168.0, 87.8)  ceilR(fTR)=Offset(1232.0, 82.9)  vpTop=Offset(707.0, -99.9)  vpBottom=Offset(728.0, 750.8)  vp.vp=Offset(707.0, -99.9)  residualPx=850.9466211177213  residualFrac=1.4910518361919538  dy=564.2813  dy/pH=0.741987
+00:03 +1: SWEEP haussmann                                                                                                                                                                              00:03 +1: SWEEP moderne                                                                                                                                                                                00:03 +1: SWEEP moderne                                                                                                                                                                                
+=== SWEEP preset=moderne ===
+delta=-0.05  wallTL=Offset(50.0, 53.6)  wallTR=Offset(1350.0, 53.6)  ceilL(fTL)=Offset(180.0, 92.6)  ceilR(fTR)=Offset(1220.0, 92.6)  vpTop=Offset(700.0, 248.6)  vpBottom=Offset(700.0, 624.0)  vp.vp=Offset(700.0, 248.6)  residualPx=375.37499999999994  residualFrac=0.6914308496440186  dy=148.6875  dy/pH=0.244000
+delta=-0.04  wallTL=Offset(50.0, 63.4)  wallTR=Offset(1350.0, 63.4)  ceilL(fTL)=Offset(180.0, 92.6)  ceilR(fTR)=Offset(1220.0, 92.6)  vpTop=Offset(700.0, 209.6)  vpBottom=Offset(700.0, 624.0)  vp.vp=Offset(700.0, 209.6)  residualPx=414.375  residualFrac=0.7774390243902439  dy=187.6875  dy/pH=0.308000
+delta=-0.03  wallTL=Offset(50.0, 73.1)  wallTR=Offset(1350.0, 73.1)  ceilL(fTL)=Offset(180.0, 92.6)  ceilR(fTR)=Offset(1220.0, 92.6)  vpTop=Offset(700.0, 170.6)  vpBottom=Offset(700.0, 624.0)  vp.vp=Offset(700.0, 170.6)  residualPx=453.37499999999994  residualFrac=0.8622288826570469  dy=226.6875  dy/pH=0.372000
+delta=-0.02  wallTL=Offset(50.0, 82.9)  wallTR=Offset(1350.0, 82.9)  ceilL(fTL)=Offset(180.0, 92.6)  ceilR(fTR)=Offset(1220.0, 92.6)  vpTop=Offset(700.0, 131.6)  vpBottom=Offset(700.0, 624.0)  vp.vp=Offset(700.0, 131.6)  residualPx=492.37499999999994  residualFrac=0.944223096550632  dy=265.6875  dy/pH=0.436000
+delta=-0.01  wallTL=Offset(50.0, 92.6)  wallTR=Offset(1350.0, 92.6)  ceilL(fTL)=Offset(180.0, 92.6)  ceilR(fTR)=Offset(1220.0, 92.6)  vpTop=NULL  vpBottom=Offset(700.0, 624.0)  vp.vp=Offset(700.0, 624.0)  residualPx=null  residualFrac=null  dy=226.6875  dy/pH=0.372000
+delta=0.00  wallTL=Offset(50.0, 102.4)  wallTR=Offset(1350.0, 102.4)  ceilL(fTL)=Offset(180.0, 92.6)  ceilR(fTR)=Offset(1220.0, 92.6)  vpTop=Offset(700.0, 53.6)  vpBottom=Offset(700.0, 624.0)  vp.vp=Offset(700.0, 53.6)  residualPx=570.375  residualFrac=1.0938029930339006  dy=343.6875  dy/pH=0.564000
+delta=0.01  wallTL=Offset(50.0, 112.1)  wallTR=Offset(1350.0, 112.1)  ceilL(fTL)=Offset(180.0, 92.6)  ceilR(fTR)=Offset(1220.0, 92.6)  vpTop=Offset(700.0, 14.6)  vpBottom=Offset(700.0, 624.0)  vp.vp=Offset(700.0, 14.6)  residualPx=609.3749999999999  residualFrac=1.1589097885175361  dy=382.6875  dy/pH=0.628000
+delta=0.02  wallTL=Offset(50.0, 121.9)  wallTR=Offset(1350.0, 121.9)  ceilL(fTL)=Offset(180.0, 92.6)  ceilR(fTR)=Offset(1220.0, 92.6)  vpTop=Offset(700.0, -24.4)  vpBottom=Offset(700.0, 624.0)  vp.vp=Offset(700.0, -24.4)  residualPx=648.375  residualFrac=1.2164634146341464  dy=421.6875  dy/pH=0.692000
+delta=0.03  wallTL=Offset(50.0, 131.6)  wallTR=Offset(1350.0, 131.6)  ceilL(fTL)=Offset(180.0, 92.6)  ceilR(fTR)=Offset(1220.0, 92.6)  vpTop=Offset(700.0, -63.4)  vpBottom=Offset(700.0, 624.0)  vp.vp=Offset(700.0, -63.4)  residualPx=687.375  residualFrac=1.2661266207767097  dy=460.6875  dy/pH=0.756000
+delta=0.04  wallTL=Offset(50.0, 141.4)  wallTR=Offset(1350.0, 141.4)  ceilL(fTL)=Offset(180.0, 92.6)  ceilR(fTR)=Offset(1220.0, 92.6)  vpTop=Offset(700.0, -102.4)  vpBottom=Offset(700.0, 624.0)  vp.vp=Offset(700.0, -102.4)  residualPx=726.3749999999999  residualFrac=1.3079348199167589  dy=499.6875  dy/pH=0.820000
+delta=0.05  wallTL=Offset(50.0, 151.1)  wallTR=Offset(1350.0, 151.1)  ceilL(fTL)=Offset(180.0, 92.6)  ceilR(fTR)=Offset(1220.0, 92.6)  vpTop=Offset(700.0, -141.4)  vpBottom=Offset(700.0, 624.0)  vp.vp=Offset(700.0, -141.4)  residualPx=765.3749999999999  residualFrac=1.3422344654296094  dy=538.6875  dy/pH=0.884000
+00:03 +2: SWEEP moderne                                                                                                                                                                                00:03 +2: SWEEP provencal                                                                                                                                                                              00:03 +2: SWEEP provencal                                                                                                                                                                              
+=== SWEEP preset=provencal ===
+delta=-0.05  wallTL=Offset(0.0, 114.1)  wallTR=Offset(1400.0, 114.1)  ceilL(fTL)=Offset(140.0, 151.4)  ceilR(fTR)=Offset(1260.0, 151.4)  vpTop=Offset(700.0, 300.8)  vpBottom=Offset(700.0, 720.9)  vp.vp=Offset(700.0, 300.8)  residualPx=420.0820312499997  residualFrac=0.7248083437168524  dy=172.7004  dy/pH=0.268116
+delta=-0.04  wallTL=Offset(0.0, 123.4)  wallTR=Offset(1400.0, 123.4)  ceilL(fTL)=Offset(140.0, 151.4)  ceilR(fTR)=Offset(1260.0, 151.4)  vpTop=Offset(700.0, 263.5)  vpBottom=Offset(700.0, 720.9)  vp.vp=Offset(700.0, 263.5)  residualPx=457.4226562499997  residualFrac=0.800957942162774  dy=210.0410  dy/pH=0.326087
+delta=-0.03  wallTL=Offset(0.0, 132.8)  wallTR=Offset(1400.0, 132.8)  ceilL(fTL)=Offset(140.0, 151.4)  ceilR(fTR)=Offset(1260.0, 151.4)  vpTop=Offset(700.0, 226.1)  vpBottom=Offset(700.0, 720.9)  vp.vp=Offset(700.0, 226.1)  residualPx=494.76328124999975  residualFrac=0.8757526702490837  dy=247.3816  dy/pH=0.384058
+delta=-0.02  wallTL=Offset(0.0, 142.1)  wallTR=Offset(1400.0, 142.1)  ceilL(fTL)=Offset(140.0, 151.4)  ceilR(fTR)=Offset(1260.0, 151.4)  vpTop=Offset(700.0, 188.8)  vpBottom=Offset(700.0, 720.9)  vp.vp=Offset(700.0, 188.8)  residualPx=532.1039062499998  residualFrac=0.948080216457313  dy=284.7223  dy/pH=0.442029
+delta=-0.01  wallTL=Offset(0.0, 151.4)  wallTR=Offset(1400.0, 151.4)  ceilL(fTL)=Offset(140.0, 151.4)  ceilR(fTR)=Offset(1260.0, 151.4)  vpTop=NULL  vpBottom=Offset(700.0, 720.9)  vp.vp=Offset(700.0, 720.9)  residualPx=null  residualFrac=null  dy=247.3816  dy/pH=0.384058
+delta=0.00  wallTL=Offset(0.0, 160.8)  wallTR=Offset(1400.0, 160.8)  ceilL(fTL)=Offset(140.0, 151.4)  ceilR(fTR)=Offset(1260.0, 151.4)  vpTop=Offset(700.0, 114.1)  vpBottom=Offset(700.0, 720.9)  vp.vp=Offset(700.0, 114.1)  residualPx=606.7851562499998  residualFrac=1.0811441064864096  dy=359.4035  dy/pH=0.557971
+delta=0.01  wallTL=Offset(0.0, 170.1)  wallTR=Offset(1400.0, 170.1)  ceilL(fTL)=Offset(140.0, 151.4)  ceilR(fTR)=Offset(1260.0, 151.4)  vpTop=Offset(700.0, 76.8)  vpBottom=Offset(700.0, 720.9)  vp.vp=Offset(700.0, 76.8)  residualPx=644.1257812499998  residualFrac=1.1401308348525807  dy=396.7441  dy/pH=0.615942
+delta=0.02  wallTL=Offset(0.0, 179.4)  wallTR=Offset(1400.0, 179.4)  ceilL(fTL)=Offset(140.0, 151.4)  ceilR(fTR)=Offset(1260.0, 151.4)  vpTop=Offset(700.0, 39.4)  vpBottom=Offset(700.0, 720.9)  vp.vp=Offset(700.0, 39.4)  residualPx=681.4664062499997  residualFrac=1.193263873018011  dy=434.0848  dy/pH=0.673913
+delta=0.03  wallTL=Offset(0.0, 188.8)  wallTR=Offset(1400.0, 188.8)  ceilL(fTL)=Offset(140.0, 151.4)  ceilR(fTR)=Offset(1260.0, 151.4)  vpTop=Offset(700.0, 2.1)  vpBottom=Offset(700.0, 720.9)  vp.vp=Offset(700.0, 2.1)  residualPx=718.8070312499998  residualFrac=1.2402276103599479  dy=471.4254  dy/pH=0.731884
+delta=0.04  wallTL=Offset(0.0, 198.1)  wallTR=Offset(1400.0, 198.1)  ceilL(fTL)=Offset(140.0, 151.4)  ceilR(fTR)=Offset(1260.0, 151.4)  vpTop=Offset(700.0, -35.3)  vpBottom=Offset(700.0, 720.9)  vp.vp=Offset(700.0, -35.3)  residualPx=756.1476562499997  residualFrac=1.2809475727660415  dy=508.7660  dy/pH=0.789855
+delta=0.05  wallTL=Offset(0.0, 207.4)  wallTR=Offset(1400.0, 207.4)  ceilL(fTL)=Offset(140.0, 151.4)  ceilR(fTR)=Offset(1260.0, 151.4)  vpTop=Offset(700.0, -72.6)  vpBottom=Offset(700.0, 720.9)  vp.vp=Offset(700.0, -72.6)  residualPx=793.4882812499998  residualFrac=1.3155634376754182  dy=546.1066  dy/pH=0.847826
+00:03 +3: SWEEP provencal                                                                                                                                                                              00:03 +3: SWEEP scandinave                                                                                                                                                                             00:03 +3: SWEEP scandinave                                                                                                                                                                             
+=== SWEEP preset=scandinave ===
+delta=-0.05  wallTL=Offset(0.0, 118.6)  wallTR=Offset(1400.0, 118.6)  ceilL(fTL)=Offset(140.0, 150.3)  ceilR(fTR)=Offset(1260.0, 150.3)  vpTop=Offset(700.0, 277.3)  vpBottom=Offset(700.0, 670.0)  vp.vp=Offset(700.0, 277.3)  residualPx=392.70000000000044  residualFrac=0.68390137605124  dy=164.6167  dy/pH=0.282313
+delta=-0.04  wallTL=Offset(0.0, 126.5)  wallTR=Offset(1400.0, 126.5)  ceilL(fTL)=Offset(140.0, 150.3)  ceilR(fTR)=Offset(1260.0, 150.3)  vpTop=Offset(700.0, 245.5)  vpBottom=Offset(700.0, 670.0)  vp.vp=Offset(700.0, 245.5)  residualPx=424.4333333333338  residualFrac=0.7471965771218333  dy=196.3500  dy/pH=0.336735
+delta=-0.03  wallTL=Offset(0.0, 134.5)  wallTR=Offset(1400.0, 134.5)  ceilL(fTL)=Offset(140.0, 150.3)  ceilR(fTR)=Offset(1260.0, 150.3)  vpTop=Offset(700.0, 213.8)  vpBottom=Offset(700.0, 670.0)  vp.vp=Offset(700.0, 213.8)  residualPx=456.1666666666671  residualFrac=0.8094017608748225  dy=228.0833  dy/pH=0.391156
+delta=-0.02  wallTL=Offset(0.0, 142.4)  wallTR=Offset(1400.0, 142.4)  ceilL(fTL)=Offset(140.0, 150.3)  ceilR(fTR)=Offset(1260.0, 150.3)  vpTop=Offset(700.0, 182.1)  vpBottom=Offset(700.0, 670.0)  vp.vp=Offset(700.0, 182.1)  residualPx=487.90000000000043  residualFrac=0.8698545196062919  dy=259.8167  dy/pH=0.445578
+delta=-0.01  wallTL=Offset(0.0, 150.3)  wallTR=Offset(1400.0, 150.3)  ceilL(fTL)=Offset(140.0, 150.3)  ceilR(fTR)=Offset(1260.0, 150.3)  vpTop=NULL  vpBottom=Offset(700.0, 670.0)  vp.vp=Offset(700.0, 670.0)  residualPx=null  residualFrac=null  dy=228.0833  dy/pH=0.391156
+delta=0.00  wallTL=Offset(0.0, 158.3)  wallTR=Offset(1400.0, 158.3)  ceilL(fTL)=Offset(140.0, 150.3)  ceilR(fTR)=Offset(1260.0, 150.3)  vpTop=Offset(700.0, 118.6)  vpBottom=Offset(700.0, 670.0)  vp.vp=Offset(700.0, 118.6)  residualPx=551.3666666666671  residualFrac=0.9830063270347525  dy=323.2833  dy/pH=0.554422
+delta=0.01  wallTL=Offset(0.0, 166.2)  wallTR=Offset(1400.0, 166.2)  ceilL(fTL)=Offset(140.0, 150.3)  ceilR(fTR)=Offset(1260.0, 150.3)  vpTop=Offset(700.0, 86.9)  vpBottom=Offset(700.0, 670.0)  vp.vp=Offset(700.0, 86.9)  residualPx=583.1000000000005  residualFrac=1.0346265986834686  dy=355.0167  dy/pH=0.608844
+delta=0.02  wallTL=Offset(0.0, 174.1)  wallTR=Offset(1400.0, 174.1)  ceilL(fTL)=Offset(140.0, 150.3)  ceilR(fTR)=Offset(1260.0, 150.3)  vpTop=Offset(700.0, 55.1)  vpBottom=Offset(700.0, 670.0)  vp.vp=Offset(700.0, 55.1)  residualPx=614.8333333333338  residualFrac=1.0823875649895713  dy=386.7500  dy/pH=0.663265
+delta=0.03  wallTL=Offset(0.0, 182.1)  wallTR=Offset(1400.0, 182.1)  ceilL(fTL)=Offset(140.0, 150.3)  ceilR(fTR)=Offset(1260.0, 150.3)  vpTop=Offset(700.0, 23.4)  vpBottom=Offset(700.0, 670.0)  vp.vp=Offset(700.0, 23.4)  residualPx=646.5666666666672  residualFrac=1.1260194373368897  dy=418.4833  dy/pH=0.717687
+delta=0.04  wallTL=Offset(0.0, 190.0)  wallTR=Offset(1400.0, 190.0)  ceilL(fTL)=Offset(140.0, 150.3)  ceilR(fTR)=Offset(1260.0, 150.3)  vpTop=Offset(700.0, -8.3)  vpBottom=Offset(700.0, 670.0)  vp.vp=Offset(700.0, -8.3)  residualPx=678.3000000000004  residualFrac=1.1653759972495095  dy=450.2167  dy/pH=0.772109
+delta=0.05  wallTL=Offset(0.0, 197.9)  wallTR=Offset(1400.0, 197.9)  ceilL(fTL)=Offset(140.0, 150.3)  ceilR(fTR)=Offset(1260.0, 150.3)  vpTop=Offset(700.0, -40.1)  vpBottom=Offset(700.0, 670.0)  vp.vp=Offset(700.0, -40.1)  residualPx=710.0333333333338  residualFrac=1.2004289427026615  dy=481.9500  dy/pH=0.826531
+00:03 +4: SWEEP scandinave                                                                                                                                                                             00:03 +4: All tests passed!                                                                                                                                                                            

@@ -1,0 +1,110 @@
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  exif_reader 4.1.0 (4.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  http 1.5.0 (1.6.0 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+21 available)
+  image_picker_ios 0.8.13+3 (0.8.13+7 available)
+  intl 0.19.0 (0.20.3 available)
+  iso_base_media 6.3.2 (6.3.3 available)
+  lints 5.1.1 (6.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.16.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  random_access_source 4.2.1 (4.3.1 available)
+  share_plus 12.0.2 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  shared_preferences 2.5.3 (2.5.5 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.6 (0.7.13 available)
+  url_launcher 6.3.1 (6.3.2 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.3.6 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_web 2.4.1 (2.4.3 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.2.0 (15.3.0 available)
+  win32 5.15.0 (6.4.0 available)
+Got dependencies!
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/flutter_app/test/core/perspective/_tmp_probe_fine_sweep.dart                                                                                                              00:01 +0: loading /home/user/flutter_app/test/core/perspective/_tmp_probe_fine_sweep.dart                                                                                                              00:02 +0: loading /home/user/flutter_app/test/core/perspective/_tmp_probe_fine_sweep.dart                                                                                                              00:02 +0: FINE SWEEP haussmann                                                                                                                                                                         00:02 +0: FINE SWEEP haussmann                                                                                                                                                                         
+=== FINE SWEEP preset=haussmann (pas 0.0025, autour de -0.01) ===
+delta=0.0000  vpTop=Offset(742.0, 54.4)  residualPx=696.4532046374462  residualFrac=1.211391649019275
+delta=-0.0025  vpTop=Offset(756.0, 62.2)  residualPx=689.1626998852566  residualFrac=1.1710303631891055
+delta=-0.0050  vpTop=Offset(784.0, 69.9)  residualPx=683.173669809731  residualFrac=1.1086702845937053
+delta=-0.0075  vpTop=Offset(868.0, 77.6)  residualPx=687.558140280448  residualFrac=0.9822012264565528
+delta=-0.0090  vpTop=Offset(1120.0, 82.2)  residualPx=774.961323514579  residualFrac=0.814086518970188
+delta=-0.0095  vpTop=Offset(1539.9, 83.8)  residualPx=1050.7627403213448  residualFrac=0.7659201976076788
+delta=-0.0099  vpTop=Offset(4899.7, 85.0)  residualPx=4224.454171630152  residualFrac=0.8928131779292188
+delta=-0.0100  vpTop=NULL  residualPx=null  residualFrac=null
+delta=-0.0101  vpTop=Offset(-3499.7, 85.6)  residualPx=4279.663054182561  residualFrac=1.1668498514182915
+delta=-0.0105  vpTop=Offset(-139.9, 86.9)  residualPx=1092.7296942858386  residualFrac=3.5480930230165453
+delta=-0.0110  vpTop=Offset(280.0, 88.4)  residualPx=799.6120073278682  residualFrac=7.139844730923047
+delta=-0.0125  vpTop=Offset(532.0, 93.0)  residualPx=686.2971648135957  residualFrac=1.8853843811739763
+delta=-0.0150  vpTop=Offset(616.0, 100.8)  residualPx=659.5771296711108  residualFrac=1.4717687390791718
+00:02 +1: FINE SWEEP haussmann                                                                                                                                                                         00:02 +1: FINE SWEEP moderne                                                                                                                                                                           00:02 +1: FINE SWEEP moderne                                                                                                                                                                           
+=== FINE SWEEP preset=moderne (pas 0.0025, autour de -0.01) ===
+delta=0.0000  vpTop=Offset(700.0, 53.6)  residualPx=570.375  residualFrac=1.0938029930339006
+delta=-0.0025  vpTop=Offset(700.0, 63.4)  residualPx=560.625  residualFrac=1.0764234094497178
+delta=-0.0050  vpTop=Offset(700.0, 73.1)  residualPx=550.875  residualFrac=1.0586309116419135
+delta=-0.0075  vpTop=Offset(700.0, 82.9)  residualPx=541.125  residualFrac=1.0404421258540755
+delta=-0.0090  vpTop=Offset(700.0, 88.7)  residualPx=535.275  residualFrac=1.0293460500494451
+delta=-0.0095  vpTop=Offset(700.0, 90.7)  residualPx=533.325  residualFrac=1.025617788650276
+delta=-0.0099  vpTop=Offset(700.0, 92.2)  residualPx=531.765  residualFrac=1.02262471238684
+delta=-0.0100  vpTop=NULL  residualPx=null  residualFrac=null
+delta=-0.0101  vpTop=Offset(700.0, 93.0)  residualPx=530.985  residualFrac=1.0211247128087149
+delta=-0.0105  vpTop=Offset(700.0, 94.6)  residualPx=529.425  residualFrac=1.0181178413840943
+delta=-0.0110  vpTop=Offset(700.0, 96.5)  residualPx=527.475  residualFrac=1.014346471906648
+delta=-0.0125  vpTop=Offset(700.0, 102.4)  residualPx=521.625  residualFrac=1.002948715913388
+delta=-0.0150  vpTop=Offset(700.0, 112.1)  residualPx=511.87499999999994  residualFrac=0.9836835904637248
+00:02 +2: FINE SWEEP moderne                                                                                                                                                                           00:02 +2: FINE SWEEP provencal                                                                                                                                                                         00:02 +2: FINE SWEEP provencal                                                                                                                                                                         
+=== FINE SWEEP preset=provencal (pas 0.0025, autour de -0.01) ===
+delta=0.0000  vpTop=Offset(700.0, 114.1)  residualPx=606.7851562499998  residualFrac=1.0811441064864096
+delta=-0.0025  vpTop=Offset(700.0, 123.4)  residualPx=597.4499999999997  residualFrac=1.0655433825023577
+delta=-0.0050  vpTop=Offset(700.0, 132.8)  residualPx=588.1148437499997  residualFrac=1.0496218890637634
+delta=-0.0075  vpTop=Offset(700.0, 142.1)  residualPx=578.7796874999997  residualFrac=1.0333915835441463
+delta=-0.0090  vpTop=Offset(700.0, 147.7)  residualPx=573.1785937499998  residualFrac=1.0235104498157406
+delta=-0.0095  vpTop=Offset(700.0, 149.6)  residualPx=571.3115624999997  residualFrac=1.0201935488096396
+delta=-0.0099  vpTop=Offset(700.0, 151.1)  residualPx=569.8179374999997  residualFrac=1.0175318050435098
+delta=-0.0100  vpTop=NULL  residualPx=null  residualFrac=null
+delta=-0.0101  vpTop=Offset(700.0, 151.8)  residualPx=569.0711249999997  residualFrac=1.0161982115899797
+delta=-0.0105  vpTop=Offset(700.0, 153.3)  residualPx=567.5774999999998  residualFrac=1.0135256171180733
+delta=-0.0110  vpTop=Offset(700.0, 155.2)  residualPx=565.7104687499997  residualFrac=1.0101748087757958
+delta=-0.0125  vpTop=Offset(700.0, 160.8)  residualPx=560.1093749999997  residualFrac=1.0000563711717543
+delta=-0.0150  vpTop=Offset(700.0, 170.1)  residualPx=550.7742187499998  residualFrac=0.9829792294406674
+00:03 +3: FINE SWEEP provencal                                                                                                                                                                         00:03 +3: FINE SWEEP scandinave                                                                                                                                                                        00:03 +3: FINE SWEEP scandinave                                                                                                                                                                        
+=== FINE SWEEP preset=scandinave (pas 0.0025, autour de -0.01) ===
+delta=0.0000  vpTop=Offset(700.0, 118.6)  residualPx=551.3666666666671  residualFrac=0.9830063270347525
+delta=-0.0025  vpTop=Offset(700.0, 126.5)  residualPx=543.4333333333337  residualFrac=0.9695414445886883
+delta=-0.0050  vpTop=Offset(700.0, 134.5)  residualPx=535.5000000000005  residualFrac=0.955866402817027
+delta=-0.0075  vpTop=Offset(700.0, 142.4)  residualPx=527.5666666666672  residualFrac=0.9419888121149071
+delta=-0.0090  vpTop=Offset(700.0, 147.2)  residualPx=522.8066666666672  residualFrac=0.9335683444952403
+delta=-0.0095  vpTop=Offset(700.0, 148.7)  residualPx=521.2200000000005  residualFrac=0.9307462640954108
+delta=-0.0099  vpTop=Offset(700.0, 150.0)  residualPx=519.9506666666671  residualFrac=0.9284831842602127
+delta=-0.0100  vpTop=NULL  residualPx=null  residualFrac=null
+delta=-0.0101  vpTop=Offset(700.0, 150.7)  residualPx=519.3160000000005  residualFrac=0.9273498511088424
+delta=-0.0105  vpTop=Offset(700.0, 151.9)  residualPx=518.0466666666672  residualFrac=0.9250796201739776
+delta=-0.0110  vpTop=Offset(700.0, 153.5)  residualPx=516.4600000000005  residualFrac=0.9222351931204877
+delta=-0.0125  vpTop=Offset(700.0, 158.3)  residualPx=511.7000000000004  residualFrac=0.9136583215249849
+delta=-0.0150  vpTop=Offset(700.0, 166.2)  residualPx=503.7666666666671  residualFrac=0.8992224678352772
+00:03 +4: FINE SWEEP scandinave                                                                                                                                                                        00:03 +4: All tests passed!                                                                                                                                                                            
