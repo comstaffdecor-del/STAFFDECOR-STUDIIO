@@ -3,11 +3,14 @@
 Reconstruit depuis `git log` + contenu réel des tests. Format imposé :
 chiffres + chemins de logs, sans prose.
 
-## Errata mutation (SHA `9eaac52`)
+## Errata mutation (SHA `9eaac52`, complété par `d066ddc`)
 
-`9eaac52` est poussé — jamais d'`--amend`/`rebase` sur lui. Cinq
-corrections, identifiées PENDANT ce tour, sont donc consignées ici
-plutôt que réécrites dans l'historique.
+`9eaac52` et `d066ddc` sont poussés — jamais d'`--amend`/`rebase` sur
+l'un ou l'autre. Les corrections suivantes portent sur `9eaac52`
+(rétractation initiale) ET sur `d066ddc` lui-même (les deux détails de
+séquence — Étage B, chiffres haussmann — corrigés ci-dessous ont été
+introduits dans `d066ddc` et sont donc rectifiés ici, sur ce même
+fichier, sans réécrire `d066ddc`).
 
 **1. Rétractation** : le message de commit `9eaac52` affirme « la
 vérification par mutation confirme que l'assertion de signe existe
@@ -20,13 +23,35 @@ de δ_deg). Le protocole valide, exécuté CE TOUR (Étages A/B/C, sur
 `lib/core/perspective/vanishing_point.dart`, arbre restauré entre
 chaque étage, `git diff --stat` vide à la fin) donne :
 - **Étage A** — neutraliser seul `expect(signs.length, 1, ...)`
-  (ligne ~753, l'assertion de signe, sans toucher au calcul `signed`) :
-  reste du fichier vert (`+40` avant, `+39` sans l'assertion neutralisée
-  — isolable, aucun couplage collatéral).
-- **Étage B** — inverser la valeur attendue du signe (côté test) :
-  rouge sur les 4 presets, message de COMPARAISON DE VALEUR
-  (`Expected: <1.0> / Actual: <-1.0>`), pas une exception — le mode
-  d'échec est bien une assertion, pas un crash.
+  (ligne 754, l'assertion de signe, sans toucher au calcul `signed`) :
+  reste du fichier vert. **Rejeu propre, versionné, mesuré sur l'arbre
+  POST-`d066ddc`** (le rejeu initial de ce tour n'avait pas laissé de
+  preuve versionnée — corrigé ici) : `flutter test
+  test/core/perspective/vp_frac_degenere_test.dart --reporter expanded`
+  → **`+40: All tests passed!`**, exit code 0 — log complet dans
+  `docs/logs/errata_etage_a.txt`. Restauration ensuite,
+  `git diff --stat test/` vide. Isolable, aucun couplage collatéral :
+  les 40 `test()` du fichier restent tous verts avec cette seule ligne
+  neutralisée à l'intérieur d'un seul d'entre eux.
+- **Étage B — valeur probante faible, à ne pas présenter comme une
+  validation** : inverser la valeur attendue du signe
+  (`expect(signs.first, 1.0, ...)`, ligne ajoutée puis retirée, jamais
+  commitée) produit un rouge sur les 4 presets avec un message de
+  COMPARAISON DE VALEUR authentique (`Expected: <1.0> / Actual:
+  <-1.0>`), pas une exception. Mais cette assertion n'existait pas
+  avant l'Étage B — elle a été CRÉÉE pour la mutation, puis retirée.
+  Trois objets distincts, à ne pas confondre : (i) la constance du
+  signe hors δ_deg, qui existe (`expect(signs.length, 1, ...)`,
+  ligne 754) ; (ii) la polarité négative hors δ_deg, qui n'existe pas
+  comme assertion permanente et a été introduite temporairement pour
+  cet étage ; (iii) une garde à la bascule δ_deg, qui n'existe pas et
+  ne peut pas exister dans ce test (il exclut structurellement δ_deg,
+  voir point 5 ci-dessous). Ainsi redécrit, l'Étage B établit qu'une
+  comparaison de doubles échoue par comparaison de valeur — ce qui
+  n'était pas en doute — sur une assertion que la mutation a
+  elle-même introduite. Il ne dit rien de la suite de tests
+  EXISTANTE. **La valeur probante du protocole repose sur l'Étage C
+  seul, et sur l'Étage A pour l'indépendance** — pas sur l'Étage B.
 - **Étage C** — mutation côté production, ligne 224, PAS `vpTop!` :
   substitution finie et géométriquement significative, symétrique de
   `vpBottom` autour de `(fTL.dy + fBL.dy)/2`. Résultat BRUT initial (une
@@ -89,9 +114,12 @@ confirme que les 7 pragmas actifs (lignes 149, 234, 746, 897, 1138,
 1240, 1300 — lignes déplacées par l'édition du collecteur, voir plus
 bas) sont chacun immédiatement suivis d'un `print()` réel ; l'orphelin
 retracté au Point 6bis a donc bien été traité, aucun pragma mort.
-`flutter analyze` (5 `avoid_print` non couverts par un `ignore`, lignes
-402/456/505/598) reste identique à la baseline, préexistant, hors
-périmètre.
+`flutter analyze` filtré sur ce seul fichier
+(`flutter analyze 2>&1 | grep "avoid_print" | grep
+"vp_frac_degenere_test.dart"`, requis pour ne pas mélanger d'autres
+fichiers dans le compte des non-couverts) : 5 `avoid_print` non
+couverts par un `ignore` (lignes 366/402/456/505/598), préexistants,
+hors périmètre, identiques à la baseline.
 
 **Rejeu Étage C, preuve versionnée** : capture intégrale dans
 `docs/logs/errata_mutation_rouge.txt`
@@ -99,23 +127,40 @@ périmètre.
 --reporter expanded`, exit code 1) — **un seul test rouge** (`+27 -1`),
 message unique listant les **4 écarts** (haussmann, moderne,
 provençal, scandinave) dans l'ordre naturel d'itération des clés,
-chacun avec l'`Offset` obtenu et attendu. Valeurs lues dans le log, pas
-prédites : haussmann `Offset(728.0, 185.3)` vs attendu
-`Offset(728.0, 750.8)` ; moderne `Offset(700.0, 170.6)` vs
-`Offset(700.0, 624.0)` ; provençal `Offset(700.0, 226.1)` vs
-`Offset(700.0, 720.9)` ; scandinave `Offset(700.0, 213.8)` vs
-`Offset(700.0, 670.0)`. Écart avec la prédiction initiale de ce tour :
-provençal avait été annoncé à 226,1 (arrondi) — la mesure du log
-confirme 226,1 à la précision affichée (le log n'affiche pas plus de
-décimales ici) ; scandinave n'avait au départ aucune trace vérifiée
-avant ce rejeu — le log ci-dessus en constitue la première preuve
-versionnée. `totalPointsVerifies` est resté à 44 dans cette exécution
-rouge (pas de `Expected: <44> Actual: <40>`) : l'incrément
-inconditionnel (variante (i)) n'a pas été affecté par le collecteur.
-Restauration ensuite : `git checkout lib/core/perspective/vanishing_point.dart`,
-`git diff --stat lib/` vide, `flutter test
-test/core/perspective/vp_frac_degenere_test.dart` → `+40: All tests
-passed!`.
+chacun avec l'`Offset` obtenu et attendu. Valeurs lues dans le log,
+pas prédites, **avec la précision réelle du log** (`toString()` sur
+`Offset` arrondit à 1 décimale — ce n'est PAS la valeur exacte) :
+haussmann `Offset(728.0, 185.3)` vs attendu `Offset(728.0, 750.8)` ;
+moderne `Offset(700.0, 170.6)` vs `Offset(700.0, 624.0)` ; provençal
+`Offset(700.0, 226.1)` vs `Offset(700.0, 720.9)` ; scandinave
+`Offset(700.0, 213.8)` vs `Offset(700.0, 670.0)`. **Correction de
+chiffre (haussmann x, corrigée dans CE fichier, pas dans `d066ddc`
+lui-même)** : le log affiche `728.0`, mais la valeur EXACTE établie
+par `docs/logs/derivation_haussmann_min.txt` (`vpBottom.x (haussmann)
+= 1298020/1783 = 727.997757`) est **727,998**, pas 728,0 — écrire
+« 728,0 » sur haussmann contredirait l'origine d'erreur déjà consignée
+plus bas (« Origine de l'approximation fautive… la constante 700…
+réutilisée par erreur… PAS 700 »). Donc : **haussmann x = 727,998
+exact, 728,0 au seul titre de la précision du log** ; les trois autres
+presets à 700,0 exact ; le hedge ±0,05px (résolution du `toString()`)
+couvre l'abscisse comme les ordonnées pour toutes les valeurs listées
+ci-dessus — aucune n'est une preuve au centième, seulement une
+confirmation à la résolution affichée. `totalPointsVerifies` est resté
+à 44 dans cette exécution rouge (pas de `Expected: <44> Actual:
+<40>`) : l'incrément inconditionnel (variante (i)) n'a pas été affecté
+par le collecteur. Restauration ensuite : `git checkout
+lib/core/perspective/vanishing_point.dart`, `git diff --stat lib/`
+vide, `flutter test test/core/perspective/vp_frac_degenere_test.dart`
+→ `+40: All tests passed!`.
+
+**Reconfirmation de l'axe, même réserve de précision** : le calcul
+`axisMirror = (fTL.dy + fBL.dy)/2` sur haussmann donne 468,0 (à la
+résolution du log) ; `2·468,0 − 750,75 = 185,25` s'accorde à la valeur
+haussmann `185,3` ci-dessus **à ±0,05px, résolution du log** — ce
+n'est pas une preuve au centième, seulement une NON-FALSIFICATION à
+cette résolution. Les décimales exactes de `axisMirror` et du résultat
+restent attribuées à la dérivation rationnelle
+(`docs/logs/derivation_haussmann_min.txt`), pas recalculées ici.
 
 ## SHA
 
