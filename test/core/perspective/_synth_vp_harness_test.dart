@@ -2532,6 +2532,7 @@ void main() {
             wallTR: wall.wallTR,
             wallBL: wall.wallBL,
             wallBR: wall.wallBR,
+            fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
           );
           expect(vp.residualPx, isNotNull, reason: 'les deux couples doivent produire une intersection finie sur cette scène (non parallèles)');
           expect(vp.residualPx!, lessThan(1e-6), reason: 'résidu attendu au niveau du bruit numérique (~1e-12 à 1e-13) sur une scène synthétique parfaitement cohérente — tout écart mesurable ici trahirait un bug du solveur, pas un défaut d\'entrée');
@@ -2564,6 +2565,7 @@ void main() {
           wallTR: wall.wallTR,
           wallBL: wall.wallBL,
           wallBR: wall.wallBR,
+          fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
         );
         // Sur cette scène cohérente, residualFrac est de l'ordre de 1e-15
         // : un seuil de 1% le classe "accepté", un seuil de 1e-20 (plus
@@ -2611,6 +2613,7 @@ void main() {
           // estimation finie disponible.
           wallBL: Offset(wall.floorL.dx - 200.0, wall.floorL.dy),
           wallBR: Offset(wall.floorR.dx - 200.0, wall.floorR.dy),
+          fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
         );
         expect(vp.residualPx, isNull, reason: 'le couple bas est rendu parallèle par construction (translation horizontale identique appliquée à fBL et fBR) -- une seule estimation (couple haut) existe, donc aucun résidu comparable n\'est mesurable');
         expect(vp.residualFrac, isNull);
@@ -2856,6 +2859,7 @@ void main() {
             wallTR: wall.wallTR,
             wallBL: wall.wallBL,
             wallBR: wall.wallBR,
+            fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
           );
 
           final vpClosed = expectedDepthVpClosedForm(
@@ -2916,6 +2920,7 @@ void main() {
             wallTR: wall.wallTR,
             wallBL: wall.wallBL,
             wallBR: wall.wallBR,
+            fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
           );
           fracs[thetaDeg] = vpReal.frac(wall.ceilL, depthPx);
         }

@@ -26,6 +26,43 @@ library;
 import 'dart:ui';
 import 'persp_geometry.dart' show dist, lineIntersect;
 
+/// Stratégie appliquée par [VanishingPoint.compute] quand un seul des
+/// deux couples (haut/bas) produit une intersection finie — l'autre
+/// étant parallèle ou dégénéré. Volontairement SANS valeur par défaut :
+/// chaque site d'appel doit déclarer explicitement son choix, y compris
+/// le site de production (`room_painter.dart`) — l'absence de `default:`
+/// dans le `switch` de [VanishingPoint.compute] est délibérée pour la
+/// même raison : reproduire un fourre-tout à l'intérieur du `switch`
+/// annulerait exactement ce que l'absence de valeur par défaut de
+/// l'enum impose à l'extérieur (voir `docs/ETAT.md`, Point 7b).
+enum VpFallbackMode {
+  /// Comportement HISTORIQUE (préservé tel quel depuis avant le
+  /// Point 7) : retient `vpTop ?? vpBottom` SANS mesurer de résidu —
+  /// [VanishingPoint.residualPx] reste `null` par construction (aucun
+  /// second point contre lequel le mesurer), donc AUCUNE trace n'est
+  /// laissée pour l'appelant indiquant que cette estimation est
+  /// dégradée (un seul couple fini, pas deux). C'est le comportement
+  /// que le test miroir 40+4=44 de `vp_frac_degenere_test.dart` épingle
+  /// et dont il vérifie le volet (b) : ce membre ne doit jamais le
+  /// faire passer au rouge, ni y être affaibli pour le faire repasser
+  /// au vert.
+  repliHistoriqueCoupleBas,
+
+  /// Lève un [ArgumentError] explicite au lieu de retourner une
+  /// estimation dégradée silencieuse. Le message porte : lequel des
+  /// deux couples (haut/bas) est fini, lequel est dégénéré/parallèle,
+  /// les deux points candidats, et le fait que `residualPx` resterait
+  /// `null` faute de second point contre lequel mesurer un résidu.
+  erreurExplicite,
+
+  /// Repli par projection parallèle — NON implémenté en 7b-1 (voir
+  /// Point 7b-2) : sur au moins 3 des 4 préréglages réels connus, les
+  /// droites pertinentes sont CONFONDUES (pas seulement parallèles),
+  /// rendant la direction de repli géométriquement indéfinie plutôt
+  /// que simplement absente.
+  projectionParallele,
+}
+
 /// Point de fuite réel + repères architecturaux dérivés de la
 /// calibration (mur du fond en pixels canvas).
 class VanishingPoint {
@@ -171,6 +208,12 @@ class VanishingPoint {
   /// Si les droites sont parallèles (mur strictement frontal, cas non
   /// dégénéré et fréquent) : retourne un VP à l'infini (`w = 0`) portant
   /// la direction unitaire de l'axe de profondeur.
+  ///
+  /// [fallbackMode] gouverne le comportement quand un SEUL des deux
+  /// couples (haut/bas) produit une intersection finie — voir
+  /// [VpFallbackMode] pour la description de chaque membre. Paramètre
+  /// requis et SANS valeur par défaut : chaque site d'appel doit
+  /// déclarer explicitement son choix (voir docstring de l'enum).
   factory VanishingPoint.compute({
     required Offset fTL,
     required Offset fTR,
@@ -180,6 +223,7 @@ class VanishingPoint {
     Offset? wallTR,
     Offset? wallBL,
     Offset? wallBR,
+    required VpFallbackMode fallbackMode,
   }) {
     if (wallTL == null || wallTR == null || wallBL == null || wallBR == null) {
       throw ArgumentError(
@@ -221,9 +265,38 @@ class VanishingPoint {
     // Un seul des deux couples a produit une intersection finie (l'autre
     // parallèle/dégénéré) : une seule estimation existe, donc AUCUN
     // résidu n'est mesurable (`residualPx` reste `null`, pas `0.0`).
-    final vpFinite = vpTop ?? vpBottom;
-    if (vpFinite != null) {
-      return VanishingPoint._(x: vpFinite.dx, y: vpFinite.dy, w: 1.0, fTL: fTL, fTR: fTR, fBL: fBL, fBR: fBR);
+    // [fallbackMode] décide explicitement de la conduite à tenir ici —
+    // voir [VpFallbackMode] pour la sémantique de chaque membre.
+    if (vpTop != null || vpBottom != null) {
+      switch (fallbackMode) {
+        case VpFallbackMode.repliHistoriqueCoupleBas:
+          final vpFinite = vpTop ?? vpBottom!;
+          return VanishingPoint._(x: vpFinite.dx, y: vpFinite.dy, w: 1.0, fTL: fTL, fTR: fTR, fBL: fBL, fBR: fBR);
+        case VpFallbackMode.erreurExplicite:
+          final coupleFiniNom = vpTop != null ? 'haut (wallTL→fTL / wallTR→fTR)' : 'bas (wallBL→fBL / wallBR→fBR)';
+          final coupleDegenereNom = vpTop != null ? 'bas (wallBL→fBL / wallBR→fBR)' : 'haut (wallTL→fTL / wallTR→fTR)';
+          final pointFini = vpTop ?? vpBottom!;
+          throw ArgumentError(
+            'VanishingPoint.compute : un seul des deux couples produit une '
+            'intersection finie — couple $coupleFiniNom fini en '
+            '(${pointFini.dx.toStringAsFixed(2)}, ${pointFini.dy.toStringAsFixed(2)}), '
+            'couple $coupleDegenereNom parallèle ou dégénéré (pas '
+            'd\'intersection finie). Aucun second point n\'existe contre '
+            'lequel mesurer un résidu : residualPx resterait null par '
+            'construction, pas 0.0. VpFallbackMode.erreurExplicite refuse '
+            'de retourner cette estimation non corroborée silencieusement — '
+            'passer VpFallbackMode.repliHistoriqueCoupleBas pour l\'accepter '
+            'explicitement, ou corriger la calibration du couple dégénéré.',
+          );
+        case VpFallbackMode.projectionParallele:
+          throw UnimplementedError(
+            'VpFallbackMode.projectionParallele : non implémenté (Point '
+            '7b-2) — sur au moins 3 des 4 préréglages réels connus, les '
+            'droites du couple dégénéré sont CONFONDUES (pas seulement '
+            'parallèles), rendant la direction de repli géométriquement '
+            'indéfinie plutôt que simplement absente.',
+          );
+      }
     }
 
     // Les deux couples sont parallèles (ou dégénérés) : tenter de

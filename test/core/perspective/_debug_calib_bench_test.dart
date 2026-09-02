@@ -84,7 +84,7 @@ Future<void> renderWireframeCandidate({
   noProductPainter.paint(canvas, size);
 
   final cp = CalibCanvasPoints.fromCalib(calib, imgDraw: imgDraw, w: size.width, h: size.height);
-  final vp = VanishingPoint.compute(fTL: cp.ceilL, fTR: cp.ceilR, fBL: cp.floorL, fBR: cp.floorR, wallTL: cp.wallTL, wallTR: cp.wallTR, wallBL: cp.wallBL, wallBR: cp.wallBR);
+  final vp = VanishingPoint.compute(fTL: cp.ceilL, fTR: cp.ceilR, fBL: cp.floorL, fBR: cp.floorR, wallTL: cp.wallTL, wallTR: cp.wallTR, wallBL: cp.wallBL, wallBR: cp.wallBR, fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas);
 
   final fondPath = Path()
     ..moveTo(cp.ceilL.dx, cp.ceilL.dy)
@@ -375,7 +375,7 @@ void main() {
     noProductPainter.paint(canvas, size);
 
     final cp = CalibCanvasPoints.fromCalib(calib, imgDraw: imgDraw, w: size.width, h: size.height);
-    final vp = VanishingPoint.compute(fTL: cp.ceilL, fTR: cp.ceilR, fBL: cp.floorL, fBR: cp.floorR, wallTL: cp.wallTL, wallTR: cp.wallTR, wallBL: cp.wallBL, wallBR: cp.wallBR);
+    final vp = VanishingPoint.compute(fTL: cp.ceilL, fTR: cp.ceilR, fBL: cp.floorL, fBR: cp.floorR, wallTL: cp.wallTL, wallTR: cp.wallTR, wallBL: cp.wallBL, wallBR: cp.wallBR, fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas);
 
     // Ligne d'horizon demandée explicitement (y = vp.dy, sur toute la
     // largeur du canevas) — trace visuellement où le solveur place la

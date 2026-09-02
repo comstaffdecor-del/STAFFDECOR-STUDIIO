@@ -227,6 +227,7 @@ void main() {
         wallTR: cp.wallTR,
         wallBL: cp.wallBL,
         wallBR: cp.wallBR,
+        fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
       );
       final pH = vp.pH;
 

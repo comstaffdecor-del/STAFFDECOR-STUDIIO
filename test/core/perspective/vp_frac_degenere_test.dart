@@ -132,6 +132,7 @@ void main() {
           wallTR: cp.wallTR,
           wallBL: cp.wallBL,
           wallBR: cp.wallBR,
+          fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
         );
 
         final vpHoriz = pg.lineIntersect(cp.ceilL, cp.ceilR, cp.floorL, cp.floorR);
@@ -205,6 +206,7 @@ void main() {
             wallTR: cp.wallTR,
             wallBL: cp.wallBL,
             wallBR: cp.wallBR,
+            fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
           );
 
           final wallTLPerturbed = Offset(cp.wallTL.dx, cp.wallTL.dy - 20.0);
@@ -217,6 +219,7 @@ void main() {
             wallTR: cp.wallTR,
             wallBL: cp.wallBL,
             wallBR: cp.wallBR,
+            fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
           );
 
           // Les deux résultats doivent être des points finis pour que la
@@ -355,6 +358,7 @@ void main() {
           wallTR: cp.wallTR,
           wallBL: cp.wallBL,
           wallBR: cp.wallBR,
+          fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
         );
         expect(vp.isAtInfinity, isFalse);
         final pH = vp.pH;
@@ -395,6 +399,7 @@ void main() {
           wallTR: cp.wallTR,
           wallBL: cp.wallBL,
           wallBR: cp.wallBR,
+          fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
         );
         final wallCenterX =
             (cp.ceilL.dx + cp.ceilR.dx + cp.floorL.dx + cp.floorR.dx) / 4;
@@ -486,6 +491,7 @@ void main() {
             wallTR: wallTR,
             wallBL: cp.wallBL,
             wallBR: cp.wallBR,
+            fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
           ).vp;
 
       final vpReal = compute(cp.ceilL, cp.ceilR, cp.wallTL, cp.wallTR);
@@ -575,6 +581,7 @@ void main() {
             wallTR: cp.wallTR,
             wallBL: cp.wallBL,
             wallBR: cp.wallBR,
+            fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
           );
           final wallCenterY =
               (cp.ceilL.dy + cp.ceilR.dy + cp.floorL.dy + cp.floorR.dy) / 4;
@@ -721,6 +728,7 @@ void main() {
             wallTR: cp.wallTR,
             wallBL: cp.wallBL,
             wallBR: cp.wallBR,
+            fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
           );
           final wallCenterY =
               (cp.ceilL.dy + cp.ceilR.dy + cp.floorL.dy + cp.floorR.dy) / 4;
@@ -849,6 +857,7 @@ void main() {
           wallTR: cpDeg.wallTR,
           wallBL: cpDeg.wallBL,
           wallBR: cpDeg.wallBR,
+          fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
         );
 
         expect(
@@ -892,6 +901,7 @@ void main() {
           wallTR: cpDegShifted.wallTR,
           wallBL: cpDegShifted.wallBL,
           wallBR: cpDegShifted.wallBR,
+          fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
         );
 
         // ignore: avoid_print
@@ -1054,6 +1064,7 @@ void main() {
               wallTR: cp.wallTR,
               wallBL: cp.wallBL,
               wallBR: cp.wallBR,
+              fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
             );
 
             if (vp.residualPx == null) {
@@ -1119,6 +1130,7 @@ void main() {
             wallTR: cpDeg.wallTR,
             wallBL: cpDeg.wallBL,
             wallBR: cpDeg.wallBR,
+            fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
           );
           expect(
             vpDeg.residualPx,
@@ -1222,6 +1234,7 @@ void main() {
           wallTR: cp.wallTR,
           wallBL: cp.wallBL,
           wallBR: cp.wallBR,
+          fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
         );
         final depthPx = corniceDefaultPx(vp.pH).faceHorizFondPx;
 
@@ -1286,6 +1299,7 @@ void main() {
           wallTR: cp.wallTR,
           wallBL: cp.wallBL,
           wallBR: cp.wallBR,
+          fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
         );
 
         expect(
@@ -1387,6 +1401,7 @@ void main() {
           wallTR: cp.wallTR,
           wallBL: cp.wallBL,
           wallBR: cp.wallBR,
+          fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
         );
         final pH = vp.pH;
 

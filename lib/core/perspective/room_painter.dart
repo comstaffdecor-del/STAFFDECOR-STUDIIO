@@ -145,6 +145,15 @@ class RoomPainter extends CustomPainter {
       wallTR: cp.wallTR,
       wallBL: cp.wallBL,
       wallBR: cp.wallBR,
+      // Site de production conservé sur le membre historique en 7b-1 —
+      // arbitrage de bascule vers erreurExplicite EXPLICITEMENT reporté
+      // à 7b-2 (voir docs/ETAT.md, liste nominative Point 7b) : mesure
+      // manquante = quelle région de l'espace de calibration utilisateur
+      // atteint la branche à couple unique fini, et quel garde-fou en
+      // amont (residualFrac sur la calibration non perturbée, jamais
+      // residualPx au moment de la bascule où il est null par
+      // construction) avant de lever ici.
+      fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
     );
     final pH = vp.pH;
 

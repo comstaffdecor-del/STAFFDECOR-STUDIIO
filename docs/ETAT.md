@@ -568,6 +568,100 @@ témoin — nombre de faces, sommets de corniche, exception éventuelle,
 emprise en pixels via `PictureRecorder → toImage → toByteData`
 (comptage des pixels non transparents). Sans arbitrage.
 
+**Point 7b-1 — propagation mécanique, FAIT ce tour (commit à suivre).**
+
+Deux décisions actées avant exécution :
+1. Pas de `@Deprecated` sur `repliHistoriqueCoupleBas` — juger le
+   membre historique serait prématuré avant que 7b-2 ait mesuré les
+   deux modes réels. Baseline `analyze` inchangée.
+2. Le site de production (`room_painter.dart:139`) reste sur
+   `repliHistoriqueCoupleBas` en 7b-1 — CE N'EST PAS une conséquence
+   mécanique de l'ajout du paramètre, c'est un arbitrage explicite
+   REPORTÉ à 7b-2, justifié par un fait déjà établi : la branche à
+   couple unique fini n'est atteinte par AUCUNE des 4 calibrations
+   réelles à δ=0 (les deux couples y sont simultanément finis, sauf
+   exactement à δ_deg, hors domaine de production) — `erreurExplicite`
+   y serait donc mesurablement inerte, mais la bascule elle-même
+   (avec son garde-fou amont sur `residualFrac`, jamais `residualPx`
+   au moment de la bascule où il est `null` par construction) est
+   traitée comme un arbitrage à documenter en 7b-2, pas comme un
+   sous-produit de ce commit.
+
+`enum VpFallbackMode { repliHistoriqueCoupleBas, erreurExplicite,
+projectionParallele }` — **sans `default:` dans le `switch`** de
+`VanishingPoint.compute` (le `switch` couvre les 3 membres
+explicitement) : une clause `default:` reproduirait à l'intérieur du
+`switch` exactement le défaut que l'absence de valeur par défaut de
+l'enum supprime à l'extérieur — l'analyzer signale toute extension
+future de l'enum non traitée dans le `switch`.
+
+`erreurExplicite` implémenté POUR DE VRAI dès ce commit (pas un
+`UnimplementedError`) — nécessaire pour que la mesure 7b-2 (4 presets ×
+2 modes) produise un log lisible : le message porte le couple fini,
+le couple dégénéré, les deux points candidats, et le fait que
+`residualPx` resterait `null` faute de second point. Calqué sur le
+`throw ArgumentError` déjà existant en fin de `compute()` (même type
+d'exception, pas de type concurrent). `projectionParallele` reste
+`UnimplementedError` documenté, reporté à 7b-2 — sa mise en œuvre
+authentique n'a de sens qu'une fois la mesure faite (3 presets/4 avec
+droites confondues, direction indéfinie).
+
+**Note importante, actée et non estompée** : implémenter proprement
+`erreurExplicite` rend le crash LISIBLE, pas ABSENT. Si un jour la
+bascule est décidée en production, la calibration utilisateur
+dégénérée passe toujours de « rendu approximatif » à « exception dans
+le chemin de peinture », sans qu'aucun test ne l'exerce aujourd'hui —
+la formule « vert en CI, régression sur le terrain » reste entière.
+Ce correctif ne traite que la lisibilité du message, pas
+l'atteignabilité de la branche.
+
+**Compte des sites d'appel — correction d'un sous-comptage découvert
+pendant ce commit.** Le grep initial de l'Étape 1
+(`grep -rn "VanishingPoint.compute(" lib/ test/`) était scopé à
+`lib/`+`test/` et donnait 29 occurrences brutes, dont 24 vrais sites
+d'appel (5 exclus : 1 déclaration `factory` + 3 mentions en prose dans
+`vp_frac_degenere_test.dart` lignes 957/964/1152 + 1 mention en prose
+dans `_synth_vp_harness_test.dart` ligne 2830). **Ce périmètre était
+lui-même incomplet** : `flutter analyze`, exécuté après propagation
+des 24 sites, a levé `missing_required_argument` sur
+`tools/calib_measure/vp_current_state_probe.dart:58` — un 25ᵉ site
+d'appel réel, hors de `lib/`+`test/`, jamais couvert par aucun grep de
+ce tour ni du précédent. Re-scan sans restriction de répertoire
+(hors `build/`) : **30 occurrences brutes, 25 vrais sites d'appel**.
+Ce site est une sonde de mesure du comportement "actuel"
+(`test('sonde: ImgDraw + distVp effectif par preset (…)')`) —
+conservée sur `repliHistoriqueCoupleBas` pour continuer à observer
+exactement ce qu'elle observait avant ce commit.
+
+Liste nominative des 25 sites, tous sur `repliHistoriqueCoupleBas`
+(production incluse, arbitrage de bascule reporté à 7b-2 — voir
+décision 2 ci-dessus) :
+
+| # | Fichier | Ligne(s) |
+|---|---|---|
+| 1 | `lib/core/perspective/room_painter.dart` | 139 (site de production — conservé, arbitrage reporté 7b-2) |
+| 2 | `tools/calib_measure/vp_current_state_probe.dart` | 58 (sonde de mesure — non couvert par le grep initial `lib/+test/`) |
+| 3-4 | `test/core/perspective/_debug_calib_bench_test.dart` | 87, 378 |
+| 5 | `test/core/perspective/_debug_room_painter_real_render_test.dart` | 221 |
+| 6-10 | `test/core/perspective/_synth_vp_harness_test.dart` | 2526, 2558, 2598, 2850, 2910 |
+| 11-25 | `test/core/perspective/vp_frac_degenere_test.dart` | 126, 199, 211, 349, 389, 480, 569, 715, 843, 886, 1048, 1113, 1216, 1280, 1381 (numéros pré-insertion, décalés de +1 chacun après propagation) |
+
+Contrôle arithmétique (post-correction, re-scan complet du dépôt hors
+`build/`) : `grep -rn "fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas"`
+→ **25**. `grep -rn "erreurExplicite"` hors déclaration/`case`/message
+→ **0 site d'appel** (seulement la déclaration de l'enum, le `case`
+du `switch`, la chaîne du message d'erreur, et le commentaire
+d'arbitrage dans `room_painter.dart`).
+
+Prédiction écrite avant exécution : 229 verts, compte inchangé, aucun
+rouge — tenue, confirmée par recomptage JSON non-circulaire
+(`--reporter json`, `testDone && hidden:false`) : 229 entrées, 0
+`result != 'success'`. `flutter analyze` : 0 erreur, 1 warning (`srcH`,
+inchangé), 106 info — baseline strictement identique à celle déclarée
+avant exécution (puisque `@Deprecated` a été refusé).
+
+Log : `docs/logs/point7b_1.txt`.
+
 **Point 8 : ne rien commencer sans accord explicite utilisateur.**
 
 ## Points restants (ordre imposé)

@@ -64,6 +64,10 @@ void main() {
         wallTR: cp.wallTR,
         wallBL: cp.wallBL,
         wallBR: cp.wallBR,
+        // Sonde de mesure du comportement ACTUEL — conservée sur le membre
+        // historique pour continuer à observer exactement ce qu'elle
+        // observait avant l'introduction de VpFallbackMode (Point 7b-1).
+        fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas,
       );
       final depthPx = corniceDefaultPx(vp.pH).faceHorizFondPx;
       final frac = vp.frac(cp.ceilL, depthPx);
