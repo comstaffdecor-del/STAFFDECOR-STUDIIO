@@ -31,11 +31,14 @@
 //      `UnimplementedError`, capturé et compté, jamais un repli
 //      arbitraire.
 //
-// Delta de compte déclaré avant exécution : 229 → 232 (3 test()
-// neufs, un par mesure ci-dessus).
+// Delta de compte déclaré avant exécution (Point 7b-2) : 229 → 232
+// (3 test() neufs, un par mesure ci-dessus).
+//
+// Point 7b-3, ajout — Mesure 4 : mécanisme de symétrie confirmé par
+// sonde synthétique jetable (docs/logs/point7b_3_symetrie.txt),
+// promu en test() permanent. Delta déclaré avant exécution : 232 →
+// 233.
 library;
-
-import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:staff_decor_studio/core/perspective/calib_canvas.dart';
@@ -321,9 +324,14 @@ void main() {
         }
 
         // ignore: avoid_print
+        // Point 7b-3, clause 2 : perpDist reformaté en notation
+        // exponentielle — toStringAsFixed(4) n'établissait que
+        // "< 5e-5px", pas l'exactitude machine (0.0 bit à bit). La
+        // notation exponentielle laisse la sortie trancher entre
+        // nul-machine et nul-exact plutôt qu'un arrondi visuel.
         print('[7b-2-projparallele] $key : crossDirs='
             '${crossDirs.toStringAsExponential(3)}  perpDist='
-            '${perpDist.toStringAsFixed(4)}px  '
+            '${perpDist.toStringAsExponential(3)}px  '
             '${estConfondue ? "CONFONDUES" : "PARALLÈLES DISTINCTES"}');
 
         // projectionParallele doit lever UnimplementedError dans TOUS
@@ -379,6 +387,105 @@ void main() {
             '(perpDist≈0) à δ_deg — mesuré $nbConfondues. Si ce nombre a '
             'changé, le fait porté depuis le diagnostic précédent doit '
             'être réévalué, pas silencieusement ignoré.',
+      );
+    },
+  );
+
+  // ===========================================================================
+  // Mesure 4 — Point 7b-3, item 6 : mécanisme de la symétrie, promu en
+  // test() permanent après confirmation par sonde synthétique jetable
+  // (voir docs/logs/point7b_3_symetrie.txt pour la trace complète, y
+  // compris un premier échec de construction). La vraie condition de
+  // confondues sous δ_deg est ceilL.yPct == ceilR.yPct (hauteurs de
+  // plafond égales), pas la seule égalité de wallTL.yPct/wallTR.yPct
+  // prise isolément — les 4 presets réels vérifient tous le lien
+  // rigide wallTL.yPct - 0.01 == ceilL.yPct et wallTR.yPct - 0.01 ==
+  // ceilR.yPct, ce qui fait coïncider les deux formulations pour eux
+  // spécifiquement. Garde de régression sur ce mécanisme, indépendant
+  // de ce lien particulier.
+  // ===========================================================================
+  test(
+    'mécanisme de symétrie : ceilL.yPct==ceilR.yPct -> confondues, '
+    'sinon parallèles distinctes, sur calibrations synthétiques',
+    () {
+      const deltaDeg = -0.01;
+      const w = kCanvasW, h = kCanvasH;
+      Offset toCanvas(CalibPoint p) => Offset(p.xPct * w, p.yPct * h);
+
+      double? mesurePerpDist(PerspCalib base) {
+        final calibDeg = base.copyWith(
+          wallTL: base.wallTL.copyWith(yPct: base.wallTL.yPct + deltaDeg),
+          wallTR: base.wallTR.copyWith(yPct: base.wallTR.yPct + deltaDeg),
+        );
+        final wallTL = toCanvas(calibDeg.wallTL);
+        final wallTR = toCanvas(calibDeg.wallTR);
+        final ceilL = toCanvas(calibDeg.ceilL);
+        final ceilR = toCanvas(calibDeg.ceilR);
+
+        final vpTop = pg.lineIntersect(wallTL, ceilL, wallTR, ceilR);
+        if (vpTop != null) return null; // précondition invalidée
+
+        final dirTL = Offset(ceilL.dx - wallTL.dx, ceilL.dy - wallTL.dy);
+        final lenTL = pg.dist(Offset.zero, dirTL);
+        final ux = dirTL.dx / lenTL, uy = dirTL.dy / lenTL;
+        final vx = wallTR.dx - wallTL.dx, vy = wallTR.dy - wallTL.dy;
+        return (vx * uy - vy * ux).abs();
+      }
+
+      // Calibration synthétique SYMÉTRIQUE : ceilL.yPct == ceilR.yPct.
+      const calibSym = PerspCalib(
+        ceilL: CalibPoint(xPct: 0.100, yPct: 0.100),
+        ceilR: CalibPoint(xPct: 0.900, yPct: 0.100),
+        floorL: CalibPoint(xPct: 0.100, yPct: 0.800),
+        floorR: CalibPoint(xPct: 0.900, yPct: 0.800),
+        wallTL: CalibPoint(xPct: 0.000, yPct: 0.110),
+        wallTR: CalibPoint(xPct: 1.000, yPct: 0.110),
+        wallBL: CalibPoint(xPct: 0.000, yPct: 0.800),
+        wallBR: CalibPoint(xPct: 1.000, yPct: 0.800),
+      );
+
+      // Calibration synthétique ASYMÉTRIQUE : ceilL.yPct != ceilR.yPct
+      // (même écart 0.005 que haussmann).
+      const calibAsym = PerspCalib(
+        ceilL: CalibPoint(xPct: 0.100, yPct: 0.100),
+        ceilR: CalibPoint(xPct: 0.900, yPct: 0.095),
+        floorL: CalibPoint(xPct: 0.100, yPct: 0.800),
+        floorR: CalibPoint(xPct: 0.900, yPct: 0.790),
+        wallTL: CalibPoint(xPct: 0.000, yPct: 0.110),
+        wallTR: CalibPoint(xPct: 1.000, yPct: 0.105),
+        wallBL: CalibPoint(xPct: 0.000, yPct: 0.800),
+        wallBR: CalibPoint(xPct: 1.000, yPct: 0.790),
+      );
+
+      final perpDistSym = mesurePerpDist(calibSym);
+      final perpDistAsym = mesurePerpDist(calibAsym);
+
+      // ignore: avoid_print
+      print('[7b-3-symetrie] SYMÉTRIQUE  : '
+          'perpDist=${perpDistSym?.toStringAsExponential(3)}');
+      // ignore: avoid_print
+      print('[7b-3-symetrie] ASYMÉTRIQUE : '
+          'perpDist=${perpDistAsym?.toStringAsExponential(3)}');
+
+      expect(perpDistSym, isNotNull,
+          reason: 'précondition (vpTop==null) invalidée pour le cas '
+              'symétrique — la construction synthétique ne reproduit '
+              'plus le mécanisme δ_deg attendu.');
+      expect(perpDistAsym, isNotNull,
+          reason: 'précondition (vpTop==null) invalidée pour le cas '
+              'asymétrique.');
+      expect(
+        perpDistSym!,
+        lessThan(1e-6),
+        reason: 'Calibration symétrique (ceilL.yPct==ceilR.yPct) '
+            'attendue CONFONDUE (perpDist≈0), mesuré $perpDistSym.',
+      );
+      expect(
+        perpDistAsym!,
+        greaterThan(1e-6),
+        reason: 'Calibration asymétrique (ceilL.yPct!=ceilR.yPct) '
+            'attendue PARALLÈLE DISTINCTE (perpDist>0), mesuré '
+            '$perpDistAsym.',
       );
     },
   );

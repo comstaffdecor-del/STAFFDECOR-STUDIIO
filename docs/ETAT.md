@@ -88,10 +88,30 @@ y sont confondues ou distinctes, ce que le caractère borné/non borné
 de la discontinuité ne fonde PAS. »
 
 **4. Garde a priori** (utile pour le Point 7b) : `residualFrac(0)`
-vaut 1,081 sur haussmann et se situe entre 0,98 et 1,21 sur les quatre
-calibrations livrées — tout seuil inférieur à 0,98 se déclenche donc
-sur les quatre à la fois. Une garde a priori calibrée naïvement bloque
-l'application entière au lieu de filtrer les cas dégénérés.
+se situe entre 0,98 et 1,21 sur les quatre calibrations livrées —
+tout seuil inférieur à 0,98 se déclenche donc sur les quatre à la
+fois. Une garde a priori calibrée naïvement bloque l'application
+entière au lieu de filtrer les cas dégénérés. **Rétractation
+(Point 7b-3, item 1)** : la valeur 1,081 précédemment attribuée à
+haussmann dans cette clause était celle du PROVENÇAL, pas de
+haussmann — la valeur réelle de haussmann est **1,211**
+(`residualFrac=121.1%`, `docs/logs/point7b_1.txt`,
+`[groupe5-conditionnement] haussmann`). Les bornes de plage
+(0,98–1,21) étaient déjà justes — c'est précisément cette justesse
+de la plage qui a rendu l'interversion invisible à la relecture :
+aucune borne n'était fausse, seule l'attribution nominative d'une
+valeur interne l'était. Seule la mesure PAR PRESET (et non la seule
+plage) pouvait exposer l'erreur. L'interversion a circulé dans tous
+les briefs précédents, y compris ceux de l'assistant. Mesure par
+preset, telle que loggée :
+```
+haussmann  : residualFrac=121.1%
+moderne    : residualFrac=109.4%
+provencal  : residualFrac=108.1%
+scandinave : residualFrac=98.3%
+```
+Le bloc figé (« 1,081 sur haussmann ») se rétracte ; la mesure du
+log l'emporte, provenance citée ci-dessus.
 
 **5. Polarité non gardée hors δ_deg** : le test de signe (Groupe 3bis,
 Test 1, `expect(signs.length, 1, ...)`) exclut explicitement δ_deg via
@@ -798,6 +818,149 @@ plus aucun numéro de ligne dérivé par arithmétique (toujours re-greppé
 frais) ; pour le bloc `avoid_print`, compte + commande de
 reproduction plutôt qu'une liste de numéros ; `git add` sur chemins
 explicites, jamais `-A`, le bot d'auto-backup écrivant en parallèle.
+
+## Point 7b-3 — Étage C (pouvoir de détection réel), circularité de
+la Mesure 2, arrondi de perpDist, mécanisme de symétrie, clôture 7b
+
+**2. Arrondi de `perpDist` corrigé.** `0.0000px` (format
+`toStringAsFixed(4)` utilisé dans `test/core/perspective/
+vp_fallback_mode_test.dart` pour les 3 presets confondus) établit
+seulement `< 5×10⁻⁵px`, PAS l'exactitude machine (`0.0` bit à bit).
+Reformaté en notation exponentielle
+(`.toStringAsExponential(3)`, déjà utilisé pour `crossDirs`) dans le
+fichier committé, pour laisser la sortie elle-même trancher entre
+nul-machine et nul-exact plutôt qu'un arrondi visuel. Mesuré après
+correction : moderne/provencal/scandinave `perpDist=0.000e+0` exact
+(bit à bit), haussmann `perpDist=4.875e+0`. Traité en même temps
+tous les `toStringAsFixed` remontés par le Bloc 1 de lecture de ce
+tour (`residualFrac` en `.toStringAsFixed(1)` et `perpDist` en
+`.toStringAsFixed(4)`) : `residualFrac` reste en pourcentage à une
+décimale (usage d'affichage de plage, pas de comparaison à zéro, non
+concerné par cette clause) ; seul `perpDist` est reformaté.
+
+**3. Verdict de circularité de la Mesure 2 (`residualFrac`),
+rendu par lecture (Bloc 1) puis mutation (Étage C, item C3) :** la
+Mesure 2 contient bien un `expect` (pas seulement un `print`), mais
+ses 3 seuls `expect` sont VACANTS — `expect(fracs.length,
+equals(4))`, `expect(minFrac > 0, isTrue)`, `expect(maxFrac.isFinite,
+isTrue)` — aucun ne contraint la VALEUR de `residualFrac`. Mutation
+(facteur ×3,0 injecté dans le getter `residualFrac` de
+`lib/core/perspective/vanishing_point.dart`, non committée,
+restaurée) : les 4 valeurs mesurées se sont déplacées
+(121,1%→363,4%, 109,4%→328,1%, 108,1%→324,3%, 98,3%→294,9%) SANS
+faire rougir aucun test (`+3: All tests passed!`,
+`docs/logs/point7b_3_etage_c.txt`). **Circularité établie par
+expérience** : la Mesure 2 est une mesure PUBLIÉE (imprimée,
+lisible dans le log), pas une mesure GARDÉE — elle ne peut pas
+attraper une régression future du calcul de `residualFrac` lui-même.
+Ceci reste correct pour son objet déclaré (rapporter la plage
+mesurée, ne décider d'aucun seuil) ; le constat porte uniquement sur
+sa capacité de garde, absente par construction.
+
+**4. Retrait de `dart:ui` dans `vp_fallback_mode_test.dart`** —
+baseline `flutter analyze` ramenée de 107 à 106 info. Le fichier
+neuf reproduisait le lint `unnecessary_import` déjà présent et non
+corrigé dans `vp_frac_degenere_test.dart:55` (import redondant avec
+`flutter_test`, qui réexporte `Offset`). Le précédent de ce fichier
+justifie de NE PAS y toucher là-bas (tolérance déjà actée en 7b-1/
+7b-2, hors périmètre de ce commit) ; il ne justifie pas de
+REPRODUIRE ce même lint dans un fichier neuf où l'import est retiré
+sans coût.
+
+**5. Résultats d'Étage C, étiquetage C/A′ (détail intégral :
+`docs/logs/point7b_3_etage_c.txt`)** :
+- **C1 [Étage C]** — `case erreurExplicite:` remplacé par le repli
+  historique (mutation dans `lib/`) : ROUGE confirmé sur les 4
+  presets, volet δ_deg de la Mesure 1 (4 mismatches nommés), volet
+  nominal resté vert. Preuve de détection réelle : `throwsArgumentError`
+  mord.
+- **C2 [tentative A′, verdict établi]** — `throw StateError`
+  inconditionnel injecté au début de
+  `case repliHistoriqueCoupleBas:` (mutation dans `lib/`, choisie
+  pour ÉTABLIR la prédiction plutôt que l'affirmer) : VERT confirmé
+  intégralement, y compris sur la Mesure 2 qui appelle explicitement
+  ce membre sur les 4 presets nominaux. **Conclusion écrite** : le
+  volet nominal de la Mesure 1 ("erreurExplicite ne lève pas sur les
+  presets nominaux") est une assertion D'ACCESSIBILITÉ (A′), pas un
+  garde comportemental — le chemin de contrôle nominal (les deux
+  couples finis) n'atteint JAMAIS le switch `fallbackMode`, donc
+  aucune mutation confinée à ce switch ne peut la faire rougir. **Le
+  test 1 est à demi mordant** : son volet δ_deg mord réellement (C1),
+  son volet nominal ne peut mathématiquement pas mordre sur cette
+  branche — plus trompeur qu'un test franchement muet, puisqu'il
+  affiche un `expect` qui semble actif.
+- **C3 [Étage C]** — mutation ×3,0 sur `residualFrac` (mutation
+  dans `lib/`) : voir clause 3 ci-dessus, circularité établie.
+- **C4 [A′ ×2, aucune mutation dans `lib/`]** — (a) seuil de
+  classification élargi côté test (`perpDist < 5.0` au lieu de
+  `< 1e-6`) : reclasse haussmann en "confondue" (bilan 4/0 au lieu de
+  3/1), test resté vert (`greaterThanOrEqualTo(3)` tient aussi à 4) ;
+  (b) mismatch forcé sur "moderne" (2ᵉ preset, pas le premier) :
+  `Actual: ['moderne : SONDE_C4_ARTIFICIELLE_NON_PREMIER']` — confirme
+  que le collecteur du test 3 liste l'écart NOMINATIF exact, pas
+  seulement le premier élément de la boucle. Les 4 mutations ont été
+  restaurées individuellement (`git checkout --`, `git diff --stat
+  lib/ test/` vide, relance verte vérifiée après chacune).
+
+**6. Hypothèse de symétrie — mécanisme confirmé, après un premier
+échec de construction (détail intégral :
+`docs/logs/point7b_3_symetrie.txt`)** : la répartition 3/1
+(confondues/distinctes) coïncide avec la symétrie des calibrations —
+moderne/provencal/scandinave ont `wallTL.yPct == wallTR.yPct`,
+haussmann seul a `wallTL.yPct ≠ wallTR.yPct` (0,100 vs 0,095).
+Sonde synthétique falsifiable (préfixe `_tmp_`, créée, mesurée,
+supprimée) : **première construction ÉCHOUÉE** — en fixant
+`wallTL.yPct`/`wallTR.yPct` indépendamment de `ceilL.yPct`/
+`ceilR.yPct`, la précondition (couple haut dégénéré, `vpTop==null`)
+n'était pas satisfaite (`vpTop` mesuré fini dans les deux cas,
+`perpDist` mesuré à 97 et 102px — sans rapport avec l'hypothèse).
+Cause identifiée : dans les 4 presets réels, le lien rigide
+`wallTL.yPct − 0,01 = ceilL.yPct` et `wallTR.yPct − 0,01 =
+ceilR.yPct` est vérifié EXACTEMENT — c'est ce lien qui rend chaque
+droite `(wallX→ceilX)` horizontale après le décalage δ_deg=−0,01, et
+la vraie condition de confondues est `ceilL.yPct == ceilR.yPct`
+(hauteurs de plafond égales), pas la seule égalité des points de mur
+latéral prise isolément. **Seconde construction, respectant ce
+lien** : cas symétrique (`ceilL.yPct=ceilR.yPct=0,100`) →
+`perpDist=0.0` exact ; cas asymétrique (`ceilL.yPct=0,100`,
+`ceilR.yPct=0,095`, même écart que haussmann) → `perpDist=4,875`
+— identique à la valeur mesurée sur haussmann lui-même. **Verdict** :
+hypothèse confirmée, avec une précision mécanique que l'échec initial
+a rendue explicite — le 3/1 n'est pas une propriété brute des
+presets mais de leur symétrie de plafond (`ceilL.yPct` vs
+`ceilR.yPct`), combinée au mécanisme de construction δ_deg PARTAGÉ
+par les 4 presets réels (même décalage −0,01 sur les deux points de
+mur latéral). Un décompte devient un mécanisme. **Décision de
+promotion** : la sonde est promue en `test()` permanent dans
+`vp_fallback_mode_test.dart` (Mesure 4) — le mécanisme, une fois
+confirmé et falsifiable, mérite un garde de régression sur la
+relation `ceilL.yPct == ceilR.yPct ⟺ confondues`. **Delta déclaré
+avant exécution : 232 → 233.**
+
+**7. Clôture de 7b, resserrée.** Établi sur le domaine mesuré (4
+presets réels + scènes δ_deg construites) : `residualFrac` sur la
+baseline non perturbée ne fournit PAS de garde-fou continu en amont
+de la bascule de `room_painter.dart:139` — plage [98,3%, 121,1%]
+sans seuil discriminant. **Non établi** : « aucune bascule
+défendable n'existe ». Un discriminant BOOLÉEN (un seul couple fini)
+est gratuit AU POINT de bascule, puisqu'il en est la condition
+d'entrée — mais il dit seulement qu'on est dans la branche, pas si
+la calibration sous-jacente est réparable ou catastrophique. C'était
+toute la fonction attendue d'un garde CONTINU, et cette fonction
+reste non pourvue. L'objection de domaine joue symétriquement : 4
+presets plus des scènes δ_deg construites ne fondaient pas
+"garde-fou continu inerte" (établi ce tour-ci), ils ne fondent pas
+davantage "bascule indéployable" (jamais établi, nulle part). Le 1/4
+de `projectionParallele` (haussmann seul distinct) est de même une
+PROPRIÉTÉ DE LA CONSTRUCTION δ_deg partagée par les presets (voir
+clause 6), pas une propriété indépendante des presets eux-mêmes.
+**Étiquette finale retenue** : question mesurable CLOSE (le domaine
+mesuré ne fournit pas de garde continu), résidu (arbitrage éventuel
+d'une bascule) HORS DE PORTÉE de ce dispositif de mesure — ni "en
+attente", ni "impossible". `room_painter.dart:139` reste sur le
+membre historique sur ce fondement précis : pas parce qu'aucune
+alternative n'existerait, mais parce que le dispositif de mesure
+disponible ne peut ni la motiver ni l'exclure.
 
 **Point 8 : ne rien commencer sans accord explicite utilisateur.**
 

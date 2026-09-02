@@ -1,0 +1,68 @@
+Point 7b-3, item 6 — Hypothèse de symétrie, sonde falsifiable
+================================================================
+Hypothèse : sous la construction δ_deg=-0.01 (translation verticale
+de wallTL/wallTR), une calibration SYMÉTRIQUE produit deux droites
+confondues par construction, une ASYMÉTRIQUE produit deux droites
+parallèles distinctes. Prédiction du brief : la répartition 3/1
+mesurée sur les 4 presets réels coïncide avec
+wallTL.yPct==wallTR.yPct (moderne/provencal/scandinave : symétriques
+: confondues ; haussmann seul asymétrique : distinct).
+
+--- PREMIÈRE TENTATIVE, ÉCHOUÉE ---
+Construction naïve : deux calibrations synthétiques avec
+wallTL.yPct==wallTR.yPct (cas "symétrique") ou != (cas
+"asymétrique"), MAIS wallTL/wallTR choisis indépendamment de
+ceilL/ceilR (sans respecter le lien wallTL.yPct = ceilL.yPct + 0.01
+observé dans les 4 presets réels).
+Résultat mesuré :
+  vpTop (attendu null) = Offset(700.0, 136.5)   -- PAS null
+  vpTop (attendu null) = Offset(665.0, 134.1)   -- PAS null
+  perpDist SYMÉTRIQUE  = 97.264...
+  perpDist ASYMÉTRIQUE = 102.128...
+ÉCHEC : la précondition (couple haut dégénéré, vpTop==null) n'était
+pas satisfaite — la construction synthétique ne reproduisait PAS le
+mécanisme réel de δ_deg. Cause identifiée par inspection des 4
+presets réels : pour chacun, wallTL.yPct - 0.01 == ceilL.yPct et
+wallTR.yPct - 0.01 == ceilR.yPct EXACTEMENT (vérifié par calcul :
+haussmann 0.100-0.01=0.090=ceilL.yPct ; 0.095-0.01=0.085=ceilR.yPct ;
+idem pour les 3 autres presets, à l'égalité près) — c'est CE lien
+(wall = ceil + delta) qui rend chaque droite (wallX→ceilX)
+horizontale après le décalage, PAS la seule valeur de wallTL/wallTR
+prise isolément. Ma première construction avait fixé wallTL=ceilL
+(au lieu de wallTL=ceilL+0.01), donc après le décalage
+wallTL_après=ceilL-0.01 != ceilL : la droite n'était pas horizontale,
+vpTop restait fini.
+
+--- SECONDE TENTATIVE, CORRIGÉE ---
+Construction respectant le lien réel : wallTL.yPct = ceilL.yPct + 0.01,
+wallTR.yPct = ceilR.yPct + 0.01 (comme dans les 4 presets réels), puis
+symétrie/asymétrie appliquée à ceilL.yPct vs ceilR.yPct :
+  - cas SYMÉTRIQUE   : ceilL.yPct = ceilR.yPct = 0.100
+  - cas ASYMÉTRIQUE  : ceilL.yPct = 0.100, ceilR.yPct = 0.095 (même
+    écart 0.005 que haussmann)
+Résultat mesuré :
+  vpTop (attendu null) = null    [SYMÉTRIQUE]
+  vpTop (attendu null) = null    [ASYMÉTRIQUE]
+  perpDist SYMÉTRIQUE  = 0.0
+  perpDist ASYMÉTRIQUE = 4.875
++1: All tests passed!
+
+VERDICT : hypothèse de symétrie CONFIRMÉE, mais avec une précision
+mécanique que le premier échec a mise en évidence — la condition
+opérante est ceilL.yPct == ceilR.yPct (hauteurs de plafond égales),
+qui coïncide dans les 4 presets réels avec wallTL.yPct==wallTR.yPct
+UNIQUEMENT parce que ces presets respectent tous le même lien rigide
+wallTL.yPct = ceilL.yPct + 0.01 / wallTR.yPct = ceilR.yPct + 0.01. La
+formulation initiale du brief (symétrie des points wallTL/wallTR)
+reste opérationnellement correcte POUR LES 4 PRESETS RÉELS ; la
+sonde synthétique devait la reformuler en ceilL/ceilR pour rester
+falsifiable indépendamment de ce lien particulier. Le 3/1 n'est donc
+pas une propriété brute des presets mais de leur symétrie de plafond
+(ceilL.yPct vs ceilR.yPct) combinée au mécanisme de construction
+δ_deg partagé par les 4 — un décompte devient un mécanisme, comme
+prédit, après correction d'une première construction invalide.
+
+Sonde jetable : test/core/perspective/_tmp_sonde_symetrie.dart,
+créée, mesurée (2 exécutions, 1 échec informatif + 1 succès),
+supprimée après usage — non promue en test() permanent (voir item 6
+du brief : delta 232 reste inchangé, pas de promotion décidée ici).

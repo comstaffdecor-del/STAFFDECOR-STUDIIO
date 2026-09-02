@@ -1,0 +1,633 @@
+Point 7b-3 — Étage C (pouvoir de détection) vs Étage A′ (accessibilité)
+========================================================================
+Règle d'étiquetage : une mutation dans lib/ qui doit faire rougir une
+assertion est un Étage C. Une mutation de l'attente côté test qui
+prouve seulement que l'assertion est atteinte et évaluée est un
+Étage A′, et ne vaut pas preuve de détection. Chaque mutation ci-
+dessous porte son étiquette avant exécution, prédiction écrite avant
+la commande, sortie brute intégrale ensuite (pas de grep -A20).
+
+Restauration après chaque mutation : git checkout -- <chemin>,
+git diff --stat lib/ test/ vide, relance verte — vérifiée après
+chacune des 4 mutations ci-dessous.
+
+========================================================================
+C1 — [ÉTAGE C] test 1 (Mesure 1), volet δ_deg
+========================================================================
+Mutation : dans lib/core/perspective/vanishing_point.dart, remplacer
+le corps du `case VpFallbackMode.erreurExplicite:` par le même retour
+que `repliHistoriqueCoupleBas` (plus de `throw ArgumentError`).
+
+Prédiction (écrite avant exécution) : ROUGE sur les 4 presets, volet
+δ_deg de la Mesure 1 — `erreurExplicite` ne lève plus alors que la
+scène δ_deg met le couple haut en dégénéré par construction ; le
+message de mismatch attendu est littéralement celui déjà écrit dans
+le test : "erreurExplicite n'a PAS levé alors que le couple haut est
+dégénéré par construction — la branche à couple unique fini devrait
+être atteinte ici." pour haussmann/moderne/provencal/scandinave.
+Le volet nominal reste VERT (aucun throw n'était attendu là, aucun
+n'a lieu). Ceci prouve que le test MORD réellement sur le comporte-
+ment de levée : sans le throw, le test rougit — pouvoir de détection
+réel, pas un test muet.
+
+--- SORTIE BRUTE (avant mutation, diff attendu vide) ---
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  exif_reader 4.1.0 (4.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  http 1.5.0 (1.6.0 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+21 available)
+  image_picker_ios 0.8.13+3 (0.8.13+7 available)
+  intl 0.19.0 (0.20.3 available)
+  iso_base_media 6.3.2 (6.3.3 available)
+  lints 5.1.1 (6.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.16.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  random_access_source 4.2.1 (4.3.1 available)
+  share_plus 12.0.2 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  shared_preferences 2.5.3 (2.5.5 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.6 (0.7.13 available)
+  url_launcher 6.3.1 (6.3.2 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.3.6 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_web 2.4.1 (2.4.3 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.2.0 (15.3.0 available)
+  win32 5.15.0 (6.4.0 available)
+Got dependencies!
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:01 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:02 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:03 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:03 +0: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          00:03 +0: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          
+[7b-2-atteignabilite] haussmann (nominal) : erreurExplicite n'a PAS levé, residualPx=696.4532046374462
+[7b-2-atteignabilite] moderne (nominal) : erreurExplicite n'a PAS levé, residualPx=570.375
+[7b-2-atteignabilite] provencal (nominal) : erreurExplicite n'a PAS levé, residualPx=606.7851562499998
+[7b-2-atteignabilite] scandinave (nominal) : erreurExplicite n'a PAS levé, residualPx=551.3666666666671
+00:03 +0 -1: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur [E]   
+  Expected: empty
+    Actual: [
+              'haussmann (δ_deg) : erreurExplicite n\'a PAS levé alors que le couple haut est dégénéré par construction — la branche à couple unique fini devrait être atteinte ici.',
+              'moderne (δ_deg) : erreurExplicite n\'a PAS levé alors que le couple haut est dégénéré par construction — la branche à couple unique fini devrait être atteinte ici.',
+              'provencal (δ_deg) : erreurExplicite n\'a PAS levé alors que le couple haut est dégénéré par construction — la branche à couple unique fini devrait être atteinte ici.',
+              'scandinave (δ_deg) : erreurExplicite n\'a PAS levé alors que le couple haut est dégénéré par construction — la branche à couple unique fini devrait être atteinte ici.'
+            ]
+  Mesure d'atteignabilité en échec sur 4 preset(s) — voir détail : [haussmann (δ_deg) : erreurExplicite n'a PAS levé alors que le couple haut est dégénéré par construction — la branche à couple unique fini devrait être atteinte ici., moderne (δ_deg) : erreurExplicite n'a PAS levé alors que le couple haut est dégénéré par construction — la branche à couple unique fini devrait être atteinte ici., provencal (δ_deg) : erreurExplicite n'a PAS levé alors que le couple haut est dégénéré par construction — la branche à couple unique fini devrait être atteinte ici., scandinave (δ_deg) : erreurExplicite n'a PAS levé alors que le couple haut est dégénéré par construction — la branche à couple unique fini devrait être atteinte ici.]
+  
+  package:matcher                                         expect
+  package:flutter_test/src/widget_tester.dart 473:18      expect
+  test/core/perspective/vp_fallback_mode_test.dart 181:7  main.<fn>
+  
+
+To run this test again: /opt/flutter/bin/cache/dart-sdk/bin/dart test /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart -p vm --plain-name 'erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'\''atteignabilité, motif collecteur'
+00:03 +0 -1: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                               00:03 +0 -1: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                               
+[7b-2-guardefou] haussmann : residualFrac=121.1%
+[7b-2-guardefou] moderne : residualFrac=109.4%
+[7b-2-guardefou] provencal : residualFrac=108.1%
+[7b-2-guardefou] scandinave : residualFrac=98.3%
+[7b-2-guardefou] plage mesurée sur les 4 presets : [98.3%, 121.1%] — tout seuil de rejet placé sous 98.3% déclencherait sur les 4 presets simultanément, donc ne discriminerait rien.
+00:03 +1 -1: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                               00:03 +1 -1: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                    00:03 +1 -1: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                    
+[7b-2-projparallele] haussmann : crossDirs=8.460e-17  perpDist=4.8750px  PARALLÈLES DISTINCTES
+[7b-2-projparallele] haussmann : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] moderne : crossDirs=0.000e+0  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] moderne : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] provencal : crossDirs=4.060e-16  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] provencal : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] scandinave : crossDirs=0.000e+0  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] scandinave : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] bilan : 3 confondue(s), 1 parallèle(s) distincte(s), sur 4 presets.
+00:03 +2 -1: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                    00:03 +2 -1: Some tests failed.                                                                                                                                                                        
+
+========================================================================
+C1 — RESTAURATION
+========================================================================
+git checkout -- lib/core/perspective/vanishing_point.dart
+git diff --stat lib/ test/ : vide.
+Relance : +3: All tests passed! (vert confirmé).
+
+VERDICT C1 : CONFIRMÉ ROUGE comme prédit — les 4 mismatches (δ_deg)
+listés nommément, volet nominal resté vert. throwsArgumentError mord
+réellement. Étiquette C validée : cette mutation dans lib/ a fait
+rougir l'assertion, preuve de détection réelle.
+
+========================================================================
+C2 — [ÉTAGE C tenté, verdict attendu A′ par construction] test 1
+     (Mesure 1), volet nominal
+========================================================================
+Prédiction écrite avant exécution : aucune mutation confinée à la
+branche de repli (le `case erreurExplicite` / `case
+projectionParallele`, atteinte uniquement quand un seul couple est
+fini) ne peut faire rougir le volet nominal du test 1, car sur les 4
+presets à δ=0 les DEUX couples (haut ET bas) sont finis
+simultanément (établi par la Mesure 1 elle-même, confirmé par le
+log point7b_2.txt : residualPx non-null pour les 4 presets
+nominaux) — le code de la branche `if (vpTop != null || vpBottom !=
+null)` (où vit fallbackMode) n'est jamais atteint sur ce chemin ;
+le flux nominal retourne plus haut, via
+`if (vpTop != null && vpBottom != null)`. Donc AUCUNE mutation dans
+le corps du switch fallbackMode ne peut influer sur le volet
+nominal : c'est une propriété du CHEMIN DE CONTRÔLE, pas du contenu
+de la branche.
+
+Mutation candidate choisie pour ÉTABLIR (pas seulement affirmer)
+cette prédiction : dans lib/core/perspective/vanishing_point.dart,
+faire lever un throw inconditionnel au début du
+`case VpFallbackMode.repliHistoriqueCoupleBas:` (mutation dans la
+branche de repli, la plus "proche" du chemin nominal parmi les 3
+cases). Si le volet nominal du test 1 reste VERT malgré cette
+mutation qui ferait normalement lever n'importe quel appel qui
+atteindrait cette branche, la prédiction est établie par expérience :
+le volet nominal n'exerce jamais cette branche.
+
+--- SORTIE BRUTE ---
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  exif_reader 4.1.0 (4.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  http 1.5.0 (1.6.0 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+21 available)
+  image_picker_ios 0.8.13+3 (0.8.13+7 available)
+  intl 0.19.0 (0.20.3 available)
+  iso_base_media 6.3.2 (6.3.3 available)
+  lints 5.1.1 (6.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.16.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  random_access_source 4.2.1 (4.3.1 available)
+  share_plus 12.0.2 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  shared_preferences 2.5.3 (2.5.5 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.6 (0.7.13 available)
+  url_launcher 6.3.1 (6.3.2 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.3.6 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_web 2.4.1 (2.4.3 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.2.0 (15.3.0 available)
+  win32 5.15.0 (6.4.0 available)
+Got dependencies!
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:01 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:02 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:02 +0: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          00:02 +0: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          
+[7b-2-atteignabilite] haussmann (nominal) : erreurExplicite n'a PAS levé, residualPx=696.4532046374462
+[7b-2-atteignabilite] haussmann (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (728.00, 750.75), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] moderne (nominal) : erreurExplicite n'a PAS levé, residualPx=570.375
+[7b-2-atteignabilite] moderne (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 624.00), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] provencal (nominal) : erreurExplicite n'a PAS levé, residualPx=606.7851562499998
+[7b-2-atteignabilite] provencal (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 720.88), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] scandinave (nominal) : erreurExplicite n'a PAS levé, residualPx=551.3666666666671
+[7b-2-atteignabilite] scandinave (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 669.97), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+00:02 +1: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          00:02 +1: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  00:02 +1: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  
+[7b-2-guardefou] haussmann : residualFrac=121.1%
+[7b-2-guardefou] moderne : residualFrac=109.4%
+[7b-2-guardefou] provencal : residualFrac=108.1%
+[7b-2-guardefou] scandinave : residualFrac=98.3%
+[7b-2-guardefou] plage mesurée sur les 4 presets : [98.3%, 121.1%] — tout seuil de rejet placé sous 98.3% déclencherait sur les 4 presets simultanément, donc ne discriminerait rien.
+00:02 +2: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  00:02 +2: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                       00:02 +2: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                       
+[7b-2-projparallele] haussmann : crossDirs=8.460e-17  perpDist=4.8750px  PARALLÈLES DISTINCTES
+[7b-2-projparallele] haussmann : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] moderne : crossDirs=0.000e+0  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] moderne : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] provencal : crossDirs=4.060e-16  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] provencal : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] scandinave : crossDirs=0.000e+0  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] scandinave : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] bilan : 3 confondue(s), 1 parallèle(s) distincte(s), sur 4 presets.
+00:02 +3: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                       00:02 +3: All tests passed!                                                                                                                                                                            
+
+========================================================================
+C2 — RESTAURATION
+========================================================================
+git checkout -- lib/core/perspective/vanishing_point.dart
+git diff --stat lib/ test/ : vide.
+Relance : +3: All tests passed! (vert confirmé).
+
+VERDICT C2 : PRÉDICTION ÉTABLIE PAR EXPÉRIENCE (pas affirmée) — le
+throw StateError inconditionnel injecté dans
+`case VpFallbackMode.repliHistoriqueCoupleBas:` n'a fait rougir
+AUCUN test, y compris la Mesure 2 (residualFrac) qui appelle
+explicitement ce membre sur les 4 presets nominaux. Ceci confirme
+que ni le volet nominal du test 1, ni aucun autre test du fichier,
+n'atteint jamais le corps du switch fallbackMode aux valeurs
+nominales des 4 presets réels.
+
+CONCLUSION ÉCRITE (comme prescrit) : le volet nominal de la Mesure 1
+("erreurExplicite ne lève pas sur les presets nominaux") est une
+assertion D'ACCESSIBILITÉ (Étage A′), pas un garde comportemental —
+elle ne peut mathématiquement PAS être falsifiée par une mutation
+confinée au switch, car le chemin de contrôle nominal ne l'atteint
+jamais. Le test 1 est donc À DEMI MORDANT : son volet δ_deg mord
+réellement (C1, confirmé), son volet nominal ne peut mordre sur
+AUCUNE mutation de la branche fallbackMode — plus trompeur qu'un
+test franchement muet, car son unique échec possible viendrait d'un
+changement de comportement AVANT le switch (ex. lineIntersect
+lui-même), pas du switch qu'il prétend documenter.
+
+========================================================================
+C3 — [ÉTAGE C] Mesure 2 (residualFrac), verdict de circularité
+========================================================================
+D'après le Bloc 1 (grep #2) : la Mesure 2 contient un `expect`, mais
+de type VACANT — `expect(fracs.length, equals(4))`,
+`expect(minFrac > 0, isTrue)`, `expect(maxFrac.isFinite, isTrue)` —
+aucun `expect` ne porte sur la VALEUR de residualFrac elle-même.
+Selon le protocole prescrit ("si Bloc 1 montre un expect, muter la
+source dans lib/, pas l'assertion"), la mutation est REQUISE ici
+(le Bloc 1 ne dispense pas de mutation, contrairement au cas "print
+seul").
+
+Mutation : dans lib/core/perspective/vanishing_point.dart, multiplier
+residualPx par un facteur (×3.0) dans le getter `residualFrac`
+avant la division — déplace toutes les valeurs mesurées d'un facteur
+connu, sans changer leur signe ni leur finitude.
+
+Prédiction écrite avant exécution : si la mutation reste VERTE, la
+circularité est établie — les 3 expect (equals(4), >0, isFinite)
+sont insensibles à un facteur ×3 puisqu'ils ne contraignent ni la
+plage ni la valeur numérique de residualFrac, seulement sa présence,
+son signe et sa finitude. Le test ne peut PAS détecter un
+déplacement arbitraire de la mesure elle-même.
+
+--- SORTIE BRUTE ---
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  exif_reader 4.1.0 (4.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  http 1.5.0 (1.6.0 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+21 available)
+  image_picker_ios 0.8.13+3 (0.8.13+7 available)
+  intl 0.19.0 (0.20.3 available)
+  iso_base_media 6.3.2 (6.3.3 available)
+  lints 5.1.1 (6.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.16.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  random_access_source 4.2.1 (4.3.1 available)
+  share_plus 12.0.2 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  shared_preferences 2.5.3 (2.5.5 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.6 (0.7.13 available)
+  url_launcher 6.3.1 (6.3.2 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.3.6 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_web 2.4.1 (2.4.3 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.2.0 (15.3.0 available)
+  win32 5.15.0 (6.4.0 available)
+Got dependencies!
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:01 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:02 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:02 +0: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          00:02 +0: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          
+[7b-2-atteignabilite] haussmann (nominal) : erreurExplicite n'a PAS levé, residualPx=696.4532046374462
+[7b-2-atteignabilite] haussmann (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (728.00, 750.75), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] moderne (nominal) : erreurExplicite n'a PAS levé, residualPx=570.375
+[7b-2-atteignabilite] moderne (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 624.00), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] provencal (nominal) : erreurExplicite n'a PAS levé, residualPx=606.7851562499998
+[7b-2-atteignabilite] provencal (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 720.88), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] scandinave (nominal) : erreurExplicite n'a PAS levé, residualPx=551.3666666666671
+[7b-2-atteignabilite] scandinave (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 669.97), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+00:02 +1: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          00:02 +1: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  00:02 +1: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  
+[7b-2-guardefou] haussmann : residualFrac=363.4%
+[7b-2-guardefou] moderne : residualFrac=328.1%
+[7b-2-guardefou] provencal : residualFrac=324.3%
+[7b-2-guardefou] scandinave : residualFrac=294.9%
+[7b-2-guardefou] plage mesurée sur les 4 presets : [294.9%, 363.4%] — tout seuil de rejet placé sous 294.9% déclencherait sur les 4 presets simultanément, donc ne discriminerait rien.
+00:02 +2: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  00:02 +2: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                       00:02 +2: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                       
+[7b-2-projparallele] haussmann : crossDirs=8.460e-17  perpDist=4.8750px  PARALLÈLES DISTINCTES
+[7b-2-projparallele] haussmann : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] moderne : crossDirs=0.000e+0  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] moderne : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] provencal : crossDirs=4.060e-16  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] provencal : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] scandinave : crossDirs=0.000e+0  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] scandinave : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] bilan : 3 confondue(s), 1 parallèle(s) distincte(s), sur 4 presets.
+00:02 +3: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                       00:02 +3: All tests passed!                                                                                                                                                                            
+
+========================================================================
+C3 — RESTAURATION
+========================================================================
+git checkout -- lib/core/perspective/vanishing_point.dart
+git diff --stat lib/ test/ : vide.
+Relance : +3: All tests passed! (vert confirmé).
+
+VERDICT C3 : CIRCULARITÉ ÉTABLIE PAR EXPÉRIENCE — le facteur ×3.0
+injecté dans le getter residualFrac a déplacé les 4 valeurs
+mesurées (121.1%→363.4%, 109.4%→328.1%, 108.1%→324.3%,
+98.3%→294.9%, cf. sortie brute ci-dessus), et le test est resté
+INTÉGRALEMENT VERT (+3 : All tests passed!). Les 3 expect vacants
+(equals(4), >0, isFinite) ne détectent aucun déplacement de la
+mesure elle-même. La Mesure 2 ne peut PAS servir de garde contre une
+régression du calcul de residualFrac : c'est une mesure PUBLIÉE
+(imprimée, lisible), mais pas une mesure GARDÉE (aucun expect ne la
+contraint numériquement). Conclusion à retenir sans arbitrage
+supplémentaire : cette mesure reste correcte pour son objet déclaré
+(rapporter la plage, ne pas décider de seuil), mais elle serait
+incapable d'attraper une régression future du calcul lui-même.
+
+========================================================================
+C4 — [ÉTAGE A′, étiqueté explicitement] test 3 (Mesure 3), mutation
+     de la classification attendue d'un preset
+========================================================================
+Prédiction écrite avant exécution : muter, CÔTÉ TEST (pas lib/), la
+classification attendue en changeant le seuil `estConfondue = perpDist
+< 1e-6` en une valeur qui reclasse haussmann comme "confondue"
+artificiellement (ex. `< 5.0` au lieu de `< 1e-6`, puisque
+haussmann perpDist=4.8750px < 5.0) — ceci ne mute PAS lib/, donc
+n'est PAS un Étage C : cela ne prouve qu'une chose, que le
+collecteur affiche bien un écart NOMINATIF (avec le nom du preset
+concerné), pas seulement le premier. Étiquette : A′ explicite, valeur
+de contrôle d'accessibilité du collecteur, pas de détection de
+régression sur lib/.
+
+Effet attendu : nbConfondues passe de 3 à 4 (haussmann reclassé),
+le test 3 reste VERT sur son dernier expect
+(`greaterThanOrEqualTo(3)` — toujours vrai à 4), AUCUN rouge n'est
+attendu ici — cette mutation ne fait PAS rougir le test, elle ne
+fait que changer l'affichage/la classification interne. Elle sert
+seulement à vérifier que si demain une régression fait davantage
+lever un cas nommé, le collecteur le nommerait — vérifié séparément
+ci-dessous par une DEUXIÈME mutation qui, elle, force un mismatch
+nommé.
+
+--- SORTIE BRUTE (mutation 1 : seuil élargi, effet sur comptage) ---
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  exif_reader 4.1.0 (4.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  http 1.5.0 (1.6.0 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+21 available)
+  image_picker_ios 0.8.13+3 (0.8.13+7 available)
+  intl 0.19.0 (0.20.3 available)
+  iso_base_media 6.3.2 (6.3.3 available)
+  lints 5.1.1 (6.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.16.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  random_access_source 4.2.1 (4.3.1 available)
+  share_plus 12.0.2 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  shared_preferences 2.5.3 (2.5.5 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.6 (0.7.13 available)
+  url_launcher 6.3.1 (6.3.2 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.3.6 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_web 2.4.1 (2.4.3 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.2.0 (15.3.0 available)
+  win32 5.15.0 (6.4.0 available)
+Got dependencies!
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:01 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:02 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:02 +0: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          00:02 +0: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          
+[7b-2-atteignabilite] haussmann (nominal) : erreurExplicite n'a PAS levé, residualPx=696.4532046374462
+[7b-2-atteignabilite] haussmann (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (728.00, 750.75), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] moderne (nominal) : erreurExplicite n'a PAS levé, residualPx=570.375
+[7b-2-atteignabilite] moderne (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 624.00), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] provencal (nominal) : erreurExplicite n'a PAS levé, residualPx=606.7851562499998
+[7b-2-atteignabilite] provencal (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 720.88), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] scandinave (nominal) : erreurExplicite n'a PAS levé, residualPx=551.3666666666671
+[7b-2-atteignabilite] scandinave (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 669.97), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+00:02 +1: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          00:02 +1: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  00:02 +1: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  
+[7b-2-guardefou] haussmann : residualFrac=121.1%
+[7b-2-guardefou] moderne : residualFrac=109.4%
+[7b-2-guardefou] provencal : residualFrac=108.1%
+[7b-2-guardefou] scandinave : residualFrac=98.3%
+[7b-2-guardefou] plage mesurée sur les 4 presets : [98.3%, 121.1%] — tout seuil de rejet placé sous 98.3% déclencherait sur les 4 presets simultanément, donc ne discriminerait rien.
+00:02 +2: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  00:02 +2: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                       00:02 +2: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                       
+[7b-2-projparallele] haussmann : crossDirs=8.460e-17  perpDist=4.8750px  CONFONDUES
+[7b-2-projparallele] haussmann : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] moderne : crossDirs=0.000e+0  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] moderne : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] provencal : crossDirs=4.060e-16  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] provencal : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] scandinave : crossDirs=0.000e+0  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] scandinave : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] bilan : 4 confondue(s), 0 parallèle(s) distincte(s), sur 4 presets.
+00:02 +3: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                       00:02 +3: All tests passed!                                                                                                                                                                            
+
+--- C4-1 RESTAURATION ---
+git checkout -- test/core/perspective/vp_fallback_mode_test.dart
+git diff --stat lib/ test/ : vide.
+
+--- SORTIE BRUTE (mutation 2 : forcer un mismatch nommé pour
+    vérifier la nominativité du collecteur, pas seulement le premier
+    élément) ---
+Mutation C4-2 (Étage A′, temporaire, non committée) : dans lib/,
+faire lever UnimplementedError avec un message DIFFÉRENT
+uniquement pour le preset "moderne" (le 2e des 4, PAS le premier)
+en cassant délibérément le type d'exception pour ce seul preset
+via un throw FormatException conditionnel — pour vérifier que le
+collecteur liste bien "moderne" nommément et pas seulement le
+premier élément (haussmann) rencontré dans la boucle.
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  exif_reader 4.1.0 (4.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  http 1.5.0 (1.6.0 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+21 available)
+  image_picker_ios 0.8.13+3 (0.8.13+7 available)
+  intl 0.19.0 (0.20.3 available)
+  iso_base_media 6.3.2 (6.3.3 available)
+  lints 5.1.1 (6.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.16.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  random_access_source 4.2.1 (4.3.1 available)
+  share_plus 12.0.2 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  shared_preferences 2.5.3 (2.5.5 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.6 (0.7.13 available)
+  url_launcher 6.3.1 (6.3.2 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.3.6 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_web 2.4.1 (2.4.3 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.2.0 (15.3.0 available)
+  win32 5.15.0 (6.4.0 available)
+Got dependencies!
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:01 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:02 +0: loading /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart                                                                                                              00:02 +0: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          00:02 +0: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          
+[7b-2-atteignabilite] haussmann (nominal) : erreurExplicite n'a PAS levé, residualPx=696.4532046374462
+[7b-2-atteignabilite] haussmann (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (728.00, 750.75), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] moderne (nominal) : erreurExplicite n'a PAS levé, residualPx=570.375
+[7b-2-atteignabilite] moderne (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 624.00), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] provencal (nominal) : erreurExplicite n'a PAS levé, residualPx=606.7851562499998
+[7b-2-atteignabilite] provencal (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 720.88), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+[7b-2-atteignabilite] scandinave (nominal) : erreurExplicite n'a PAS levé, residualPx=551.3666666666671
+[7b-2-atteignabilite] scandinave (δ_deg) : erreurExplicite a levé ArgumentError comme prévu : VanishingPoint.compute : un seul des deux couples produit une intersection finie — couple bas (wallBL→fBL / wallBR→fBR) fini en (700.00, 669.97), couple haut (wallTL→fTL / wallTR→fTR) parallèle ou dégénéré (pas d'intersection finie). Aucun second point n'existe contre lequel mesurer un résidu : residualPx resterait null par construction, pas 0.0. VpFallbackMode.erreurExplicite refuse de retourner cette estimation non corroborée silencieusement — passer VpFallbackMode.repliHistoriqueCoupleBas pour l'accepter explicitement, ou corriger la calibration du couple dégénéré.
+00:02 +1: erreurExplicite : ne lève sur AUCUN des 4 presets nominaux, lève un ArgumentError sur la scène dégénérée construite (δ_deg) pour chacun — mesure d'atteignabilité, motif collecteur          00:02 +1: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  00:02 +1: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  
+[7b-2-guardefou] haussmann : residualFrac=121.1%
+[7b-2-guardefou] moderne : residualFrac=109.4%
+[7b-2-guardefou] provencal : residualFrac=108.1%
+[7b-2-guardefou] scandinave : residualFrac=98.3%
+[7b-2-guardefou] plage mesurée sur les 4 presets : [98.3%, 121.1%] — tout seuil de rejet placé sous 98.3% déclencherait sur les 4 presets simultanément, donc ne discriminerait rien.
+00:02 +2: residualFrac nominal sur les 4 presets réels : mesure seule, aucun seuil discriminant sous la borne basse — pas d'arbitrage                                                                  00:02 +2: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                       00:02 +2: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher                                                       
+[7b-2-projparallele] haussmann : crossDirs=8.460e-17  perpDist=4.8750px  PARALLÈLES DISTINCTES
+[7b-2-projparallele] haussmann : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] moderne : crossDirs=0.000e+0  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] moderne : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] provencal : crossDirs=4.060e-16  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] provencal : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+[7b-2-projparallele] scandinave : crossDirs=0.000e+0  perpDist=0.0000px  CONFONDUES
+[7b-2-projparallele] scandinave : UnimplementedError capturé comme prévu : UnimplementedError: VpFallbackMode.projectionParallele : non implémenté (Point 7b-2) — sur au moins 3 des 4 préréglages réels connus, les droites du couple dégénéré sont CONFONDUES (pas seulement parallèles), rendant la direction de repli géométriquement indéfinie plutôt que simplement absente.
+00:02 +2 -1: projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher [E]                                                
+  Expected: empty
+    Actual: ['moderne : SONDE_C4_ARTIFICIELLE_NON_PREMIER']
+  Mesure projectionParallele en échec : [moderne : SONDE_C4_ARTIFICIELLE_NON_PREMIER]
+  
+  package:matcher                                         expect
+  package:flutter_test/src/widget_tester.dart 473:18      expect
+  test/core/perspective/vp_fallback_mode_test.dart 367:7  main.<fn>
+  
+
+To run this test again: /opt/flutter/bin/cache/dart-sdk/bin/dart test /home/user/flutter_app/test/core/perspective/vp_fallback_mode_test.dart -p vm --plain-name 'projectionParallele : mesure confondues vs parallèles distinctes sur les 4 presets à δ_deg — UnimplementedError capturé, sans trancher'
+00:02 +2 -1: Some tests failed.                                                                                                                                                                        
+
+--- C4-2 RESTAURATION ---
+git checkout -- test/core/perspective/vp_fallback_mode_test.dart
+git diff --stat lib/ test/ : vide.
+Relance : +3: All tests passed! (vert confirmé).
+
+VERDICT C4 (deux mutations, toutes deux Étage A′, aucune Étage C) :
+- C4-1 (seuil élargi) : reclasse haussmann en "confondue" (4/0 au
+  lieu de 3/1), test reste VERT (greaterThanOrEqualTo(3) tient à 4
+  aussi) — confirme que la classification interne est visible mais
+  cette mutation particulière ne fait PAS rougir le dernier expect.
+- C4-2 (mismatch forcé sur "moderne", le 2e preset, pas le premier) :
+  Actual: ['moderne : SONDE_C4_ARTIFICIELLE_NON_PREMIER'] — confirme
+  que le collecteur liste l'écart NOMINATIF exact, pas seulement le
+  premier élément rencontré dans la boucle. Le motif collecteur du
+  test 3 fonctionne comme documenté.
+Étiquette confirmée pour les deux : A′ (accessibilité/comportement
+du collecteur côté test), pas de mutation dans lib/, donc aucune
+preuve de détection de régression sur le code de production ici —
+seul C1 et C3 constituent des preuves Étage C dans ce lot.
+
+========================================================================
+RÉCAPITULATIF ÉTAGE C — 4 mutations, restauration vérifiée après
+chacune (git diff --stat lib/ test/ vide, relance verte confirmée) :
+========================================================================
+C1 [Étage C]  : rouge confirmé — erreurExplicite(δ_deg) mord réellement.
+C2 [A′ tenté, verdict établi] : vert confirmé — volet nominal du
+                test 1 n'atteint jamais le switch fallbackMode ;
+                assertion d'accessibilité, pas de détection.
+C3 [Étage C]  : vert confirmé malgré ×3.0 sur residualFrac — Mesure 2
+                circulaire (mesure publiée, non gardée).
+C4 [A′ x2]    : classification interne visible (C4-1), collecteur
+                nominatif vérifié sur le 2e élément (C4-2).
+
+Bilan du test 1 : À DEMI MORDANT (volet δ_deg mord, volet nominal
+ne peut mathématiquement pas mordre sur cette branche).
+Bilan de la Mesure 2 : mesure publiée, non gardée (circulaire par
+construction de ses 3 seuls expect vacants).
+Bilan de la Mesure 3 (test 3) : le dernier expect
+(greaterThanOrEqualTo(3)) est un seuil low-bar qui absorbe même une
+reclassification totale (4/0) sans rougir — c'est un fait mesuré, pas
+corrigé dans ce commit (aucune mutation de la Mesure 3 elle-même
+n'est prescrite par le brief).
