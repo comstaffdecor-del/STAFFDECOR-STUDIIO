@@ -644,7 +644,7 @@ décision 2 ci-dessus) :
 | 3-4 | `test/core/perspective/_debug_calib_bench_test.dart` | 87, 378 |
 | 5 | `test/core/perspective/_debug_room_painter_real_render_test.dart` | 221 |
 | 6-10 | `test/core/perspective/_synth_vp_harness_test.dart` | 2526, 2558, 2598, 2850, 2910 |
-| 11-25 | `test/core/perspective/vp_frac_degenere_test.dart` | 126, 199, 211, 349, 389, 480, 569, 715, 843, 886, 1048, 1113, 1216, 1280, 1381 (numéros pré-insertion, décalés de +1 chacun après propagation) |
+| 11-25 | `test/core/perspective/vp_frac_degenere_test.dart` | 126, 199, 211, 349, 389, 480, 569, 715, 843, 886, 1048, 1113, 1216, 1280, 1381 (numéros PRÉ-insertion, tels que grep les a donnés avant la propagation de ce commit — voir errata post-`d013a07` ci-dessous : le déplacement n'est PAS uniforme, reproduction par commande, pas par arithmétique) |
 
 Contrôle arithmétique (post-correction, re-scan complet du dépôt hors
 `build/`) : `grep -rn "fallbackMode: VpFallbackMode.repliHistoriqueCoupleBas"`
@@ -661,6 +661,105 @@ inchangé), 106 info — baseline strictement identique à celle déclarée
 avant exécution (puisque `@Deprecated` a été refusé).
 
 Log : `docs/logs/point7b_1.txt`.
+
+**Errata post-`d013a07` — trois défauts constatés dans ce commit
+même, tranchés sans recalcul.**
+
+**Défaut 1 (le plus grave, récidivant, de la main de l'assistant)** :
+la table des « 15 numéros pré-insertion » ci-dessus a été présentée
+comme si `d013a07` ne l'avait déplacée que « de +1 chacun » — FAUX. Les
+15 insertions du paramètre `fallbackMode:` dans
+`vp_frac_degenere_test.dart` sont CUMULATIVES : le site compté en
+kᵉ position depuis le haut du fichier se décale de +k lignes, pas de
++1. Concrètement (grep frais post-`d013a07`, aucun recalcul) : 126
+reste 126 (aucune insertion ne le précède), 199→200, 211→213,
+349→352, 389→393, 480→485, 569→575, 715→722, 843→851, 886→895,
+1048→1058, 1113→1124, 1216→1228, 1280→1293, 1381→1395. C'est
+exactement la famille d'erreur que `4771ff1` avait rétractée sur le
+bloc `avoid_print` (« déplacement uniforme de +12 » — faux, c'était
++12/+41/+41) — reproduite un commit plus tard, par l'assistant qui
+venait de la corriger chez autrui.
+
+Corollaire, également confirmé par grep frais, aucun recalcul : ces
+mêmes 15 insertions ont re-périmé le bloc `avoid_print` figé par
+`4771ff1` (149/234/746/897/1138/1240/1300) ET les 3 mentions en prose
+957/964/1152 citées plus haut comme non-appels. Nouveaux numéros,
+grep frais post-`d013a07` :
+```
+grep -n "ignore: avoid_print" test/core/perspective/vp_frac_degenere_test.dart
+```
+→ 7 pragmas actifs à 150, 237, 754, 907, 1150, 1253, 1314 (+ une 8ᵉ
+occurrence en L.1385 qui est une mention en prose décrivant un pragma
+historique déjà supprimé, PAS un pragma actif — vérifié par
+`grep -n -A1`, chacun des 7 est bien suivi d'un `print()` réel, le
+compte reste 7). Aucun de ces nouveaux numéros n'est recalculé —
+tous re-greppés, estampillés `d013a07`. Convention retenue à partir
+d'ici : pour ce bloc, on cite le COMPTE (7) plus la commande de
+reproduction, jamais la liste de numéros — une liste « rote » (devient
+fausse) à la première insertion suivante, une commande ne rote pas.
+
+**Défaut 2** : le recomptage JSON non-circulaire annoncé dans le
+message du commit `d013a07` (229 entrées, 0 non-success) a été produit
+dans `/tmp`, non versionné, et — fait plus important — exécuté AVANT
+le correctif du site manqué `tools/calib_measure/vp_current_state_probe.dart`.
+Le 229 cité reposait donc sur une mesure pré-correctif, jamais
+conservée. Refait sur `d013a07` (post-correctif), versionné dans
+`docs/logs/point7b_1_json.txt` :
+```
+flutter test --reporter json > docs/logs/point7b_1_json.txt
+# testDone hidden:false : 229 entrées, 0 result != 'success'
+```
+Résultat numérique identique (229/0), mais désormais reproductible
+depuis le disque, pas depuis une exécution non tracée.
+
+**Défaut 3** : l'affirmation « le `switch` couvre les 3 membres
+explicitement, l'analyzer signale toute extension future » n'avait
+JAMAIS été vérifiée par mutation — exactement le même statut que
+l'assertion rétractée en `9eaac52` (affirmée par raisonnement sur le
+code, jamais falsifiée par exécution). Mutation appliquée : ajout d'un
+4ᵉ membre `sondeExhaustiviteTmp` à `VpFallbackMode`, NON commité.
+Résultat, log dans `docs/logs/point7b_1_exhaustivite.txt` :
+```
+error • The type 'VpFallbackMode' isn't exhaustively matched by the
+switch cases since it doesn't match the pattern
+'VpFallbackMode.sondeExhaustiviteTmp' • vanishing_point.dart:272:7 •
+non_exhaustive_switch_statement
+```
+Prédiction (`error`, pas un `info`) confirmée exactement. Mutation
+retirée immédiatement (`git checkout -- lib/core/perspective/vanishing_point.dart`),
+`git diff --stat lib/` vide, `flutter analyze` revenu à la baseline
+(0 erreur, 1 warning `srcH`, 106 info).
+
+**Fait central du tour, le plus durable** : `flutter test` NE
+COMPILE PAS `tools/` — vérifié explicitement
+(`flutter test tools/` exécute la suite standard sous `test/`, 229
+verts, sans jamais toucher `vp_current_state_probe.dart`). La suite
+était donc verte sur un arbre contenant un site de compilation cassé,
+et AUCUN recomptage (JSON ou compact) n'aurait pu le voir — seul
+`flutter analyze` l'a détecté. **Règle en dur, retenue pour la suite** :
+hors de `test/`, le filet est `flutter analyze`, JAMAIS `flutter test`.
+Corollaire : le `test()` interne à `vp_current_state_probe.dart` ne
+tourne dans aucune CI basée sur `flutter test` — c'est une sonde
+morte, hors périmètre d'exécution, seulement une déclaration
+Dart valide ou non pour `analyze`.
+
+**Item de provenance (le 25 « juste » par annulation de deux
+erreurs)** : le 25 énoncé par l'assistant avant `d013a07` (15+6+2+1+1)
+et le 25 réel post-correction (15+5+2+1+1+1) coïncident numériquement
+par ANNULATION de deux erreurs indépendantes et sans lien causal —
+un surcomptage de +1 dans `_synth_vp_harness_test.dart` (compté 6 vrais
+sites, en réalité 5) contre l'omission complète du fichier
+`tools/calib_measure/vp_current_state_probe.dart` (compté 0, en
+réalité 1). Sans cette ligne au dossier, la trace se relirait comme
+si le 25 initial avait été juste par construction — il ne l'était
+pas, il l'est devenu par coïncidence arithmétique entre deux fautes
+distinctes.
+
+Conventions retenues à partir d'ici, pour tout le reste du brief :
+plus aucun numéro de ligne dérivé par arithmétique (toujours re-greppé
+frais) ; pour le bloc `avoid_print`, compte + commande de
+reproduction plutôt qu'une liste de numéros ; `git add` sur chemins
+explicites, jamais `-A`, le bot d'auto-backup écrivant en parallèle.
 
 **Point 8 : ne rien commencer sans accord explicite utilisateur.**
 
