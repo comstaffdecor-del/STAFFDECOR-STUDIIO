@@ -631,3 +631,135 @@ Bilan de la Mesure 3 (test 3) : le dernier expect
 reclassification totale (4/0) sans rougir — c'est un fait mesuré, pas
 corrigé dans ce commit (aucune mutation de la Mesure 3 elle-même
 n'est prescrite par le brief).
+
+========================================================================
+TOUR 7b-3-bis — DURCISSEMENTS (C3′, C4-1′) ET 5ᵉ ENTRÉE ÉTAGE C (C5)
+========================================================================
+Suite au constat que C3 et C4-1 n'établissaient PAS de pouvoir de
+détection réel (mesure publiée non gardée / seuil low-bar tolérant),
+ce tour convertit ces deux points faibles en gardes de régression
+réelles, puis ajoute une 5e entrée Étage C sur le seuil de
+classification lui-même.
+
+------------------------------------------------------------------------
+C3′ — [ÉTAGE C après durcissement] Mesure 2 (residualFrac), épinglage
+par preset
+------------------------------------------------------------------------
+Durcissement (test/, appliqué et committé) : ajout de 4 expect(...,
+closeTo(valeur_exacte, 1e-9)) par preset, valeurs sourcées dans
+docs/logs/point7b_2.txt et vérifiées en pleine précision (haussmann
+1.211391649019275, moderne 1.0938029930339006, provencal
+1.0811441064864096, scandinave 0.9830063270347525).
+
+Prédiction (écrite avant exécution) : en rejouant la mutation ×3,0
+sur residualFrac (lib/core/perspective/vanishing_point.dart), les 4
+assertions doivent devenir ROUGES simultanément.
+
+Sortie brute (mutation appliquée) :
+[7b-2-guardefou] haussmann : residualFrac=363.4%
+[7b-2-guardefou] moderne : residualFrac=328.1%
+[7b-2-guardefou] provencal : residualFrac=324.3%
+[7b-2-guardefou] scandinave : residualFrac=294.9%
+Expected: a numeric value within <1e-9> of <1.211391649019275>
+  Actual: <3.6341749470578257>
+   Which: differs by <2.4227832980385506>
+residualFrac haussmann attendu ≈121.1% (log point7b_2.txt), épinglage C3′.
++3 -1: Some tests failed.
+
+Verdict : prédiction confirmée — ROUGE (interruption à la première
+assertion en échec, haussmann, ordre d'itération de la Map ; les 4
+valeurs imprimées montrent le déplacement ×3 sur les 4 presets
+simultanément). La Mesure 2 est convertie d'Étage A′ (publiée, non
+gardée) en Étage C (détection réelle) : toute régression future du
+calcul de residualFrac, y compris une interversion de valeur par
+preset comme celle rétractée en clause 1, fera rougir ce test à
+l'écriture, pas seulement à la lecture d'un log.
+
+Restauration : git checkout -- lib/core/perspective/vanishing_point.dart
+git diff --stat lib/ test/ : vide (test/ contient le durcissement
+committé, lib/ est revenu à l'état 8f45a71).
+Relance : +4: All tests passed! (vert confirmé).
+
+------------------------------------------------------------------------
+C4-1′ — [ÉTAGE C après durcissement] Mesure 3 (bilan projectionParallele),
+resserrement du bilan
+------------------------------------------------------------------------
+Durcissement (test/, appliqué et committé) : remplacement de
+`expect(nbConfondues, greaterThanOrEqualTo(3), ...)` (conservé) par
+l'ajout de `expect(nbConfondues, equals(3))`,
+`expect(nbParallelesDistinctes, equals(1))`,
+`expect(distinctKeys, equals(['haussmann']))`.
+
+Prédiction (écrite avant exécution) : en rejouant la mutation du
+seuil de classification (perpDist < 5.0 au lieu de perpDist < 1e-6),
+le résultat doit devenir ROUGE (bilan 4/0 viole equals(3)),
+convertissant C4-1 d'A′ en Étage C.
+
+Sortie brute (mutation appliquée, perpDist < 5.0) :
+[7b-2-projparallele] haussmann : crossDirs=8.460e-17  perpDist=4.875e+0px  CONFONDUES
+[7b-2-projparallele] bilan : 4 confondue(s), 0 parallèle(s) distincte(s), sur 4 presets.
+Expected: <3>
+  Actual: <4>
+Bilan resserré (C4-1′) : exactement 3 presets/4 en configuration
+confondue attendus — mesuré 4.
++2 -1: Some tests failed.
+
+Verdict : prédiction confirmée — ROUGE. C4-1 est converti d'Étage A′
+en Étage C : un seuil de classification élargi fait maintenant
+rougir le test, alors que l'ancien greaterThanOrEqualTo(3) seul le
+tolérait silencieusement.
+
+Restauration : git checkout -- <n'a pas été nécessaire, mutation
+appliquée directement dans test/ puis reversée par édition inverse
+avant tout commit> ; perpDist < 1e-6 restauré.
+git diff --stat lib/ test/ : vide sur lib/ (aucune mutation lib/ dans
+ce point).
+Relance : +4: All tests passed! (vert confirmé).
+
+------------------------------------------------------------------------
+C5 — [ÉTAGE C, 5e entrée] Seuil de classification lui-même
+------------------------------------------------------------------------
+Mutation (test/, transitoire, restaurée) : `estConfondue = perpDist <
+1e-6` remplacé par `estConfondue = perpDist == 0.0` (exactitude bit à
+bit, plus de tolérance).
+
+Prédiction (écrite avant exécution) : provençal (perpDist=2.842e-13,
+non nul bit à bit, voir clause 2) bascule en DISTINCTES ; bilan 2/2 ;
+equals(3) [C4-1′] rougit — ce qui justifie la tolérance 1e-6 au lieu
+de la laisser passer pour arbitraire.
+
+Sortie brute (mutation appliquée) :
+[7b-2-projparallele] provencal : crossDirs=4.060e-16  perpDist=2.842e-13px  PARALLÈLES DISTINCTES
+[7b-2-projparallele] bilan : 2 confondue(s), 2 parallèle(s) distincte(s), sur 4 presets.
+Expected: a value greater than or equal to <3>
+  Actual: <2>
++2 -1: Some tests failed.
+
+Verdict : prédiction confirmée — ROUGE, dès greaterThanOrEqualTo(3)
+(avant même d'atteindre equals(3) de C4-1′). Provençal bascule bien
+en DISTINCTES sous un seuil bit-exact. La marge mesurée entre le
+seuil retenu (1e-6) et la valeur réelle de provençal (2,8e-13) est de
+SEPT DÉCADES — equals(3) n'est donc pas fragile pour un seuil
+réaliste ; seule une mutation extrême (exactitude bit à bit) le fait
+rougir. Ceci motive le choix de la tolérance 1e-6 plutôt que de la
+laisser paraître arbitraire.
+
+Restauration : perpDist < 1e-6 restauré (édition inverse).
+git diff --stat lib/ test/ : vide.
+Relance : +4: All tests passed! (vert confirmé).
+
+========================================================================
+RÉCAPITULATIF TOUR 7b-3-bis
+========================================================================
+C3′  [Étage C, converti depuis A′] : residualFrac épinglé par preset,
+     ROUGE confirmé sous mutation ×3,0.
+C4-1′[Étage C, converti depuis A′] : bilan resserré à equals(3)/
+     equals(1)+nom, ROUGE confirmé sous seuil élargi (< 5.0).
+C5   [Étage C, 5e entrée]          : seuil resserré à == 0.0, ROUGE
+     confirmé (provençal bascule), marge de 7 décades mesurée entre
+     seuil retenu et valeur réelle — justifie la tolérance 1e-6.
+
+Aucun test() neuf dans ce lot de durcissements (compte de tests
+inchangé par C3′/C4-1′/C5 — seules des assertions supplémentaires
+dans les 2 test() existants). room_painter.dart:139 reste sur le
+membre historique — aucune bascule produit touchée.

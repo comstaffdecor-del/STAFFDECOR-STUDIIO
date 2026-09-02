@@ -822,21 +822,47 @@ explicites, jamais `-A`, le bot d'auto-backup écrivant en parallèle.
 ## Point 7b-3 — Étage C (pouvoir de détection réel), circularité de
 la Mesure 2, arrondi de perpDist, mécanisme de symétrie, clôture 7b
 
-**2. Arrondi de `perpDist` corrigé.** `0.0000px` (format
-`toStringAsFixed(4)` utilisé dans `test/core/perspective/
-vp_fallback_mode_test.dart` pour les 3 presets confondus) établit
-seulement `< 5×10⁻⁵px`, PAS l'exactitude machine (`0.0` bit à bit).
-Reformaté en notation exponentielle
+**2. Arrondi de `perpDist` corrigé — trois cas distincts, pas deux.**
+`0.0000px` (format `toStringAsFixed(4)` utilisé dans
+`test/core/perspective/vp_fallback_mode_test.dart` pour les presets
+« confondus ») n'établissait que `< 5×10⁻⁵px`, pas l'exactitude
+machine. Reformaté en notation exponentielle
 (`.toStringAsExponential(3)`, déjà utilisé pour `crossDirs`) dans le
-fichier committé, pour laisser la sortie elle-même trancher entre
-nul-machine et nul-exact plutôt qu'un arrondi visuel. Mesuré après
-correction : moderne/provencal/scandinave `perpDist=0.000e+0` exact
-(bit à bit), haussmann `perpDist=4.875e+0`. Traité en même temps
-tous les `toStringAsFixed` remontés par le Bloc 1 de lecture de ce
-tour (`residualFrac` en `.toStringAsFixed(1)` et `perpDist` en
-`.toStringAsFixed(4)`) : `residualFrac` reste en pourcentage à une
-décimale (usage d'affichage de plage, pas de comparaison à zéro, non
-concerné par cette clause) ; seul `perpDist` est reformaté.
+fichier committé, pour laisser la sortie elle-même trancher. Mesure
+brute (`toString()`, sonde `_tmp_provencal_probe_test.dart`, tour
+7b-3-bis) : la ventilation à trois cas prédite se confirme, mais
+PAS comme 3 nuls-exacts / 1 distinct — **2 nuls-exacts / 1 nul au
+bruit machine / 1 distinct** :
+- **nul EXACT (bit à bit)** : moderne, scandinave —
+  `perpDist=0.0` littéral (`uy=0.0` exact, `crossDirs=0.0` exact).
+- **nul AU BRUIT MACHINE, pas exact** : provençal —
+  `perpDist=2.8421709430404007e-13`, `crossDirs=4.0602442043434295e-16`.
+  Rapport `perpDist/crossDirs=700.0` exactement (confirmé, voir
+  clause 6) — la valeur n'est pas un bruit accumulé sans structure,
+  mais une annulation à l'échelle de l'ulp qui ne retombe pas sur
+  zéro bit à bit, contrairement à moderne/scandinave où l'annulation
+  est parfaite dès `uy`.
+- **DISTINCT** : haussmann — `perpDist=4.874999999999896px`.
+
+Le texte antérieur de cette clause (« moderne/provencal/scandinave
+`perpDist=0.000e+0` exact ») est donc **rétracté sur provençal** :
+son affichage `0.000e+0` à 3 décimales masquait encore un résidu non
+nul, exactement le phénomène que cette clause avait pour but
+d'exposer — la correction devait être poussée jusqu'au `toString()`
+complet pour se révéler à elle-même. **Le nul exact n'est pas
+garanti par le mécanisme** (clause 6) : le mécanisme (`ceilL.yPct ==
+ceilR.yPct`) produit une annulation algébrique EXACTE sur le papier,
+mais son exactitude bit à bit en flottant dépend de la façon dont
+les pourcentages spécifiques de chaque preset se convertissent en
+coordonnées canvas — moderne/scandinave y arrivent, provençal non.
+La Mesure 4 (nouveau `test()`, voir clause 6) n'assert que
+`lessThan(1e-6)` sur le cas symétrique synthétique — un seuil de
+négligeabilité, pas une assertion de nullité bit à bit — ce qui est
+exact au vu de ce que la mesure établit réellement, sans
+sur-affirmation. Traité en même temps tous les `toStringAsFixed`
+remontés par le Bloc 1 de lecture du tour précédent (`residualFrac`
+en `.toStringAsFixed(1)`, non concerné, usage d'affichage de plage) ;
+seul `perpDist` est reformaté.
 
 **3. Verdict de circularité de la Mesure 2 (`residualFrac`),
 rendu par lecture (Bloc 1) puis mutation (Étage C, item C3) :** la
@@ -922,20 +948,49 @@ la vraie condition de confondues est `ceilL.yPct == ceilR.yPct`
 (hauteurs de plafond égales), pas la seule égalité des points de mur
 latéral prise isolément. **Seconde construction, respectant ce
 lien** : cas symétrique (`ceilL.yPct=ceilR.yPct=0,100`) →
-`perpDist=0.0` exact ; cas asymétrique (`ceilL.yPct=0,100`,
+`perpDist=0.0` exact (confirmé par `toString()` brut, pas seulement
+par un seuil) ; cas asymétrique (`ceilL.yPct=0,100`,
 `ceilR.yPct=0,095`, même écart que haussmann) → `perpDist=4,875`
-— identique à la valeur mesurée sur haussmann lui-même. **Verdict** :
-hypothèse confirmée, avec une précision mécanique que l'échec initial
-a rendue explicite — le 3/1 n'est pas une propriété brute des
-presets mais de leur symétrie de plafond (`ceilL.yPct` vs
-`ceilR.yPct`), combinée au mécanisme de construction δ_deg PARTAGÉ
-par les 4 presets réels (même décalage −0,01 sur les deux points de
-mur latéral). Un décompte devient un mécanisme. **Décision de
-promotion** : la sonde est promue en `test()` permanent dans
-`vp_fallback_mode_test.dart` (Mesure 4) — le mécanisme, une fois
-confirmé et falsifiable, mérite un garde de régression sur la
-relation `ceilL.yPct == ceilR.yPct ⟺ confondues`. **Delta déclaré
-avant exécution : 232 → 233.**
+— identique à la valeur mesurée sur haussmann lui-même.
+
+**Confirmation quantitative (tour 7b-3-bis, sonde
+`_tmp_provencal_probe_test.dart`, supprimée après usage)** : sur
+provençal, `ceilL.yPct == ceilR.yPct` (0,140 = 0,140) et
+`perpDist/crossDirs = 700,0` EXACTEMENT — 700,0 = `kCanvasW/2`
+(`kCanvasW=1400,0`, seule valeur trouvée dans `lib/`/`test/`), donc
+le résidu non nul de provençal (clause 2) est lui-même structuré par
+le même centre de canvas que le `vp.x` des presets symétriques
+(`vp_frac_degenere_test.dart`), pas un bruit indépendant. Côté
+haussmann : `kCanvasH=975,0`, et `0,005 × 975 = 4,875` exactement —
+le `4,875` mesuré sur haussmann (et reproduit à l'identique par la
+Mesure 4 sur le cas asymétrique synthétique) est donc **forcé
+arithmétiquement par l'écart de calibration (0,005) et la hauteur de
+canvas commune**, ce n'est pas une coïncidence entre deux mesures
+indépendantes — la clause 6 se corrige elle-même sur ce point : le
+texte antérieur disait « identique à la valeur mesurée sur haussmann
+lui-même » comme une observation ; c'est en réalité une conséquence
+arithmétique directe, pas une simple co-occurrence numérique.
+Recherche de provenance sur `727,998`/`741,9966` (Bloc 2 du tour
+7b-3-bis) : les deux valeurs sont réelles et sourcées dans des logs
+versionnés distincts (`derivation_haussmann_min.txt` pour
+`vpBottom.x=727,997757` ; `groupe3_apres_split.txt` et autres pour
+`vp.x=741,9966348850253`) — ce sont deux observables distincts du
+même calcul (position théorique du couple bas seul, avant repli, vs
+position finale retournée par `compute()` après repli), non une
+interversion d'étiquette à rétracter.
+
+**Verdict** : hypothèse confirmée, avec une précision mécanique que
+l'échec initial puis la sonde de confirmation ont rendue explicite —
+le 3/1 n'est pas une propriété brute des presets mais de leur
+symétrie de plafond (`ceilL.yPct` vs `ceilR.yPct`), combinée au
+mécanisme de construction δ_deg PARTAGÉ par les 4 presets réels
+(même décalage −0,01 sur les deux points de mur latéral) et à la
+géométrie du canvas commun (`kCanvasW`, `kCanvasH`). Un décompte
+devient un mécanisme. **Décision de promotion** : la sonde est
+promue en `test()` permanent dans `vp_fallback_mode_test.dart`
+(Mesure 4) — le mécanisme, une fois confirmé et falsifiable, mérite
+un garde de régression sur la relation `ceilL.yPct == ceilR.yPct ⟺
+confondues`. **Delta déclaré avant exécution : 232 → 233.**
 
 **7. Clôture de 7b, resserrée.** Établi sur le domaine mesuré (4
 presets réels + scènes δ_deg construites) : `residualFrac` sur la
@@ -961,6 +1016,58 @@ attente", ni "impossible". `room_painter.dart:139` reste sur le
 membre historique sur ce fondement précis : pas parce qu'aucune
 alternative n'existerait, mais parce que le dispositif de mesure
 disponible ne peut ni la motiver ni l'exclure.
+
+## Point 7b-3-bis — sonde provençal, provenance, durcissements Étage C
+(C3′, C4-1′), 5ᵉ entrée Étage C (C5)
+
+**Sonde provençal + provenance (détail intégral :
+`docs/logs/point7b_3_bis_sonde.txt`)** : sur provençal, `perpDist /
+crossDirs = 700,0` exactement (`700,0 = kCanvasW/2`), confirmant que
+le résidu non nul de la clause 2 est structuré par le même centre de
+canvas que le `vp.x` des presets symétriques, pas un bruit
+indépendant. Le diagnostic initial d'« origine normalisation » via
+`ux==vx`/`uy==vy` était mal posé (comparaison de grandeurs
+hétérogènes, unitaire vs longueur) — non confirmé proprement ; la
+variante « cas symétrique aux dimensions de provençal » n'est donc
+pas écrite, faute de diagnostic la justifiant. Provenance de
+`727,998`/`741,9966` (Bloc 2) : les deux valeurs sont réelles et
+sourcées dans des logs versionnés distincts (`vpBottom.x=727,997757`
+dans `derivation_haussmann_min.txt` ; `vp.x=741,9966348850253` dans
+plusieurs logs de suite complète) — deux observables distincts du
+même calcul, aucune interversion à rétracter.
+
+**Durcissements Étage C (détail intégral, sorties brutes complètes :
+`docs/logs/point7b_3_etage_c.txt`, section « TOUR 7b-3-bis »)** :
+- **C3′ [converti A′→C]** : les 3 `expect` vacants de la Mesure 2
+  (clause 3) sont complétés par 4 `expect(..., closeTo(valeur_exacte,
+  1e-9))` par preset (valeurs sourcées `docs/logs/point7b_2.txt`).
+  Rejeu de la mutation ×3,0 (`lib/`) : ROUGE confirmé (`Actual:
+  <3.6341749470578257>` vs attendu `1.211391649019275` pour
+  haussmann). La Mesure 2 est désormais une mesure GARDÉE, pas
+  seulement publiée.
+- **C4-1′ [converti A′→C]** : `greaterThanOrEqualTo(3)` complété par
+  `equals(3)`, `equals(1)`, et le nom nominatif du preset distinct
+  attendu (`['haussmann']`). Rejeu de la mutation du seuil
+  (`perpDist < 5.0`, côté test) : ROUGE confirmé (`Actual: <4>` vs
+  attendu `<3>`), là où l'ancien seuil bas absorbait silencieusement
+  la reclassification 4/0.
+- **C5 [5ᵉ entrée Étage C]** : resserrement du seuil de classification
+  lui-même (`perpDist < 1e-6` → `perpDist == 0.0`, côté test) :
+  provençal (`perpDist=2,842×10⁻¹³`, non nul bit à bit, clause 2)
+  bascule en DISTINCTES, bilan 2/2, ROUGE confirmé dès
+  `greaterThanOrEqualTo(3)`. La marge mesurée entre le seuil retenu
+  (`1e-6`) et la valeur réelle de provençal (`2,8×10⁻¹³`) est de
+  **sept décades** — `equals(3)` n'est donc pas fragile pour un seuil
+  réaliste ; seule une mutation à l'exactitude bit à bit le fait
+  rougir. Ceci motive le choix de la tolérance `1e-6` plutôt que de
+  la laisser paraître arbitraire.
+
+Les 3 mutations ont été restaurées individuellement (`git diff
+--stat lib/ test/` vide sur `lib/` après chacune, relance verte
+vérifiée). Aucun `test()` neuf dans ce lot (compte de tests inchangé
+par C3′/C4-1′/C5 — assertions supplémentaires dans les 2 `test()`
+existants). `room_painter.dart:139` reste sur le membre historique —
+aucune bascule produit touchée.
 
 **Point 8 : ne rien commencer sans accord explicite utilisateur.**
 

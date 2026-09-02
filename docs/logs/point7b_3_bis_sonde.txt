@@ -1,0 +1,142 @@
+Point 7b-3-bis — Bloc 1 (sonde provençal + ligne symétrie en brut) et
+Bloc 2 (provenance de kCanvasW/H, 727,998, 741,9966)
+============================================================================
+
+Règle du brief : aucune phrase descriptive n'est écrite avant la
+sortie brute qui la fonde. Ce fichier consigne les sorties brutes des
+Blocs 1 et 2, confrontées explicitement aux 4+2 prédictions écrites
+avant exécution.
+
+----------------------------------------------------------------------------
+BLOC 1 — sonde jetable test/core/perspective/_tmp_provencal_probe_test.dart
+(créée, exécutée, supprimée après usage ; find test/ -iname "*_tmp_*"
+confirmé vide après suppression)
+----------------------------------------------------------------------------
+
+Prédictions écrites avant exécution :
+  1. perpDist / crossDirs = 700,0 exactement.
+  2. crossDirs ≈ 1,83 × ulp(1), origine à l'étape dirTL/lenTL, pas à
+     la conversion pct→canvas ; ux==vx faux pour provençal, vrai pour
+     moderne/scandinave.
+  3. perpDist s'affichera en dyadique exact 2.8421709430404e-13.
+  4. Ligne symétrie (Mesure 4, cas SYMÉTRIQUE) : perpDist ≤ 1e-12
+     mais pas nécessairement nul exact.
+
+Sortie brute complète (flutter test test/core/perspective/
+_tmp_provencal_probe_test.dart, capturée intégralement, non tronquée) :
+
+===== provencal =====
+ceilL.yPct=0.14  ceilR.yPct=0.14  egal=true
+ceilL.dy=151.43437500000002  ceilR.dy=151.43437500000002  egal=true
+wallTL.dy=151.434375  wallTR.dy=151.434375  egal=true
+lenTL=140.0  lenTR=140.0  egal=true
+ux=1.0  uy=2.0301221021717148e-16
+vx=1400.0  vy=0.0
+ux==vx : false   uy==vy : false
+crossDirs=4.0602442043434295e-16  perpDist=2.8421709430404007e-13
+perpDist/crossDirs=700.0
+
+===== haussmann =====
+ceilL.yPct=0.09  ceilR.yPct=0.085  egal=false
+ceilL.dy=87.75  ceilR.dy=82.875  egal=false
+wallTL.dy=87.75000000000001  wallTR.dy=82.875  egal=false
+lenTL=167.98653954010095  lenTR=167.98653954010092  egal=false
+ux=1.0  uy=-8.459519884216471e-17
+vx=1399.8878295008412  vy=-4.875000000000014
+ux==vx : false   uy==vy : false
+crossDirs=8.459519884216471e-17  perpDist=4.874999999999896
+perpDist/crossDirs=57627383902667224.0
+
+===== moderne =====
+ceilL.yPct=0.095  ceilR.yPct=0.095  egal=true
+lenTL=130.0  lenTR=130.0  egal=true
+ux=1.0  uy=0.0
+vx=1300.0  vy=0.0
+ux==vx : false   uy==vy : true
+crossDirs=0.0  perpDist=0.0
+perpDist/crossDirs=NaN
+
+===== scandinave =====
+ceilL.yPct=0.075  ceilR.yPct=0.075  egal=true
+lenTL=140.0  lenTR=140.0  egal=true
+ux=1.0  uy=0.0
+vx=1400.0  vy=0.0
+ux==vx : false   uy==vy : true
+crossDirs=0.0  perpDist=0.0
+perpDist/crossDirs=NaN
+
+Ligne symétrie (Mesure 4 committée, vp_fallback_mode_test.dart) :
+[7b-3-symetrie] SYMÉTRIQUE  : perpDist=0.000e+0
+[7b-3-symetrie] ASYMÉTRIQUE : perpDist=4.875e+0
+
+Valeur brute non arrondie de perpDistSym (sonde dédiée, toString()
+sans exponentiel) :
+perpDistSym raw toString() = 0.0
+
+Confrontation :
+  1. CONFIRMÉE pour provençal (perpDist/crossDirs=700.0 exact). Pour
+     haussmann le ratio n'est PAS 700.0 (5.76e16) — attendu, son
+     crossDirs n'est pas un résidu de la même annulation ux/uy≈colin.
+  2. INFIRMÉE en l'état : uy=2.0301...e-16 n'est pas nul pour
+     provençal ; ux==vx est FAUX dans les 4 cas (comparaison
+     hétérogène : ux≈1.0 unitaire vs vx≈1400 longueur — test mal
+     posé tel que formulé, ne discrimine rien). uy==vy est vrai pour
+     moderne/scandinave (uy=0.0 exact), faux pour provençal/haussmann
+     — seule cette partie de la prédiction 2 est confirmée.
+  3. CONFIRMÉE littéralement : perpDist=2.8421709430404007e-13,
+     identique à la valeur dyadique prédite.
+  4. INFIRMÉE : perpDistSym = 0.0 bit à bit sur la construction
+     synthétique aux valeurs rondes, pas une approximation ≤1e-12.
+
+Conséquence explicite (clause conditionnelle du brief) : la
+prédiction d'« origine normalisation » n'est pas proprement
+confirmée (diagnostic ux==vx/uy==vy mal posé). La variante « cas
+symétrique aux dimensions de provençal » n'est donc PAS écrite, faute
+de diagnostic confirmé la justifiant.
+
+----------------------------------------------------------------------------
+BLOC 2 — provenance de kCanvasW/H, 727,998, 741,9966
+----------------------------------------------------------------------------
+
+Prédictions écrites avant exécution :
+  - kCanvasH = 975, donc 0,005×975 = 4,875 exactement (tautologie à
+    corriger en "forcé par l'écart 0,005 et la hauteur de canvas
+    commune").
+  - Si 1783 n'apparaît que dans ETAT.md et jamais dans docs/logs/, la
+    valeur 727,998 se rétracte comme conversationnelle ; si elle
+    apparaît dans un log, 727,998 (vpBottom.x) et 741,9966 (vp.x)
+    sont deux observables distincts et la rétractation initialement
+    envisagée serait elle-même une erreur.
+
+Sortie brute :
+  grep -rn "kCanvasW\|kCanvasH" lib/ test/
+    → kCanvasH = 975.0 (seule valeur trouvée, tous fichiers test/*.dart)
+    → kCanvasW = 1400.0 (idem)
+
+  grep -rn "1783\|727,99\|727\.99" docs/
+    → "1783" : uniquement dans des logs de taille d'image photo
+      (2560x1783), sans rapport avec vpBottom.x.
+    → "727.997757" TROUVÉ dans docs/logs/derivation_haussmann_min.txt:52 :
+      "vpBottom.x (haussmann) = 1298020/1783 = 727.997757"
+    → "727,998" (virgule) trouvé dans docs/ETAT.md:165, :168, :330.
+
+  grep -rn "741\.99" docs/logs/
+    → "vp.x=741.9966348850253" TROUVÉ dans de multiples logs
+      versionnés (groupe3_apres_split.txt:53, point7b_1.txt:506,
+      point7b_2.txt:504, etc.)
+
+Confrontation :
+  - kCanvasH=975 confirmé → 0,005×975=4,875 exactement. Prédiction
+    CONFIRMÉE : le 4,875 mesuré sur haussmann (et reproduit par la
+    Mesure 4 sur le cas asymétrique synthétique) est une CONSÉQUENCE
+    ARITHMÉTIQUE de l'écart de calibration (0,005) et de la hauteur
+    de canvas commune (975), pas une coïncidence entre deux mesures
+    indépendantes.
+  - 727,997757 EST présent dans un log versionné
+    (derivation_haussmann_min.txt), pas seulement dans ETAT.md ou en
+    conversation. Selon la clause conditionnelle : 727,998
+    (vpBottom.x, position théorique du couple bas seul, avant repli)
+    et 741,9966 (vp.x, valeur finale retournée par compute() après
+    repli) sont bien DEUX OBSERVABLES DISTINCTS du même calcul, tous
+    deux réels et sourcés. Aucune rétractation n'est justifiée ici —
+    il n'y a pas d'interversion d'étiquette à corriger sur ce point.

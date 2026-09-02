@@ -264,6 +264,28 @@ void main() {
       // de vp_frac_degenere_test.dart.
       expect(minFrac > 0, isTrue);
       expect(maxFrac.isFinite, isTrue);
+
+      // Point 7b-3-bis, durcissement C3′ : les 3 expect ci-dessus
+      // sont VACANTS (clause 3) — ils ne contraignent aucune valeur.
+      // Épinglage par preset avec tolérance déclarée (1e-9), valeurs
+      // sourcées dans docs/logs/point7b_2.txt (haussmann 121.1%,
+      // moderne 109.4%, provencal 108.1%, scandinave 98.3%) et
+      // vérifiées ici en pleine précision. Convertit la Mesure 2
+      // d'une mesure PUBLIÉE (imprimée, non gardée) en une mesure
+      // GARDÉE : toute régression du calcul de residualFrac (y
+      // compris une interversion de valeur par preset, comme celle
+      // rétractée clause 1) fera rougir cette assertion à l'écriture.
+      expect(fracs['haussmann'], closeTo(1.211391649019275, 1e-9),
+          reason: 'residualFrac haussmann attendu ≈121.1% (log '
+              'point7b_2.txt), épinglage C3′.');
+      expect(fracs['moderne'], closeTo(1.0938029930339006, 1e-9),
+          reason: 'residualFrac moderne attendu ≈109.4%, épinglage C3′.');
+      expect(fracs['provencal'], closeTo(1.0811441064864096, 1e-9),
+          reason: 'residualFrac provencal attendu ≈108.1%, épinglage '
+              'C3′.');
+      expect(fracs['scandinave'], closeTo(0.9830063270347525, 1e-9),
+          reason: 'residualFrac scandinave attendu ≈98.3%, épinglage '
+              'C3′.');
     },
   );
 
@@ -279,6 +301,7 @@ void main() {
       final mismatches = <String>[];
       var nbConfondues = 0;
       var nbParallelesDistinctes = 0;
+      final distinctKeys = <String>[];
 
       for (final key in kDemoSceneNativeSize.keys) {
         final cpDeg = calibPointsAtDeltaDeg(key);
@@ -321,6 +344,7 @@ void main() {
           nbConfondues++;
         } else {
           nbParallelesDistinctes++;
+          distinctKeys.add(key);
         }
 
         // ignore: avoid_print
@@ -388,6 +412,25 @@ void main() {
             'changé, le fait porté depuis le diagnostic précédent doit '
             'être réévalué, pas silencieusement ignoré.',
       );
+
+      // Point 7b-3-bis, durcissement C4-1′ : `greaterThanOrEqualTo(3)`
+      // ci-dessus tolère aussi un bilan 4/0 (A′, voir C4 dans
+      // docs/ETAT.md) — resserré en `equals(3)`/`equals(1)` plus le
+      // nom NOMINATIF du preset distinct attendu (haussmann), pour
+      // que toute mutation élargissant le seuil de classification
+      // (`perpDist < 1e-6` → un seuil plus large) fasse rougir cette
+      // assertion au lieu de rester tolérée. Convertit un A′ en C.
+      expect(nbConfondues, equals(3),
+          reason: 'Bilan resserré (C4-1′) : exactement 3 presets/4 en '
+              'configuration confondue attendus — mesuré $nbConfondues.');
+      expect(nbParallelesDistinctes, equals(1),
+          reason: 'Bilan resserré (C4-1′) : exactement 1 preset/4 en '
+              'configuration parallèle distincte attendu — mesuré '
+              '$nbParallelesDistinctes.');
+      expect(distinctKeys, equals(['haussmann']),
+          reason: 'Le preset distinct attendu est nominativement '
+              '"haussmann" (asymétrie ceilL.yPct≠ceilR.yPct, clause 6) — '
+              'mesuré $distinctKeys.');
     },
   );
 
