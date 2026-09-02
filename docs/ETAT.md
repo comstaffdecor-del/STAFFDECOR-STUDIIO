@@ -940,27 +940,46 @@ supprimée) : **première construction ÉCHOUÉE** — en fixant
 `ceilR.yPct`, la précondition (couple haut dégénéré, `vpTop==null`)
 n'était pas satisfaite (`vpTop` mesuré fini dans les deux cas,
 `perpDist` mesuré à 97 et 102px — sans rapport avec l'hypothèse).
-Cause identifiée : dans les 4 presets réels, le lien rigide
-`wallTL.yPct − 0,01 = ceilL.yPct` et `wallTR.yPct − 0,01 =
-ceilR.yPct` est vérifié EXACTEMENT — c'est ce lien qui rend chaque
-droite `(wallX→ceilX)` horizontale après le décalage δ_deg=−0,01, et
-la vraie condition de confondues est `ceilL.yPct == ceilR.yPct`
-(hauteurs de plafond égales), pas la seule égalité des points de mur
-latéral prise isolément. **Seconde construction, respectant ce
-lien** : cas symétrique (`ceilL.yPct=ceilR.yPct=0,100`) →
-`perpDist=0.0` exact (confirmé par `toString()` brut, pas seulement
-par un seuil) ; cas asymétrique (`ceilL.yPct=0,100`,
-`ceilR.yPct=0,095`, même écart que haussmann) → `perpDist=4,875`
-— identique à la valeur mesurée sur haussmann lui-même.
+Cause identifiée à ce moment (formulation initiale, **rétractée ci-
+dessous, voir Point 7b-3-ter**) : un lien pct `wallTL.yPct − 0,01 =
+ceilL.yPct` supposé vérifié EXACTEMENT sur les 4 presets réels — cette
+affirmation a été tapée de mémoire, pas relue depuis
+`persp_calib.dart`, et s'est révélée FAUSSE au niveau pct pour 3 des 4
+presets à la mesure Dart-native ultérieure (Point 7b-3-ter). La vraie
+condition de confondues RESTE `ceilL.yPct == ceilR.yPct` (hauteurs de
+plafond égales), établie indépendamment par la sonde synthétique
+ci-dessous (pas par le lien pct erroné) — voir Point 7b-3-ter pour le
+mécanisme correct au niveau canvas. **Seconde construction, respectant
+la relation `ceilL.yPct == ceilR.yPct`** : cas symétrique
+(`ceilL.yPct=ceilR.yPct=0,100`) → `perpDist=0.0` exact (confirmé par
+`toString()` brut, pas seulement par un seuil) ; cas asymétrique
+(`ceilL.yPct=0,100`, `ceilR.yPct=0,095`, même écart que haussmann) →
+`perpDist=4,875` — identique à la valeur mesurée sur haussmann
+lui-même.
 
 **Confirmation quantitative (tour 7b-3-bis, sonde
 `_tmp_provencal_probe_test.dart`, supprimée après usage)** : sur
 provençal, `ceilL.yPct == ceilR.yPct` (0,140 = 0,140) et
 `perpDist/crossDirs = 700,0` EXACTEMENT — 700,0 = `kCanvasW/2`
-(`kCanvasW=1400,0`, seule valeur trouvée dans `lib/`/`test/`), donc
-le résidu non nul de provençal (clause 2) est lui-même structuré par
-le même centre de canvas que le `vp.x` des presets symétriques
-(`vp_frac_degenere_test.dart`), pas un bruit indépendant. Côté
+(`kCanvasW=1400,0`, seule valeur trouvée dans `lib/`/`test/`). **Ce
+rapport N'EST PAS une identité qui tiendrait quelles que soient les
+valeurs** : il tient PARCE QUE la configuration mesurée est
+symétrique (`vy=0`, `ux=1,0`, `dirTR` est le miroir de `dirTL`, donc
+`uy' = −uy ⟹ crossDirs = 2·uy` par construction algébrique) — c'est
+une conséquence directe de la symétrie étudiée, et ne porte donc
+AUCUNE information au-delà de `uy` lui-même. Haussmann, en
+configuration asymétrique, le prouve directement : son rapport mesuré
+est `perpDist/crossDirs = 5,76×10¹⁶`, sans rapport avec 700,0. Le
+constat correct est donc : chez provençal (cas symétrique), le résidu
+non nul de la clause 2 est structuré par le même centre de canvas que
+le `vp.x` des presets symétriques (`vp_frac_degenere_test.dart`), pas
+un bruit indépendant — mais cette structure est elle-même une
+CONSÉQUENCE de la symétrie de configuration, pas une propriété
+universelle du calcul. La dégradation du rapport en tautologie
+(`crossDirs = 2·uy` rend le rapport `perpDist/crossDirs` redondant
+avec `perpDist/(2·uy)`) est correcte ; sa justification initiale
+(« quelles que soient les valeurs ») ne l'était pas et est ici
+rétractée. Côté
 haussmann : `kCanvasH=975,0`, et `0,005 × 975 = 4,875` exactement —
 le `4,875` mesuré sur haussmann (et reproduit à l'identique par la
 Mesure 4 sur le cas asymétrique synthétique) est donc **forcé
@@ -1069,7 +1088,106 @@ par C3′/C4-1′/C5 — assertions supplémentaires dans les 2 `test()`
 existants). `room_painter.dart:139` reste sur le membre historique —
 aucune bascule produit touchée.
 
-**Point 8 : ne rien commencer sans accord explicite utilisateur.**
+## Point 7b-3-ter — correctif ULP (clause 6 rétractée sur le lien
+pct), correctif pragma `avoid_print` (clause 4 confirmée, pas
+réécrite), reformulation du ratio 700,0 (clause 6)
+
+**1. Correctif ULP — le « lien rigide EXACTEMENT » de la clause 6 est
+RÉTRACTÉ au niveau pct (détail intégral, sorties brutes complètes :
+`docs/logs/point7b_3_ulp_probe.txt`).** Le texte antérieur affirmant
+que « les 4 presets réels vérifient tous le lien rigide
+`wallTL.yPct − 0,01 = ceilL.yPct` et `wallTR.yPct − 0,01 = ceilR.yPct`
+... EXACTEMENT » a été tapé de mémoire (report d'une vérification
+Python antérieure, hors session), pas relu depuis `persp_calib.dart`
+au moment de l'écriture, et ne couvrait que 3 comparaisons sur les 8
+requises (2 paires TL/TR × 4 presets — haussmann a `ceilL≠ceilR`, donc
+2 paires distinctes à vérifier, pas 1 comme implicitement traité).
+Sonde jetable `_tmp_ulp_test.dart` (confinée `test/`, créée, exécutée,
+supprimée) mesurant Dart-natif, par preset, `wallTL.yPct−0,01==
+ceilL.yPct`, `wallTR.yPct−0,01==ceilR.yPct`, et — le maillon
+réellement en cause — `wallTL_shifté.dy==ceilL.dy` après conversion
+canvas (comparaison réellement effectuée par `pg.lineIntersect` sur la
+scène `δ_deg`, pas la simple soustraction pct) :
+
+- **Au niveau pct** (8 comparaisons) : SEULES 3 sur 8 sont vraies
+  (moderne TL, moderne TR, haussmann TR) ; 5 sont FAUSSES (haussmann
+  TL, provencal TL, provencal TR, scandinave TL, scandinave TR) — dont
+  le cas exact soulevé : `0,085 − 0,01 == 0,075` est bien FAUX pour
+  scandinave (`0,07500000000000001 ≠ 0,075` littéral, 1 ulp d'écart
+  au-dessus de 0,075, confirmé). Le « EXACTEMENT » de la clause 6 est
+  donc FAUX pour 3 des 4 presets au niveau pct — seul moderne le
+  vérifie intégralement.
+- **Au niveau canvas** (`wallTL_shifté.dy==ceilL.dy`, la grandeur
+  réellement consommée) : moderne (`true`/`true`) et scandinave
+  (`true`/`true`) obtiennent l'égalité bit à bit malgré l'échec pct de
+  scandinave — la conversion pct→canvas RECOMBINE les arrondis et
+  rétablit l'égalité pour scandinave, contredisant toute attribution
+  simple « pct exact ⟹ canvas exact ». Provençal (`false`/`false`) ne
+  rétablit PAS l'égalité canvas, cohérent avec son résidu mesuré
+  (`perpDist=2,842×10⁻¹³`, clause 2). Haussmann est MIXTE
+  (`false`/`true`) — sans conséquence sur son statut « distinct »,
+  qui reste fondé sur `ceilL.yPct≠ceilR.yPct` (Mesure 4), pas sur ce
+  lien wallX-ceilX.
+
+**Conclusion corrigée** : la classification confondue/distincte reste
+correctement fondée sur `ceilL.yPct == ceilR.yPct` (établi
+indépendamment par la Mesure 4 synthétique, non affecté par ce
+correctif). Ce que la clause 6 antérieure attribuait à tort à un
+« lien pct exact partagé par les 4 presets » est en réalité une
+propriété du niveau CANVAS (pas pct), qui elle-même n'explique QUE la
+précision bit à bit du résidu (nul exact vs nul au bruit machine)
+DANS le sous-cas où `ceilL.yPct==ceilR.yPct` est déjà vrai — elle
+n'est ni nécessaire ni suffisante pour la classification elle-même
+(haussmann, mixte, le montre). Aucune conséquence sur le Verdict de la
+clause 6 (hypothèse de symétrie confirmée) ni sur la Mesure 4
+committée (basée sur `ceilL.yPct==ceilR.yPct`, jamais sur le lien
+wallX-ceilX) — seule l'explication accessoire du mécanisme au niveau
+pct est corrigée.
+
+**2. Correctif `avoid_print` — clause 4 CONFIRMÉE, pas réécrite
+(détail : sortie brute des 3 commandes prescrites ci-dessous).**
+Lecture décisive, remplaçant l'investigation antérieure (git stash/
+checkout, quasi vacante) :
+```
+flutter analyze 2>&1 | grep "unnecessary_import\|avoid_print" | grep "vp_fallback_mode_test\|vp_frac_degenere_test"
+grep -c "print(" test/core/perspective/vp_fallback_mode_test.dart
+grep -c "ignore: avoid_print" test/core/perspective/vp_fallback_mode_test.dart
+```
+Sortie : la 1ʳᵉ commande isole `vp_fallback_mode_test.dart:356:9 •
+avoid_print` — SEULE occurrence dans ce fichier, alors que le pragma
+`// ignore: avoid_print` s'y trouvait en ligne 350, séparé du `print(`
+par 4 lignes de commentaire explicatif (insérées par le reformatage
+clause 2, tour 7b-3). La 2ᵉ et 3ᵉ commande donnent 9=9 (macro-compte
+par fichier, insensible à l'adjacence ligne-à-ligne) — ce comptage
+global ne détecte PAS ce défaut, confirmant que la 1ʳᵉ commande était
+bien la mesure décisive. **Décision appliquée strictement selon la
+règle du brief** : `print( − pragmas` locaux à ce site valait 1 (un
+print non couvert) → corrigé en déplaçant le pragma immédiatement au-
+dessus du `print(` (adjacence rétablie, aucune logique modifiée).
+`flutter analyze` retombe à **106 info / 1 warning** (confirmé après
+correctif). **La clause 4 N'EST PAS réécrite** : sa prémisse (« retrait
+de `dart:ui` ramène 107→106 ») était en réalité CORRECTE — le
+défaut résidait dans un site distinct (adjacence du pragma, introduit
+par une édition différente du même tour), pas dans l'arithmétique de
+la clause 4 elle-même. Fichier `vp_fallback_mode_test.dart` touché
+(déplacement de commentaire seul, aucune modification de logique) →
+suite complète et recomptage JSON rejoués par mesure (`+233: All
+tests passed!`, JSON 233/233/0, tous deux confirmés inchangés,
+`docs/logs/point7b_3.txt` et `docs/logs/point7b_3_json.txt`
+écrasés avec la sortie fraîche).
+
+**3. Reformulation du ratio `perpDist/crossDirs=700,0` (clause 6)** :
+le texte antérieur laissait entendre que ce rapport tiendrait
+« quelles que soient les valeurs » — surenchère corrigée directement
+dans la clause 6 ci-dessus : le rapport est une CONSÉQUENCE de la
+configuration symétrique mesurée (`vy=0`, `ux=1,0`,
+`uy'=−uy ⟹ crossDirs=2·uy`), ne porte aucune information au-delà de
+`uy`, et NE GÉNÉRALISE PAS — haussmann (asymétrique) mesure un rapport
+de `5,76×10¹⁶`, sans rapport avec 700,0. La dégradation en tautologie
+reste correcte, seule sa justification initiale l'était mal.
+
+**Point 8 : ne rien commencer sans accord explicite utilisateur —
+toujours bloqué, sans intitulé enregistré.**
 
 ## Points restants (ordre imposé)
 

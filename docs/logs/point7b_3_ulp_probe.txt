@@ -1,0 +1,165 @@
+Point 7b-3 (correctif post-clôture) — sonde ULP _tmp_ulp_test.dart
+============================================================================
+
+Règle du brief (rappel) : aucune phrase descriptive n'est écrite avant
+la sortie brute qui la fonde. Ce fichier consigne les prédictions
+ÉCRITES AVANT EXÉCUTION, puis la sortie brute Dart-native, puis la
+confrontation littérale.
+
+Contexte : ETAT.md clause 6 affirme (texte tapé de mémoire, PAS relu
+depuis persp_calib.dart au moment de l'écriture) que « les 4 presets
+réels vérifient tous le lien rigide wallTL.yPct − 0,01 = ceilL.yPct et
+wallTR.yPct − 0,01 = ceilR.yPct... EXACTEMENT ». L'utilisateur produit
+un calcul ulp manuel montrant que 0,085 − 0,01 == 0,075 est FAUX pour
+la paire scandinave (écart exact 5,90e-18 au-dessus de 0,075, milieu
+d'arrondi à 4,16e-18, donc arrondi au double supérieur, 1 ulp d'écart).
+Ceci contredirait la revendication "EXACTEMENT" pour au moins un
+preset — et ne couvre par ailleurs que 3 des 8 comparaisons TL/TR × 4
+presets requises (haussmann a ceilL≠ceilR : 2 paires distinctes à
+vérifier, pas 1).
+
+----------------------------------------------------------------------------
+Prédictions écrites AVANT exécution de la sonde Dart
+----------------------------------------------------------------------------
+
+Fondées sur une évaluation IEEE-754 double précision cohérente avec le
+calcul ulp de l'utilisateur (à confirmer, pas à assumer, par la sortie
+Dart réelle — même modèle flottant que Python/Dart, mais la mesure
+tranche, pas le raisonnement) :
+
+  P1. haussmann  : wallTL.yPct-0.01==ceilL.yPct → FALSE (0.100-0.01
+      calcule 0.09000000000000001 ≠ 0.09 littéral) ;
+      wallTR.yPct-0.01==ceilR.yPct → TRUE (0.095-0.01==0.085 exact).
+  P2. moderne    : TL → TRUE (0.105-0.01==0.095 exact) ;
+      TR → TRUE (idem, wallTR=0.105=wallTL ici).
+  P3. provencal  : TL → FALSE (0.150-0.01 calcule
+      0.13999999999999999 ≠ 0.14 littéral) ; TR → FALSE (idem, wallTR=
+      wallTL=0.150 ici).
+  P4. scandinave : TL → FALSE (0.085-0.01 calcule
+      0.07500000000000001 ≠ 0.075 littéral, cas exact soulevé par
+      l'utilisateur) ; TR → FALSE (idem, wallTR=wallTL=0.085 ici).
+
+  P5 (canvas, dy après conversion) : maillon réellement en cause selon
+  l'utilisateur — PAS prédit par avance à la décimale (dépend de
+  imgDraw.dy/dh propres à chaque preset, chemin d'arrondi différent
+  d'une simple soustraction pct). Mesure pure, aucune valeur annoncée
+  avant sortie.
+
+Si P1-P4 se confirment : AU MOINS 3 des 4 presets (provencal,
+scandinave, et le TL de haussmann) contredisent le "EXACTEMENT" de la
+clause 6 au niveau pct — mais ceci ne préjuge PAS encore du niveau
+canvas (dy), qui est la grandeur réellement consommée par le mécanisme
+(conversion pct→canvas peut re-aligner ou non selon les arrondis
+d'échelle). C'est P5 qui décide si le mécanisme causal énoncé
+(wallTL.dy==ceilL.dy après conversion, condition réellement testée par
+pg.lineIntersect) tient malgré l'inexactitude au niveau pct.
+
+----------------------------------------------------------------------------
+Sortie brute Dart-native (flutter test test/core/perspective/
+_tmp_ulp_test.dart, capturée intégralement, non tronquée)
+----------------------------------------------------------------------------
+
+ITÉRATION 1 (comparaison naïve wallX.yPct-0.01 vs ceilX.yPct au pct, ET
+wallTL.dy BRUT non décalé vs ceilL.dy) — ERREUR DE CONCEPTION DÉTECTÉE
+EN COURS DE SONDE : comparer wallTL.dy NON décalé à ceilL.dy compare
+deux points distincts par construction (wallTL et ceilL sont deux
+lignes différentes, écart ~10px trivial, sans rapport avec le
+mécanisme δ_deg réellement testé par pg.lineIntersect). Corrigé avant
+toute conclusion — voir ITÉRATION 2 (version committée ci-dessous).
+
+ITÉRATION 2 (wallTL/wallTR SHIFTÉS de δ_deg=-0.01, comparés en canvas
+à ceilL/ceilR NON décalés — c'est la comparaison réellement effectuée
+par pg.lineIntersect sur la scène dégénérée) :
+
+[ulp] haussmann : wallTL.yPct-0.01==ceilL.yPct(pct)=false
+  (0.09000000000000001 vs 0.09)
+  wallTR.yPct-0.01==ceilR.yPct(pct)=true (0.085 vs 0.085)
+  wallTL_shifté.dy==ceilL.dy(canvas)=false (87.75000000000001 vs 87.75)
+  wallTR_shifté.dy==ceilR.dy(canvas)=true (82.875 vs 82.875)
+
+[ulp] moderne : wallTL.yPct-0.01==ceilL.yPct(pct)=true (0.095 vs 0.095)
+  wallTR.yPct-0.01==ceilR.yPct(pct)=true (0.095 vs 0.095)
+  wallTL_shifté.dy==ceilL.dy(canvas)=true
+  (92.62500000000004 vs 92.62500000000004)
+  wallTR_shifté.dy==ceilR.dy(canvas)=true
+  (92.62500000000004 vs 92.62500000000004)
+
+[ulp] provencal : wallTL.yPct-0.01==ceilL.yPct(pct)=false
+  (0.13999999999999999 vs 0.14)
+  wallTR.yPct-0.01==ceilR.yPct(pct)=false (0.13999999999999999 vs 0.14)
+  wallTL_shifté.dy==ceilL.dy(canvas)=false
+  (151.434375 vs 151.43437500000002)
+  wallTR_shifté.dy==ceilR.dy(canvas)=false
+  (151.434375 vs 151.43437500000002)
+
+[ulp] scandinave : wallTL.yPct-0.01==ceilL.yPct(pct)=false
+  (0.07500000000000001 vs 0.075)
+  wallTR.yPct-0.01==ceilR.yPct(pct)=false (0.07500000000000001 vs 0.075)
+  wallTL_shifté.dy==ceilL.dy(canvas)=true
+  (150.33333333333337 vs 150.33333333333337)
+  wallTR_shifté.dy==ceilR.dy(canvas)=true
+  (150.33333333333337 vs 150.33333333333337)
+
+----------------------------------------------------------------------------
+Confrontation littérale aux prédictions P1-P5
+----------------------------------------------------------------------------
+
+  P1 (haussmann pct) : CONFIRMÉE — TL=false, TR=true, exactement comme
+     prédit.
+  P2 (moderne pct)   : CONFIRMÉE — TL=true, TR=true.
+  P3 (provencal pct) : CONFIRMÉE — TL=false, TR=false.
+  P4 (scandinave pct): CONFIRMÉE — TL=false, TR=false, exactement le
+     cas soulevé par l'utilisateur (0.085-0.01 ≠ 0.075 littéral, 1 ulp
+     d'écart, sens identique : le double calculé est AU-DESSUS de
+     0.075).
+
+  → Le "lien rigide EXACTEMENT" pour les 4 presets, tel qu'affirmé
+    dans ETAT.md clause 6, est FAUX au niveau pct pour 3 des 4 presets
+    (haussmann : 1 des 2 comparaisons ; provencal : les 2 ; scandinave :
+    les 2). SEUL moderne vérifie les 2 comparaisons exactement au pct.
+    Sur les 8 comparaisons pct requises (2 par preset × 4 presets),
+    seules 3 sont vraies (moderne TL, moderne TR, haussmann TR).
+
+  P5 (canvas, dy après conversion, non prédit à la décimale — mesure
+      pure) : résultat NON trivial, et RÉVÉLATEUR :
+    - moderne    : TL=true, TR=true  → nul EXACT (cohérent avec la
+      mesure directe perpDist=0.0 déjà établie clause 2).
+    - scandinave : TL=true, TR=true  → nul EXACT EN CANVAS malgré
+      l'échec au pct (false/false) — la conversion pct→canvas
+      RECOMBINE les arrondis et rétablit l'égalité bit à bit. Ceci est
+      EXACTEMENT le "maillon réellement en cause" signalé par
+      l'utilisateur : le pct seul ne détermine pas le résultat canvas.
+    - provencal  : TL=false, TR=false → canvas NE rétablit PAS
+      l'égalité, cohérent avec le résidu non nul mesuré
+      (perpDist=2.842e-13, clause 2).
+    - haussmann  : TL=false, TR=true → mixte ; mais ceci N'EST PAS le
+      facteur déterminant du statut "distinct" de haussmann — ce
+      facteur reste ceilL.yPct≠ceilR.yPct (asymétrie de plafond),
+      confirmé indépendamment par la Mesure 4 synthétique
+      (ceilL.yPct==ceilR.yPct ⟺ confondues) et par la valeur mesurée
+      perpDist=4.875 (grande, pas un résidu d'arrondi).
+
+Conclusion factuelle (à répercuter dans ETAT.md clause 6) :
+  1. Le "lien rigide wallX.yPct-0.01==ceilX.yPct EXACTEMENT" tel
+     qu'énoncé pour "les 4 presets réels" est RÉTRACTÉ — faux au
+     niveau pct pour haussmann (partiel), provencal (total) et
+     scandinave (total) ; vrai seulement pour moderne.
+  2. Le vrai déterminant du statut nul-exact/nul-au-bruit/distinct
+     N'EST PAS ce lien pct, mais la comparaison AU NIVEAU CANVAS
+     (wallX_shifté.dy vs ceilX.dy) ET, pour le statut distinct de
+     haussmann spécifiquement, l'asymétrie ceilL.yPct≠ceilR.yPct
+     (mécanisme déjà établi et testé indépendamment par la Mesure 4).
+  3. La correspondance canvas observée (moderne/scandinave : les deux
+     comparaisons vraies → nul exact ; provencal : les deux fausses →
+     résidu non nul mesurable) est cohérente avec TOUTES les mesures
+     déjà établies clause 2 — mais ce n'est PAS "le" mécanisme causal
+     unique et suffisant : haussmann (mixte true/false) démontre que
+     ces deux comparaisons canvas ne sont pas non plus la condition
+     nécessaire et suffisante de la classification confondue/distincte
+     — cette classification reste correctement fondée sur
+     ceilL.yPct==ceilR.yPct (Mesure 4), le lien wallX-ceilX canvas
+     n'expliquant que la PRÉCISION bit à bit du résidu (nul exact vs
+     nul au bruit machine) dans le SOUS-CAS où ceilL.yPct==ceilR.yPct
+     est déjà vrai (moderne, scandinave, provencal).
+
+Sonde supprimée après usage — confinement _tmp_/_test.dart respecté.

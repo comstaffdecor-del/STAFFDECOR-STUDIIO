@@ -347,12 +347,12 @@ void main() {
           distinctKeys.add(key);
         }
 
-        // ignore: avoid_print
         // Point 7b-3, clause 2 : perpDist reformaté en notation
         // exponentielle — toStringAsFixed(4) n'établissait que
         // "< 5e-5px", pas l'exactitude machine (0.0 bit à bit). La
         // notation exponentielle laisse la sortie trancher entre
         // nul-machine et nul-exact plutôt qu'un arrondi visuel.
+        // ignore: avoid_print
         print('[7b-2-projparallele] $key : crossDirs='
             '${crossDirs.toStringAsExponential(3)}  perpDist='
             '${perpDist.toStringAsExponential(3)}px  '
