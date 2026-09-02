@@ -109,11 +109,16 @@ dans la même exécution. Seul le volet (b) (repli δ_deg) a été converti
 en collecteur ce tour ; le volet (a) n'a pas été touché.
 
 **`avoid_print`, tranché et consigné** : le grep frais
-(`grep -n -A1 "ignore: avoid_print" test/core/perspective/vp_frac_degenere_test.dart`)
-confirme que les 7 pragmas actifs (lignes 149, 234, 746, 897, 1138,
-1240, 1300 — lignes déplacées par l'édition du collecteur, voir plus
-bas) sont chacun immédiatement suivis d'un `print()` réel ; l'orphelin
-retracté au Point 6bis a donc bien été traité, aucun pragma mort.
+(`grep -n "ignore: avoid_print" test/core/perspective/vp_frac_degenere_test.dart`,
+relu **post-`d066ddc`**, sans recalcul) confirme 7 pragmas actifs aux
+lignes **149, 234, 746, 897, 1138, 1240, 1300**. Ce ne sont PAS les
+lignes pré-collecteur (1126, 1199, 1259) décalées uniformément de +12
+— l'édition du collecteur a inséré à trois endroits distincts, dont un
+bloc de ~30 lignes entre les anciens 1126 et 1199 ; le décalage n'est
+donc pas uniforme sur les trois dernières occurrences (+12, +41, +41).
+Chacune des 7 lignes ci-dessus est confirmée immédiatement suivie d'un
+`print()` réel (`grep -n -A1`) ; l'orphelin retracté au Point 6bis a
+donc bien été traité, aucun pragma mort.
 `flutter analyze` filtré sur ce seul fichier
 (`flutter analyze 2>&1 | grep "avoid_print" | grep
 "vp_frac_degenere_test.dart"`, requis pour ne pas mélanger d'autres
