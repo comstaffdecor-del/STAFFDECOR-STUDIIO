@@ -3,6 +3,120 @@
 Reconstruit depuis `git log` + contenu réel des tests. Format imposé :
 chiffres + chemins de logs, sans prose.
 
+## Errata mutation (SHA `9eaac52`)
+
+`9eaac52` est poussé — jamais d'`--amend`/`rebase` sur lui. Cinq
+corrections, identifiées PENDANT ce tour, sont donc consignées ici
+plutôt que réécrites dans l'historique.
+
+**1. Rétractation** : le message de commit `9eaac52` affirme « la
+vérification par mutation confirme que l'assertion de signe existe
+comme expect distinct ». Cette conclusion n'est PAS soutenue par le
+protocole réellement exécuté à l'époque (mutation `vpTop!` ligne 224 ⇒
+`Null check operator used on a null value`, rouge par EXCEPTION, pas
+par assertion de signe — un rouge indistinguable de tout crash proche
+de δ_deg). Le protocole valide, exécuté CE TOUR (Étages A/B/C, sur
+`test/core/perspective/vp_frac_degenere_test.dart` et
+`lib/core/perspective/vanishing_point.dart`, arbre restauré entre
+chaque étage, `git diff --stat` vide à la fin) donne :
+- **Étage A** — neutraliser seul `expect(signs.length, 1, ...)`
+  (ligne ~753, l'assertion de signe, sans toucher au calcul `signed`) :
+  reste du fichier vert (`+40` avant, `+39` sans l'assertion neutralisée
+  — isolable, aucun couplage collatéral).
+- **Étage B** — inverser la valeur attendue du signe (côté test) :
+  rouge sur les 4 presets, message de COMPARAISON DE VALEUR
+  (`Expected: <1.0> / Actual: <-1.0>`), pas une exception — le mode
+  d'échec est bien une assertion, pas un crash.
+- **Étage C** — mutation côté production, ligne 224, PAS `vpTop!` :
+  substitution finie et géométriquement significative, symétrique de
+  `vpBottom` autour de `(fTL.dy + fBL.dy)/2`. Résultat BRUT initial (une
+  seule exécution, collecteur pas encore en place) : **1 seul test
+  rouge, PAS 4**, et ce n'est PAS le test de signe (Groupe 3bis
+  « affinité ») — celui-ci exclut structurellement δ_deg
+  (`retenus = points.entries.where((e) => e.value.$2 != null)`, garde
+  `residualPx != null`) et reste donc vert sous cette mutation. Le seul
+  rouge observé porte sur le test fusionné 40+4=44 (partie (b),
+  `expect(vpDeg.vp, equals(vpBottomIndep), ...)`), et un seul preset
+  (haussmann) y apparaissait — la boucle `for (final key in ...)`
+  contenant un `expect` throwing s'arrête au premier échec et masque
+  les presets suivants dans la même exécution.
+
+**2. Non-monotonie, remplacement complet** : les deux composantes sont
+monotones sur l'intervalle balayé — `dx` croissant, `|dy|`
+décroissant — et la non-monotonie de `residualPx` naît de leur
+COMPOSITION, pas de l'une ou l'autre seule. À `dy` fixé, il n'y aurait
+ni minimum ni non-monotonie ; à `dx` fixé, `residualPx = |dy|` serait
+monotone décroissant. La phase descendante est portée par `|dy|` — à
+δ=0 et δ=−0,0025, `residualPx − |dy|` vaut respectivement 0,1405 puis
+0,569 (courbe confondue avec `|dy|` à moins d'un pixel) ; la phase
+montante est portée par `dx` dès que `dx²/(2|dy|)` domine, le minimum
+se situant au croisement des deux régimes. L'énoncé antérieur
+(composante y monotone donc non contributive) était un non-sequitur —
+il disparaît.
+
+**3. `w = 0`, deux phrases disjointes, jamais fusionnées sous un
+même intitulé causal** : « La discontinuité a deux régimes : bornée à
+531,375px sur les trois presets symétriques, non bornée sur
+haussmann. » puis, séparément : « `w = 0` est rejeté sur les trois
+presets symétriques et valide sur haussmann parce que les deux droites
+y sont confondues ou distinctes, ce que le caractère borné/non borné
+de la discontinuité ne fonde PAS. »
+
+**4. Garde a priori** (utile pour le Point 7b) : `residualFrac(0)`
+vaut 1,081 sur haussmann et se situe entre 0,98 et 1,21 sur les quatre
+calibrations livrées — tout seuil inférieur à 0,98 se déclenche donc
+sur les quatre à la fois. Une garde a priori calibrée naïvement bloque
+l'application entière au lieu de filtrer les cas dégénérés.
+
+**5. Polarité non gardée hors δ_deg** : le test de signe (Groupe 3bis,
+Test 1, `expect(signs.length, 1, ...)`) exclut explicitement δ_deg via
+sa garde `residualPx != null` — il ne fournit donc AUCUNE garde
+exactement au point de bascule de branche. Ce fait est mis en évidence
+par l'Étage C ci-dessus : le Test 1 reste vert sous la mutation de
+production, précisément parce qu'il n'évalue jamais le point où la
+mutation change quelque chose.
+
+**Limite connue du volet (a), hors périmètre de ce correctif** :
+l'incrément `totalPointsVerifies++` du volet (a) (ligne ~1098) reste
+gaté par deux `expect` throwing à l'intérieur du même `for (int i...)`
+— un écart sur un δ donné masque encore les δ suivants du même preset
+dans la même exécution. Seul le volet (b) (repli δ_deg) a été converti
+en collecteur ce tour ; le volet (a) n'a pas été touché.
+
+**`avoid_print`, tranché et consigné** : le grep frais
+(`grep -n -A1 "ignore: avoid_print" test/core/perspective/vp_frac_degenere_test.dart`)
+confirme que les 7 pragmas actifs (lignes 149, 234, 746, 897, 1138,
+1240, 1300 — lignes déplacées par l'édition du collecteur, voir plus
+bas) sont chacun immédiatement suivis d'un `print()` réel ; l'orphelin
+retracté au Point 6bis a donc bien été traité, aucun pragma mort.
+`flutter analyze` (5 `avoid_print` non couverts par un `ignore`, lignes
+402/456/505/598) reste identique à la baseline, préexistant, hors
+périmètre.
+
+**Rejeu Étage C, preuve versionnée** : capture intégrale dans
+`docs/logs/errata_mutation_rouge.txt`
+(`flutter test test/core/perspective/vp_frac_degenere_test.dart
+--reporter expanded`, exit code 1) — **un seul test rouge** (`+27 -1`),
+message unique listant les **4 écarts** (haussmann, moderne,
+provençal, scandinave) dans l'ordre naturel d'itération des clés,
+chacun avec l'`Offset` obtenu et attendu. Valeurs lues dans le log, pas
+prédites : haussmann `Offset(728.0, 185.3)` vs attendu
+`Offset(728.0, 750.8)` ; moderne `Offset(700.0, 170.6)` vs
+`Offset(700.0, 624.0)` ; provençal `Offset(700.0, 226.1)` vs
+`Offset(700.0, 720.9)` ; scandinave `Offset(700.0, 213.8)` vs
+`Offset(700.0, 670.0)`. Écart avec la prédiction initiale de ce tour :
+provençal avait été annoncé à 226,1 (arrondi) — la mesure du log
+confirme 226,1 à la précision affichée (le log n'affiche pas plus de
+décimales ici) ; scandinave n'avait au départ aucune trace vérifiée
+avant ce rejeu — le log ci-dessus en constitue la première preuve
+versionnée. `totalPointsVerifies` est resté à 44 dans cette exécution
+rouge (pas de `Expected: <44> Actual: <40>`) : l'incrément
+inconditionnel (variante (i)) n'a pas été affecté par le collecteur.
+Restauration ensuite : `git checkout lib/core/perspective/vanishing_point.dart`,
+`git diff --stat lib/` vide, `flutter test
+test/core/perspective/vp_frac_degenere_test.dart` → `+40: All tests
+passed!`.
+
 ## SHA
 
 Écrit au commit **suivant celui-ci** (structurel : ce fichier est commité

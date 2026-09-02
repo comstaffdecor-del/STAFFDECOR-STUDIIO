@@ -1,0 +1,148 @@
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  exif_reader 4.1.0 (4.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  http 1.5.0 (1.6.0 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+21 available)
+  image_picker_ios 0.8.13+3 (0.8.13+7 available)
+  intl 0.19.0 (0.20.3 available)
+  iso_base_media 6.3.2 (6.3.3 available)
+  lints 5.1.1 (6.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.16.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  random_access_source 4.2.1 (4.3.1 available)
+  share_plus 12.0.2 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  shared_preferences 2.5.3 (2.5.5 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.6 (0.7.13 available)
+  url_launcher 6.3.1 (6.3.2 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.3.6 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_web 2.4.1 (2.4.3 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.2.0 (15.3.0 available)
+  win32 5.15.0 (6.4.0 available)
+Got dependencies!
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/flutter_app/test/core/perspective/vp_frac_degenere_test.dart
+00:00 +0: Groupe 1 — VP de profondeur (compute) distinct du VP horizontal (lineIntersect brut) quand ce dernier existe haussmann : VanishingPoint.compute (axe profondeur) doit être un point DIFFÉRENT de lineIntersect(fTL,fTR,fBL,fBR) (axe horizontal)
+[groupe1] haussmann : vp_profondeur=Offset(742.0, 54.4)  vp_horizontal_brut=Offset(166138.7, -672.8)
+00:00 +1: Groupe 2 — compute() dépend réellement des points de mur latéral (wallTL/wallTR), pas seulement des coins du mur du fond haussmann : perturber wallTL doit déplacer le VP calculé
+[groupe2] haussmann : vp=Offset(742.0, 54.4)  vp_perturbe=Offset(-22216.2, -1278.1)  delta=22996.8px
+00:00 +2: Groupe 2 — compute() dépend réellement des points de mur latéral (wallTL/wallTR), pas seulement des coins du mur du fond moderne : perturber wallTL doit déplacer le VP calculé
+[groupe2] moderne : vp=Offset(700.0, 53.6)  vp_perturbe=Offset(-20100.0, -1506.4)  delta=20858.4px
+00:00 +3: Groupe 2 — compute() dépend réellement des points de mur latéral (wallTL/wallTR), pas seulement des coins du mur du fond provencal : perturber wallTL doit déplacer le VP calculé
+[groupe2] provencal : vp=Offset(700.0, 114.1)  vp_perturbe=Offset(-7723.0, -447.6)  delta=8441.7px
+00:00 +4: Groupe 2 — compute() dépend réellement des points de mur latéral (wallTL/wallTR), pas seulement des coins du mur du fond scandinave : perturber wallTL doit déplacer le VP calculé
+[groupe2] scandinave : vp=Offset(700.0, 118.6)  vp_perturbe=Offset(-2009.7, -34.9)  delta=2714.0px
+00:00 +5: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) haussmann : composante y (verticale) — écart rapporté en fraction de pH, borne choisie explicitement (pas dérivée)
+[groupe3-y] haussmann : vp.y=54.4  centre_y=464.3  dy=409.9px  pH=760.5  dy/pH=0.5390
+00:00 +6: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) haussmann : composante x (horizontale) — assertion POSITIVE de sous-détermination, pas un skip
+[groupe3-x] haussmann : vp.x=741.9966348850253  centre_x=700.0
+00:00 +7: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) moderne : composante y (verticale) — écart rapporté en fraction de pH, borne choisie explicitement (pas dérivée)
+[groupe3-y] moderne : vp.y=53.6  centre_y=397.3  dy=343.7px  pH=609.4  dy/pH=0.5640
+00:00 +8: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) moderne : composante x (horizontale) — assertion POSITIVE de sous-détermination, pas un skip
+[groupe3-x] moderne : vp.x=700.0  centre_x=700.0
+00:00 +9: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) provencal : composante y (verticale) — écart rapporté en fraction de pH, borne choisie explicitement (pas dérivée)
+[groupe3-y] provencal : vp.y=114.1  centre_y=473.5  dy=359.4px  pH=644.1  dy/pH=0.5580
+00:00 +10: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) provencal : composante x (horizontale) — assertion POSITIVE de sous-détermination, pas un skip
+[groupe3-x] provencal : vp.x=700.0  centre_x=700.0
+00:00 +11: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) scandinave : composante y (verticale) — écart rapporté en fraction de pH, borne choisie explicitement (pas dérivée)
+[groupe3-y] scandinave : vp.y=118.6  centre_y=441.9  dy=323.3px  pH=583.1  dy/pH=0.5544
+00:00 +12: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) scandinave : composante x (horizontale) — assertion POSITIVE de sous-détermination, pas un skip
+[groupe3-x] scandinave : vp.x=700.0  centre_x=700.0
+00:00 +13: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) haussmann : asymétrie dx de wallTL/wallTR infirmée comme source du décalage (assertion permanente, pas une sonde jetable)
+[groupe3-x-asym] haussmann : wallTL.dx-centre=-699.943915  wallTR.dx-centre=699.943915  somme=0.000000
+00:00 +14: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) haussmann : décomposition causale de dx par isolement des pentes ceilL/ceilR et wallTL/wallTR (aucun chiffre recopié d'une sonde supprimée)
+[groupe3-x-decomp] haussmann : reel.x=741.9966348850253  ceilAplati.x=567.0106561974202  wallAplati.x=874.9859786876052  lesDeuxAplatis.x=700.0  centre=700.0
+00:00 +15: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) haussmann : falsification — dy/pH réagit à une perturbation de yPct (pas une identité algébrique déguisée)
+[groupe3-y-falsification] haussmann : baseline=0.5389957264957265  perturbe(+0.01)=0.5795940170940171  delta=0.040598290598290676
+00:00 +16: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) moderne : falsification — dy/pH réagit à une perturbation de yPct (pas une identité algébrique déguisée)
+[groupe3-y-falsification] moderne : baseline=0.564  perturbe(+0.01)=0.6279999999999998  delta=0.06399999999999983
+00:00 +17: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) provencal : falsification — dy/pH réagit à une perturbation de yPct (pas une identité algébrique déguisée)
+[groupe3-y-falsification] provencal : baseline=0.5579710144927534  perturbe(+0.01)=0.6159420289855071  delta=0.05797101449275366
+00:00 +18: Groupe 3 — VP vs centre géométrique du mur du fond, composantes x et y séparées (régime VP-centre) scandinave : falsification — dy/pH réagit à une perturbation de yPct (pas une identité algébrique déguisée)
+[groupe3-y-falsification] scandinave : baseline=0.554421768707483  perturbe(+0.01)=0.608843537414966  delta=0.05442176870748294
+00:00 +19: Groupe 3bis — affinité de dy/pH (signée) et discontinuité de branche à δ_deg, diagnostic complet haussmann : affinité de la grandeur signée (vp.dy-wallCenterY)/pH en δ, hors point de bascule de branche
+[groupe3bis-affine] haussmann : 10/11 points retenus (residualPx != null), exclu=[-0.01]
+00:00 +20: Groupe 3bis — affinité de dy/pH (signée) et discontinuité de branche à δ_deg, diagnostic complet haussmann : discontinuité à δ_deg — residualPx==null, invariant yPct, et repli sur le couple bas démontré sans réimplémenter lineIntersect
+[groupe3bis-discontinuite] haussmann : vp.vp(δ_deg)=Offset(728.0, 185.3)  vp.vp(δ_deg, wallTL/TR décalés en x)=Offset(728.0, 185.3)  residualPx(décalé)=null
+00:00 +21: Groupe 3bis — affinité de dy/pH (signée) et discontinuité de branche à δ_deg, diagnostic complet moderne : affinité de la grandeur signée (vp.dy-wallCenterY)/pH en δ, hors point de bascule de branche
+[groupe3bis-affine] moderne : 10/11 points retenus (residualPx != null), exclu=[-0.01]
+00:00 +22: Groupe 3bis — affinité de dy/pH (signée) et discontinuité de branche à δ_deg, diagnostic complet moderne : discontinuité à δ_deg — residualPx==null, invariant yPct, et repli sur le couple bas démontré sans réimplémenter lineIntersect
+[groupe3bis-discontinuite] moderne : vp.vp(δ_deg)=Offset(700.0, 170.6)  vp.vp(δ_deg, wallTL/TR décalés en x)=Offset(700.0, 170.6)  residualPx(décalé)=null
+00:00 +23: Groupe 3bis — affinité de dy/pH (signée) et discontinuité de branche à δ_deg, diagnostic complet provencal : affinité de la grandeur signée (vp.dy-wallCenterY)/pH en δ, hors point de bascule de branche
+[groupe3bis-affine] provencal : 10/11 points retenus (residualPx != null), exclu=[-0.01]
+00:00 +24: Groupe 3bis — affinité de dy/pH (signée) et discontinuité de branche à δ_deg, diagnostic complet provencal : discontinuité à δ_deg — residualPx==null, invariant yPct, et repli sur le couple bas démontré sans réimplémenter lineIntersect
+[groupe3bis-discontinuite] provencal : vp.vp(δ_deg)=Offset(700.0, 226.1)  vp.vp(δ_deg, wallTL/TR décalés en x)=Offset(700.0, 226.1)  residualPx(décalé)=null
+00:00 +25: Groupe 3bis — affinité de dy/pH (signée) et discontinuité de branche à δ_deg, diagnostic complet scandinave : affinité de la grandeur signée (vp.dy-wallCenterY)/pH en δ, hors point de bascule de branche
+[groupe3bis-affine] scandinave : 10/11 points retenus (residualPx != null), exclu=[-0.01]
+00:00 +26: Groupe 3bis — affinité de dy/pH (signée) et discontinuité de branche à δ_deg, diagnostic complet scandinave : discontinuité à δ_deg — residualPx==null, invariant yPct, et repli sur le couple bas démontré sans réimplémenter lineIntersect
+[groupe3bis-discontinuite] scandinave : vp.vp(δ_deg)=Offset(700.0, 213.8)  vp.vp(δ_deg, wallTL/TR décalés en x)=Offset(700.0, 213.8)  residualPx(décalé)=null
+00:00 +27: Groupe 3bis — affinité de dy/pH (signée) et discontinuité de branche à δ_deg, diagnostic complet les 4 presets, sur les 10 δ retenus (residualPx != null) : VP(δ) == vpTop(δ) (couple haut, calculé indépendamment via pg.lineIntersect) ; à δ_deg, VP(δ_deg) == vpBottom (couple bas, idem) — égalité exacte sur Offset, pas une comparaison de distance
+[groupe3bis-identite-fusionnee] haussmann : vp(δ_deg)=Offset(728.0, 185.3)  vpBottomIndep=Offset(728.0, 750.8)
+[groupe3bis-identite-fusionnee] moderne : vp(δ_deg)=Offset(700.0, 170.6)  vpBottomIndep=Offset(700.0, 624.0)
+[groupe3bis-identite-fusionnee] provencal : vp(δ_deg)=Offset(700.0, 226.1)  vpBottomIndep=Offset(700.0, 720.9)
+[groupe3bis-identite-fusionnee] scandinave : vp(δ_deg)=Offset(700.0, 213.8)  vpBottomIndep=Offset(700.0, 670.0)
+00:00 +27 -1: Groupe 3bis — affinité de dy/pH (signée) et discontinuité de branche à δ_deg, diagnostic complet les 4 presets, sur les 10 δ retenus (residualPx != null) : VP(δ) == vpTop(δ) (couple haut, calculé indépendamment via pg.lineIntersect) ; à δ_deg, VP(δ_deg) == vpBottom (couple bas, idem) — égalité exacte sur Offset, pas une comparaison de distance [E]
+  Expected: empty
+    Actual: [
+              'preset \'haussmann\' : à δ_deg=-0.01, VanishingPoint.compute(...).vp devrait être EXACTEMENT égal à pg.lineIntersect(wallBL,fBL,wallBR,fBR) calculé indépendamment (couple bas, repli attendu) — sinon compute() ne retombe plus sur le couple bas tel que documenté pour ce régime. Obtenu=Offset(728.0, 185.3)  Attendu=Offset(728.0, 750.8)',
+              'preset \'moderne\' : à δ_deg=-0.01, VanishingPoint.compute(...).vp devrait être EXACTEMENT égal à pg.lineIntersect(wallBL,fBL,wallBR,fBR) calculé indépendamment (couple bas, repli attendu) — sinon compute() ne retombe plus sur le couple bas tel que documenté pour ce régime. Obtenu=Offset(700.0, 170.6)  Attendu=Offset(700.0, 624.0)',
+              'preset \'provencal\' : à δ_deg=-0.01, VanishingPoint.compute(...).vp devrait être EXACTEMENT égal à pg.lineIntersect(wallBL,fBL,wallBR,fBR) calculé indépendamment (couple bas, repli attendu) — sinon compute() ne retombe plus sur le couple bas tel que documenté pour ce régime. Obtenu=Offset(700.0, 226.1)  Attendu=Offset(700.0, 720.9)',
+              'preset \'scandinave\' : à δ_deg=-0.01, VanishingPoint.compute(...).vp devrait être EXACTEMENT égal à pg.lineIntersect(wallBL,fBL,wallBR,fBR) calculé indépendamment (couple bas, repli attendu) — sinon compute() ne retombe plus sur le couple bas tel que documenté pour ce régime. Obtenu=Offset(700.0, 213.8)  Attendu=Offset(700.0, 670.0)'
+            ]
+  écart(s) sur le repli VP(δ_deg) == vpBottom (couple bas) pour 4/4 preset(s) :
+  preset 'haussmann' : à δ_deg=-0.01, VanishingPoint.compute(...).vp devrait être EXACTEMENT égal à pg.lineIntersect(wallBL,fBL,wallBR,fBR) calculé indépendamment (couple bas, repli attendu) — sinon compute() ne retombe plus sur le couple bas tel que documenté pour ce régime. Obtenu=Offset(728.0, 185.3)  Attendu=Offset(728.0, 750.8)
+  preset 'moderne' : à δ_deg=-0.01, VanishingPoint.compute(...).vp devrait être EXACTEMENT égal à pg.lineIntersect(wallBL,fBL,wallBR,fBR) calculé indépendamment (couple bas, repli attendu) — sinon compute() ne retombe plus sur le couple bas tel que documenté pour ce régime. Obtenu=Offset(700.0, 170.6)  Attendu=Offset(700.0, 624.0)
+  preset 'provencal' : à δ_deg=-0.01, VanishingPoint.compute(...).vp devrait être EXACTEMENT égal à pg.lineIntersect(wallBL,fBL,wallBR,fBR) calculé indépendamment (couple bas, repli attendu) — sinon compute() ne retombe plus sur le couple bas tel que documenté pour ce régime. Obtenu=Offset(700.0, 226.1)  Attendu=Offset(700.0, 720.9)
+  preset 'scandinave' : à δ_deg=-0.01, VanishingPoint.compute(...).vp devrait être EXACTEMENT égal à pg.lineIntersect(wallBL,fBL,wallBR,fBR) calculé indépendamment (couple bas, repli attendu) — sinon compute() ne retombe plus sur le couple bas tel que documenté pour ce régime. Obtenu=Offset(700.0, 213.8)  Attendu=Offset(700.0, 670.0)
+  
+  package:matcher                                          expect
+  package:flutter_test/src/widget_tester.dart 473:18       expect
+  test/core/perspective/vp_frac_degenere_test.dart 1192:9  main.<fn>.<fn>
+  
+00:00 +27 -1: Groupe 4 — frac(ceilL, depthPx par défaut) reste dans (0, 1] pour les 4 presets réels (aucune exception levée) haussmann : frac() ne lève pas et reste dans (0, 1]
+[groupe4] haussmann : depthPx=106.47000000000001  frac=0.18519100495520577
+00:00 +28 -1: Groupe 4 — frac(ceilL, depthPx par défaut) reste dans (0, 1] pour les 4 presets réels (aucune exception levée) moderne : frac() ne lève pas et reste dans (0, 1]
+[groupe4] moderne : depthPx=85.31250000000001  frac=0.1636030117785749
+00:00 +29 -1: Groupe 4 — frac(ceilL, depthPx par défaut) reste dans (0, 1] pour les 4 presets réels (aucune exception levée) provencal : frac() ne lève pas et reste dans (0, 1]
+[groupe4] provencal : depthPx=90.177609375  frac=0.16067464721013416
+00:00 +30 -1: Groupe 4 — frac(ceilL, depthPx par défaut) reste dans (0, 1] pour les 4 presets réels (aucune exception levée) scandinave : frac() ne lève pas et reste dans (0, 1]
+[groupe4] scandinave : depthPx=81.63400000000001  frac=0.1455415123048575
+00:00 +31 -1: Groupe 5 — résidu haut/bas (conditionnement), mesuré sur les 4 presets réels — sans seuil deviné, juste le rapport de la mesure haussmann : residualPx/residualFrac rapportés (pas de seuil ici)
+[groupe5-conditionnement] haussmann : residualPx=696.5px  residualFrac=121.1%  vpTop_utilise=Offset(742.0, 54.4)
+00:00 +32 -1: Groupe 5 — résidu haut/bas (conditionnement), mesuré sur les 4 presets réels — sans seuil deviné, juste le rapport de la mesure moderne : residualPx/residualFrac rapportés (pas de seuil ici)
+[groupe5-conditionnement] moderne : residualPx=570.4px  residualFrac=109.4%  vpTop_utilise=Offset(700.0, 53.6)
+00:00 +33 -1: Groupe 5 — résidu haut/bas (conditionnement), mesuré sur les 4 presets réels — sans seuil deviné, juste le rapport de la mesure provencal : residualPx/residualFrac rapportés (pas de seuil ici)
+[groupe5-conditionnement] provencal : residualPx=606.8px  residualFrac=108.1%  vpTop_utilise=Offset(700.0, 114.1)
+00:00 +34 -1: Groupe 5 — résidu haut/bas (conditionnement), mesuré sur les 4 presets réels — sans seuil deviné, juste le rapport de la mesure scandinave : residualPx/residualFrac rapportés (pas de seuil ici)
+[groupe5-conditionnement] scandinave : residualPx=551.4px  residualFrac=98.3%  vpTop_utilise=Offset(700.0, 118.6)
+00:00 +35 -1: Groupe 6 - aucun des 4 presets reels n emprunte aujourd hui les branches catch de _safeToward (vp.toward(p, vp.frac(p, depthPx)) ne leve pour aucun point reel x depthPx reel) haussmann : vp.toward(p, vp.frac(p, depthPx)) ne leve pour aucune combinaison reelle (8 points de calibration x 4 profondeurs par defaut corniche/plinthe, fond et lateral)
+00:00 +36 -1: Groupe 6 - aucun des 4 presets reels n emprunte aujourd hui les branches catch de _safeToward (vp.toward(p, vp.frac(p, depthPx)) ne leve pour aucun point reel x depthPx reel) moderne : vp.toward(p, vp.frac(p, depthPx)) ne leve pour aucune combinaison reelle (8 points de calibration x 4 profondeurs par defaut corniche/plinthe, fond et lateral)
+00:00 +37 -1: Groupe 6 - aucun des 4 presets reels n emprunte aujourd hui les branches catch de _safeToward (vp.toward(p, vp.frac(p, depthPx)) ne leve pour aucun point reel x depthPx reel) provencal : vp.toward(p, vp.frac(p, depthPx)) ne leve pour aucune combinaison reelle (8 points de calibration x 4 profondeurs par defaut corniche/plinthe, fond et lateral)
+00:00 +38 -1: Groupe 6 - aucun des 4 presets reels n emprunte aujourd hui les branches catch de _safeToward (vp.toward(p, vp.frac(p, depthPx)) ne leve pour aucun point reel x depthPx reel) scandinave : vp.toward(p, vp.frac(p, depthPx)) ne leve pour aucune combinaison reelle (8 points de calibration x 4 profondeurs par defaut corniche/plinthe, fond et lateral)
+00:00 +39 -1: Some tests failed.

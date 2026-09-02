@@ -1020,6 +1020,13 @@ void main() {
       () {
         const deltaDeg = -0.01;
         var totalPointsVerifies = 0;
+        // Collecteur (b) : accumule les écarts au lieu de faire throw un
+        // expect par clé — un expect throwing à l'intérieur de la boucle
+        // for (final key in ...) arrête la boucle au premier preset en
+        // échec et masque les suivants (constaté lors du rejeu Étage C,
+        // errata post-9eaac52). L'ordre d'accumulation suit l'ordre
+        // naturel d'itération des clés, sans tri.
+        final mismatches = <String>[];
 
         for (final key in kDemoSceneNativeSize.keys) {
           final base = PerspCalib.forDemoScene(key);
@@ -1083,6 +1090,11 @@ void main() {
                   'renvoie plus la position du couple haut telle que '
                   'documentée pour ce régime.',
             );
+            // NB (asymétrie connue, hors périmètre de ce correctif) :
+            // cet incrément reste gaté par les deux expect throwing
+            // ci-dessus — le volet (a) masque donc toujours les δ
+            // suivants d'un même preset dès le premier écart. Seul le
+            // volet (b) ci-dessous a été converti en collecteur.
             totalPointsVerifies++;
           }
 
@@ -1127,23 +1139,40 @@ void main() {
           print('[groupe3bis-identite-fusionnee] $key : '
               'vp(δ_deg)=${vpDeg.vp}  vpBottomIndep=$vpBottomIndep');
 
-          expect(
-            vpDeg.vp,
-            equals(vpBottomIndep),
-            reason: "preset '$key' : à δ_deg=$deltaDeg, "
-                'VanishingPoint.compute(...).vp devrait être '
-                'EXACTEMENT égal à pg.lineIntersect(wallBL,fBL,wallBR,'
-                'fBR) calculé indépendamment (couple bas, repli '
-                'attendu) — sinon compute() ne retombe plus sur le '
-                'couple bas tel que documenté pour ce régime.',
-          );
+          // Collecteur (b) : accumulation non-throwing à la place du
+          // expect(vpDeg.vp, equals(vpBottomIndep), ...) throwing —
+          // égalité stricte conservée (le != ci-dessous est
+          // isofonctionnel à equals(), aucun durcissement ni
+          // assouplissement de sévérité), mais l'écart n'interrompt
+          // plus la boucle for (final key in ...) : les quatre presets
+          // sont donc tous évalués dans la même exécution.
+          if (vpDeg.vp != vpBottomIndep) {
+            mismatches.add(
+              "preset '$key' : à δ_deg=$deltaDeg, "
+              'VanishingPoint.compute(...).vp devrait être EXACTEMENT '
+              'égal à pg.lineIntersect(wallBL,fBL,wallBR,fBR) calculé '
+              'indépendamment (couple bas, repli attendu) — sinon '
+              "compute() ne retombe plus sur le couple bas tel que "
+              'documenté pour ce régime. '
+              'Obtenu=${vpDeg.vp}  Attendu=$vpBottomIndep',
+            );
+          }
+          // Incrément inconditionnel par clé (variante (i)) : le
+          // compteur dénombre désormais les vérifications de (b)
+          // ATTEINTES (et non plus seulement réussies) — l'assertion
+          // equals(44) ci-dessous redevient une garde de PÉRIMÈTRE
+          // uniquement (le nombre de points couverts par la boucle),
+          // distincte de la garde de RÉUSSITE portée par
+          // expect(mismatches, isEmpty, ...) juste après.
           totalPointsVerifies++;
         }
 
         // Sanity de périmètre, décomposée (brief Point 7a) : 4 presets
         // × 10 δ non dégénérés = 40 vérifications de (a), PLUS 4
         // presets × 1 δ_deg = 4 vérifications de (b) — 40 + 4 = 44,
-        // jamais laissé comme nombre nu.
+        // jamais laissé comme nombre nu. Depuis le collecteur (b),
+        // ce nombre garde le périmètre (points atteints), pas le
+        // succès (voir expect(mismatches, isEmpty, ...) ci-dessous).
         expect(
           totalPointsVerifies,
           equals(44),
@@ -1154,6 +1183,18 @@ void main() {
               'différent de points pour au moins un preset, et le '
               'commentaire de périmètre ci-dessus doit être mis à '
               'jour en conséquence.',
+        );
+
+        // Garde de réussite du volet (b), collectée sur les 4 presets
+        // dans l'ordre naturel d'itération — remplace l'ancien expect
+        // throwing par clé, qui masquait les presets suivant le
+        // premier échec.
+        expect(
+          mismatches,
+          isEmpty,
+          reason: 'écart(s) sur le repli VP(δ_deg) == vpBottom '
+              '(couple bas) pour ${mismatches.length}/4 preset(s) :\n'
+              '${mismatches.join('\n')}',
         );
       },
     );
