@@ -756,8 +756,12 @@ C3′  [Étage C, converti depuis A′] : residualFrac épinglé par preset,
 C4-1′[Étage C, converti depuis A′] : bilan resserré à equals(3)/
      equals(1)+nom, ROUGE confirmé sous seuil élargi (< 5.0).
 C5   [Étage C, 5e entrée]          : seuil resserré à == 0.0, ROUGE
-     confirmé (provençal bascule), marge de 7 décades mesurée entre
-     seuil retenu et valeur réelle — justifie la tolérance 1e-6.
+     confirmé (provençal bascule), marge mesurée sur la grandeur
+     réellement comparée au seuil dans estConfondue (perpDist, pas
+     l'écart dy en amont) : 1e-6 / 2,842e-13 ≈ 3,52e6, soit
+     log10≈6,55 — entre six et sept décades (corrigé post-audit ;
+     "7 décades" arrondissait par excès sans citer le rapport
+     chiffré) — justifie la tolérance 1e-6.
 
 Aucun test() neuf dans ce lot de durcissements (compte de tests
 inchangé par C3′/C4-1′/C5 — seules des assertions supplémentaires

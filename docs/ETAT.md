@@ -844,6 +844,24 @@ bruit machine / 1 distinct** :
   est parfaite dès `uy`.
 - **DISTINCT** : haussmann — `perpDist=4.874999999999896px`.
 
+**Chaîne canvas mesurée, provençal (correctif post-audit)** : l'écart
+`dy` entre `wallTL` décalé et `ceilL` — `151.43437500000002 −
+151.434375 = 2,842×10⁻¹⁴` — divisé par `lenTL=140` donne `2,03×10⁻¹⁶`,
+exactement le `uy` mesuré ; multiplié par `vx=1400` (`perpDist =
+vx·uy` quand `vy=0`, `ux=1,0`), il redonne `2,842×10⁻¹³`, exactement
+le `perpDist` mesuré. La chaîne boucle sur des nombres, et elle est
+GÉNÉRALE aux quatre presets, pas propre à provençal seul : moderne et
+scandinave y entrent avec un écart `dy` NUL et en sortent à `0,0`
+exact, ce qui CONFIRME le mécanisme au lieu de le falsifier — ce qui
+échoue pour scandinave, c'est le niveau `pct` (clause 6, correctif
+ULP), pas cette chaîne canvas. Provençal est le SEUL preset où cet
+écart `dy` est le contributeur UNIQUE de `perpDist` — sur haussmann,
+l'écart `dy` existe aussi (`87.75000000000001` vs `87.75`, soit
+`1,42×10⁻¹⁴`) mais l'asymétrie de plafond (`ceilL.yPct≠ceilR.yPct`)
+domine de QUATORZE ordres de grandeur (`perpDist=4,875`, pas un résidu
+d'arrondi). Ne pas lire « valable pour provençal seul » : la mesure a
+rendu la chaîne générale, elle ne la restreint pas.
+
 Le texte antérieur de cette clause (« moderne/provencal/scandinave
 `perpDist=0.000e+0` exact ») est donc **rétracté sur provençal** :
 son affichage `0.000e+0` à 3 décimales masquait encore un résidu non
@@ -975,20 +993,47 @@ non nul de la clause 2 est structuré par le même centre de canvas que
 le `vp.x` des presets symétriques (`vp_frac_degenere_test.dart`), pas
 un bruit indépendant — mais cette structure est elle-même une
 CONSÉQUENCE de la symétrie de configuration, pas une propriété
-universelle du calcul. La dégradation du rapport en tautologie
-(`crossDirs = 2·uy` rend le rapport `perpDist/crossDirs` redondant
-avec `perpDist/(2·uy)`) est correcte ; sa justification initiale
-(« quelles que soient les valeurs ») ne l'était pas et est ici
-rétractée. Côté
-haussmann : `kCanvasH=975,0`, et `0,005 × 975 = 4,875` exactement —
-le `4,875` mesuré sur haussmann (et reproduit à l'identique par la
-Mesure 4 sur le cas asymétrique synthétique) est donc **forcé
-arithmétiquement par l'écart de calibration (0,005) et la hauteur de
-canvas commune**, ce n'est pas une coïncidence entre deux mesures
-indépendantes — la clause 6 se corrige elle-même sur ce point : le
-texte antérieur disait « identique à la valeur mesurée sur haussmann
-lui-même » comme une observation ; c'est en réalité une conséquence
-arithmétique directe, pas une simple co-occurrence numérique.
+universelle du calcul. La dégradation du rapport en tautologie de FORMULE, pas seulement
+d'observation, se vérifie algébriquement : `crossDirs = |ux·uy' −
+uy·ux'|`, avec la configuration mesurée `vy=0`, `ux=1,0` et `dirTR`
+miroir de `dirTL` (`ux'=1,0`, `uy'=−uy`), donne `crossDirs =
+|1,0·(−uy) − uy·1,0| = 2·uy` ; et `perpDist = |vx·uy − vy·ux| =
+vx·uy` (puisque `vy=0`) `= 1400·uy`. Le rapport
+`perpDist/crossDirs = 1400·uy / (2·uy) = 1400/2 = 700,0 = vx/2` — une
+identité de FORMULE, conditionnée strictement par `vy=0`, `ux=1,0` et
+le miroir `uy'=−uy`, c'est-à-dire par la symétrie étudiée, PAS
+indépendamment des valeurs. Vérifié numériquement sur provençal :
+`uy=2,0301...×10⁻¹⁶` → `crossDirs` formule `=4,0602...×10⁻¹⁶`
+(mesuré : identique) et `perpDist` formule `=2,8421...×10⁻¹³` (mesuré :
+identique). Haussmann, où `ux'≠ux` et `uy'≠−uy` (configuration non
+miroir), mesure un rapport de `5,76×10¹⁶`, sans rapport avec 700,0 —
+falsifiant directement toute lecture générale du rapport. Sa
+justification initiale (« quelles que soient les valeurs ») ne
+l'était pas et est ici rétractée ; ce qui reste correct est que le
+rapport n'apporte AUCUNE information au-delà de `uy` lui-même. Le
+`700,0` de ce rapport (`vx/2`, provençal) et le `700,0` de `vp.x` sur
+les presets symétriques (`vp_frac_degenere_test.dart`, `kCanvasW/2`)
+ne sont PAS « deux 700 sans lien » — les deux dérivations diffèrent
+(l'une vient du rapport `perpDist/crossDirs`, l'autre de la position
+horizontale du point de fuite), mais procèdent de la MÊME symétrie
+gauche-droite autour de `kCanvasW/2` : ce qui se rétracte n'est pas
+l'existence d'un lien, mais l'idée que le rapport `700,0` porterait
+une information indépendante de cette symétrie — il n'atteste qu'une
+STRUCTURE du résidu (centrée sur `kCanvasW/2`), rien de plus.
+
+Côté haussmann, les deux valeurs, algèbre et mesure, juxtaposées :
+`kCanvasH=975,0`, et `0,005 × 975 = 4,875` EXACTEMENT en algèbre ;
+la valeur effectivement MESURÉE (Mesure 4, cas asymétrique
+synthétique, et clause 2 sur haussmann lui-même) est
+`4,874999999999896` — le `4,875` mesuré sur haussmann est donc
+**forcé arithmétiquement par l'écart de calibration (0,005) et la
+hauteur de canvas commune (975)**, à un résidu d'arrondi flottant
+près (`≈1,04×10⁻¹³` d'écart entre l'algèbre exacte et la mesure), ce
+n'est pas une coïncidence entre deux mesures indépendantes — la
+clause 6 se corrige elle-même sur ce point : le texte antérieur
+disait « identique à la valeur mesurée sur haussmann lui-même » comme
+une observation ; c'est en réalité une conséquence arithmétique
+directe, pas une simple co-occurrence numérique.
 Recherche de provenance sur `727,998`/`741,9966` (Bloc 2 du tour
 7b-3-bis) : les deux valeurs sont réelles et sourcées dans des logs
 versionnés distincts (`derivation_haussmann_min.txt` pour
@@ -1074,12 +1119,19 @@ même calcul, aucune interversion à rétracter.
   lui-même (`perpDist < 1e-6` → `perpDist == 0.0`, côté test) :
   provençal (`perpDist=2,842×10⁻¹³`, non nul bit à bit, clause 2)
   bascule en DISTINCTES, bilan 2/2, ROUGE confirmé dès
-  `greaterThanOrEqualTo(3)`. La marge mesurée entre le seuil retenu
-  (`1e-6`) et la valeur réelle de provençal (`2,8×10⁻¹³`) est de
-  **sept décades** — `equals(3)` n'est donc pas fragile pour un seuil
-  réaliste ; seule une mutation à l'exactitude bit à bit le fait
-  rougir. Ceci motive le choix de la tolérance `1e-6` plutôt que de
-  la laisser paraître arbitraire.
+  `greaterThanOrEqualTo(3)`. **Marge recalculée sur la grandeur
+  RÉELLEMENT comparée au seuil dans `estConfondue`** (`perpDist`, pas
+  l'écart `dy` en amont de la chaîne, qui n'est pas la quantité
+  testée) : `1e-6 / 2,842×10⁻¹³ ≈ 3,52×10⁶`, soit `log₁₀ ≈ 6,55` —
+  **entre six et sept décades** (arrondi par excès à « sept décades »
+  dans les deux occurrences antérieures de ce chiffre, qui se
+  contredisaient en libellé — « sept décades » ici, « SEPT DÉCADES »
+  dans `docs/logs/point7b_3_etage_c.txt` — sans jamais citer le
+  rapport chiffré ; corrigé dans les deux textes par le rapport
+  `≈3,52×10⁶` / `log₁₀≈6,55`). `equals(3)` n'est donc pas fragile pour
+  un seuil réaliste ; seule une mutation à l'exactitude bit à bit le
+  fait rougir. Ceci motive le choix de la tolérance `1e-6` plutôt que
+  de la laisser paraître arbitraire.
 
 Les 3 mutations ont été restaurées individuellement (`git diff
 --stat lib/ test/` vide sur `lib/` après chacune, relance verte
@@ -1169,7 +1221,12 @@ correctif). **La clause 4 N'EST PAS réécrite** : sa prémisse (« retrait
 de `dart:ui` ramène 107→106 ») était en réalité CORRECTE — le
 défaut résidait dans un site distinct (adjacence du pragma, introduit
 par une édition différente du même tour), pas dans l'arithmétique de
-la clause 4 elle-même. Fichier `vp_fallback_mode_test.dart` touché
+la clause 4 elle-même. **Note non actée** : le lint `unnecessary_import`
+sur `vp_frac_degenere_test.dart:55` (import `dart:ui` redondant avec
+`flutter_test`) SUBSISTE et reste COMPTÉ dans ces 106 — le retirer
+donnerait 105 ; ce n'est pas fait ce tour (hors périmètre, tolérance
+déjà actée en 7b-1/7b-2, cf. clause 4 originelle). Fichier
+`vp_fallback_mode_test.dart` touché
 (déplacement de commentaire seul, aucune modification de logique) →
 suite complète et recomptage JSON rejoués par mesure (`+233: All
 tests passed!`, JSON 233/233/0, tous deux confirmés inchangés,
@@ -1224,3 +1281,19 @@ toujours bloqué, sans intitulé enregistré.**
   cette session.
 - Bot `genspark auto-backup` écrit en parallèle : jamais de
   `commit --amend`/`rebase` sur un commit déjà poussé.
+- **Un total `flutter analyze` conservé n'est pas une absence de
+  changement** (Point 7b-3-ter/bis) : le retrait de `dart:ui` dans
+  `vp_fallback_mode_test.dart` (un `unnecessary_import` en moins) et
+  le décollement du pragma `avoid_print` par le reformatage clause 2
+  (un `avoid_print` non couvert en plus) se sont soldés à 107→107,
+  masquant les deux événements l'un derrière l'autre — seul le
+  correctif du second a fait retomber le compte à 106.
+- **Un `grep -c` par fichier est aveugle à un défaut d'adjacence**
+  ligne-à-ligne entre un pragma `// ignore:` et le site qu'il doit
+  couvrir (compte global identique, 9=9, que l'adjacence soit rompue
+  ou non) — seul `flutter analyze` (qui applique la règle Dart réelle
+  d'adjacence) le détecte. Une numérotation ou un motif de compte tapé
+  de mémoire, plutôt que re-mesuré, est exactement ce qui a produit le
+  couple `727,998`/`741,9966` mal attribué avant correction (Point
+  7b-3-bis) — aucune généralisation de motif au-delà des cas
+  effectivement sourcés n'est écrite ici sans grep dédié.
