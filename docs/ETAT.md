@@ -670,33 +670,49 @@ la table des « 15 numéros pré-insertion » ci-dessus a été présentée
 comme si `d013a07` ne l'avait déplacée que « de +1 chacun » — FAUX. Les
 15 insertions du paramètre `fallbackMode:` dans
 `vp_frac_degenere_test.dart` sont CUMULATIVES : le site compté en
-kᵉ position depuis le haut du fichier se décale de +k lignes, pas de
-+1. Concrètement (grep frais post-`d013a07`, aucun recalcul) : 126
-reste 126 (aucune insertion ne le précède), 199→200, 211→213,
-349→352, 389→393, 480→485, 569→575, 715→722, 843→851, 886→895,
-1048→1058, 1113→1124, 1216→1228, 1280→1293, 1381→1395. C'est
-exactement la famille d'erreur que `4771ff1` avait rétractée sur le
-bloc `avoid_print` (« déplacement uniforme de +12 » — faux, c'était
+kᵉ position depuis le haut du fichier se décale de +(k−1) lignes
+(l'insertion du site 1 le précède, donc ne le décale pas lui-même ;
+seuls les k−1 sites qui le précèdent contribuent chacun +1), PAS de
++1 ni de +k. Concrètement (grep frais post-`d013a07`, aucun recalcul) :
+126 reste 126 (k=1, aucune insertion ne le précède, +0), 199→200 (k=2,
++1), 211→213 (k=3, +2), 349→352 (k=4, +3), 389→393 (k=5, +4), 480→485
+(k=6, +5), 569→575 (k=7, +6), 715→722 (k=8, +7), 843→851 (k=9, +8),
+886→895 (k=10, +9), 1048→1058 (k=11, +10), 1113→1124 (k=12, +11),
+1216→1228 (k=13, +12), 1280→1293 (k=14, +13), 1381→1395 (k=15, +14).
+C'est exactement la famille d'erreur que `4771ff1` avait rétractée sur
+le bloc `avoid_print` (« déplacement uniforme de +12 » — faux, c'était
 +12/+41/+41) — reproduite un commit plus tard, par l'assistant qui
-venait de la corriger chez autrui.
+venait de la corriger chez autrui, et reproduite UNE TROISIÈME FOIS
+dans la formulation « décale de +k » elle-même (corrigée ici, en tête
+de 7b-2, sans recalcul — seule la RÈGLE en prose était fausse, la
+liste juste au-dessus et le message de commit `0edb4fd` donnaient
+déjà les bonnes valeurs).
 
 Corollaire, également confirmé par grep frais, aucun recalcul : ces
 mêmes 15 insertions ont re-périmé le bloc `avoid_print` figé par
-`4771ff1` (149/234/746/897/1138/1240/1300) ET les 3 mentions en prose
-957/964/1152 citées plus haut comme non-appels. Nouveaux numéros,
-grep frais post-`d013a07` :
+`4771ff1` ET les 3 mentions en prose citées plus haut comme
+non-appels. Reproduction par COMMANDE, pas par liste de numéros (une
+liste « rote » à la prochaine insertion, une commande ne rote pas) :
 ```
 grep -n "ignore: avoid_print" test/core/perspective/vp_frac_degenere_test.dart
 ```
-→ 7 pragmas actifs à 150, 237, 754, 907, 1150, 1253, 1314 (+ une 8ᵉ
-occurrence en L.1385 qui est une mention en prose décrivant un pragma
-historique déjà supprimé, PAS un pragma actif — vérifié par
-`grep -n -A1`, chacun des 7 est bien suivi d'un `print()` réel, le
-compte reste 7). Aucun de ces nouveaux numéros n'est recalculé —
-tous re-greppés, estampillés `d013a07`. Convention retenue à partir
-d'ici : pour ce bloc, on cite le COMPTE (7) plus la commande de
-reproduction, jamais la liste de numéros — une liste « rote » (devient
-fausse) à la première insertion suivante, une commande ne rote pas.
+→ 7 pragmas actifs, chacun vérifié par `grep -n -A1` comme suivi
+d'un `print()` réel (le compte reste 7 ; une 8ᵉ occurrence du motif
+est une mention en prose décrivant un pragma historique déjà
+supprimé, PAS un pragma actif). Précision de troncature : seuls
+trois des quinze numéros post-insertion apparaissaient dans la
+sortie affichée au tour précédent (` — les douze autres avaient bien
+été lus au grep mais l'affichage était tronqué) ; c'est la commande
+elle-même qui couvre les sept, pas le récit qui la paraphrase.
+```
+grep -n "VanishingPoint.compute(...).vp\|VanishingPoint.compute(...)" test/core/perspective/vp_frac_degenere_test.dart | grep -v "final \|VanishingPoint.compute($"
+```
+→ les 3 mentions en prose (précédemment numérotées 957/964/1152,
+désormais périmées par les mêmes insertions) sont reproduites par
+cette commande, jamais par leurs anciens numéros. Convention retenue
+à partir d'ici pour TOUT numéro de ligne dans ce fichier ou tout
+fichier soumis à insertion répétée : compte + commande de
+reproduction, jamais une liste figée.
 
 **Défaut 2** : le recomptage JSON non-circulaire annoncé dans le
 message du commit `d013a07` (229 entrées, 0 non-success) a été produit
@@ -730,18 +746,40 @@ retirée immédiatement (`git checkout -- lib/core/perspective/vanishing_point.d
 `git diff --stat lib/` vide, `flutter analyze` revenu à la baseline
 (0 erreur, 1 warning `srcH`, 106 info).
 
-**Fait central du tour, le plus durable** : `flutter test` NE
+**Fait central du tour, le plus durable** : `flutter test` (sans
+argument, ou avec un argument de RÉPERTOIRE comme `tools/`) NE
 COMPILE PAS `tools/` — vérifié explicitement
 (`flutter test tools/` exécute la suite standard sous `test/`, 229
-verts, sans jamais toucher `vp_current_state_probe.dart`). La suite
-était donc verte sur un arbre contenant un site de compilation cassé,
-et AUCUN recomptage (JSON ou compact) n'aurait pu le voir — seul
-`flutter analyze` l'a détecté. **Règle en dur, retenue pour la suite** :
-hors de `test/`, le filet est `flutter analyze`, JAMAIS `flutter test`.
-Corollaire : le `test()` interne à `vp_current_state_probe.dart` ne
-tourne dans aucune CI basée sur `flutter test` — c'est une sonde
-morte, hors périmètre d'exécution, seulement une déclaration
-Dart valide ou non pour `analyze`.
+verts, sans jamais toucher `vp_current_state_probe.dart` — commande
+NOMMÉMENT écartée comme élément de preuve, faux vert lisible comme
+une couverture). La suite était donc verte sur un arbre contenant un
+site de compilation cassé, et AUCUN recomptage (JSON ou compact)
+n'aurait pu le voir — seul `flutter analyze` l'a détecté. **Règle en
+dur, retenue pour la suite** : hors de `test/`, le filet est
+`flutter analyze`, JAMAIS `flutter test`.
+
+**Mécanisme de collecte, séparé en deux causes distinctes** —
+précision apportée en tête de 7b-2, commande discriminante exécutée
+sur chemin de FICHIER explicite plutôt que de répertoire :
+```
+flutter test tools/calib_measure/vp_current_state_probe.dart
+```
+Résultat : le fichier est COMPILÉ et EXÉCUTÉ (chargement effectif,
+sortie de la sonde affichée pour les 4 presets, `+1: All tests
+passed!`). Ceci sépare proprement les deux causes possibles : (a) le
+NOMMAGE du fichier (`vp_current_state_probe.dart`, sans suffixe
+`_test.dart`) l'exclut du glob `*_test.dart` appliqué au PARCOURS
+d'un répertoire — confirmé, c'est la cause réelle ; (b)
+l'EMPLACEMENT (`tools/` plutôt que `test/`) N'Y EST POUR RIEN — un
+chemin de fichier explicite le fait tourner qu'il soit sous `tools/`
+ou ailleurs, tant que le suffixe est respecté. Conséquence pratique :
+déplacer `vp_current_state_probe.dart` sous `test/` sans renommer ne
+le ferait toujours pas tourner via `flutter test` (répertoire) — il
+faudrait le renommer en `*_test.dart`. Corollaire inchangé : le
+`test()` interne à `vp_current_state_probe.dart` ne tourne dans
+aucune CI basée sur `flutter test <répertoire>` — c'est une sonde
+morte pour toute collecte par glob, exécutable seulement par chemin
+de fichier explicite ou par `flutter analyze`.
 
 **Item de provenance (le 25 « juste » par annulation de deux
 erreurs)** : le 25 énoncé par l'assistant avant `d013a07` (15+6+2+1+1)
