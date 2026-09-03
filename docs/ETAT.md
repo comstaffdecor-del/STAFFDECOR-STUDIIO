@@ -2089,15 +2089,33 @@ et P8a) ci-dessous.
   parce que l'état intermédiaire est mesuré et documenté ligne par
   ligne ci-dessus.
 
-  **Prédiction écrite d'avance pour un éventuel prochain tour** (non
-  exécutée ce tour, notée pour mémoire) : `floorLines` avec les deux
-  bornes de position PLUS
-  `&& ((l.y2 - l.y1) / h).abs() < 0.12` → moderne perd ses deux
-  candidats, replie sur `wH * 0.78` (référence `0,72`), soit
-  `58,5000` EXACTEMENT ; `conf` moderne `0,75 → 0,50` ; les trois
-  autres planchers et les quatre plafonds inchangés. Haussmann
-  (`0,0898`) est le seul candidat proche de `0,12` et doit être
-  surveillé en premier si ce tour est un jour exécuté.
+  **Correction du seuil de la prédiction ci-dessus, `0.12` → `0.22`,
+  micro-commit séparé** : le `0,12` initialement écrit comparait un
+  écart brut `floorR − floorL` (mesuré aux abscisses `xL=0,2`/`xR=0,8`,
+  span `0,6`) à un seuil portant sur la pente RÉELLE
+  `(l.y2 - l.y1) / h` (span `1,0`, bords `x=0`/`x=240`) — deux échelles
+  différentes, jamais homogénéisées avant écriture. Repris ici :
+  pente réelle `= (floorR − floorL) / 0,6`. Haussmann
+  `-0,089820 / 0,6 = -0,149700` — DÉJÀ AU-DESSUS de l'ancien seuil
+  `0,12` en valeur absolue : la prédiction telle qu'écrite aurait
+  exclu haussmann, une détection RÉELLE à `58,1205`px d'erreur, en la
+  faisant passer pour un cas limite alors qu'elle tombait dedans.
+  Pentes réelles recalculées pour les cinq candidats : `haussmann
+  = -0,149700`, `moderne(ancien) = +0,044443`,
+  `provencal = +0,050000`, `scandinave = +0,058825`,
+  `moderne(nouveau) = +0,311112`.
+
+  **Prédiction corrigée** : `floorLines` avec les deux bornes de
+  position PLUS `&& ((l.y2 - l.y1) / h).abs() < 0.22` → moderne perd
+  ses deux candidats (`0,311112 > 0,22`), replie sur `wH * 0.78`
+  (référence `0,72`), soit `58,5000` EXACTEMENT ; `conf` moderne
+  `0,75 → 0,50` ; les trois autres planchers passent la borne
+  (`0,149700`/`0,044443`/`0,050000`/`0,058825`, tous `< 0,22`) et
+  restent inchangés, de même que les quatre plafonds. Haussmann
+  (`0,149700`) est le candidat le plus proche du seuil `0,22`
+  (marge `0,0703`) et doit être surveillé en premier si ce tour est
+  un jour exécuté — pas moderne(nouveau), qui en est loin
+  (marge `0,0911`).
 
   **Réserve à écrire avant tout nouveau seuil** : ce serait le
   TROISIÈME seuil calibré sur les quatre mêmes photos de démo, après
