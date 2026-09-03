@@ -1348,10 +1348,40 @@ et P8a) ci-dessous.
   Les huit écarts se retrouvent à la décimale depuis les valeurs de
   `9eaac52` (par exemple 464,34375 − 54,4375 = 409,90625).
 
-  Polarité : `9eaac52` énonce l'encadrement de `wallCenterY` par
-  `vpTop`/`vpBottom` comme « le défaut identifié pour le Point 8 ». Le
-  classement « encadré » des quatre presets ci-dessus constate donc ce
-  défaut sur les quatre, avec des marges allant de 227 à 410 px.
+  Polarité, modalité exacte relue au SHA `9eaac52` (deux passages, PAS
+  fusionnés) : le premier, sous « Hypothèse NON VÉRIFIÉE, à ne pas
+  confondre avec le fait ci-dessus », porte l'apposition « (le défaut
+  identifié pour le Point 8, voir plus bas) » — la réserve modale du
+  paragraphe porte sur « déclencherait cette garde », pas sur cette
+  apposition elle-même, mais le paragraphe qui la contient reste titré
+  « Hypothèse NON VÉRIFIÉE » et cette réserve n'est pas retirée ici. Le
+  second, en constat sans réserve : « L'encadrement de `wallCenterY`
+  par `vpTop`/`vpBottom`, à la calibration de PRODUCTION (δ=0, sans
+  balayage), sur les 4 presets, reste le seul défaut identifié à ce
+  jour qui affecte réellement ce que l'application affiche ». Les deux
+  passages sont du même SHA `9eaac52` ; aucun ne prime sur l'autre ici,
+  aucun ne s'efface. Le classement « encadré » des quatre presets
+  ci-dessus se lit à la lumière de ces deux modalités, pas d'une
+  formule fusionnée.
+
+  Plage recomputée ce tour depuis les valeurs de `9eaac52` (Bloc 1/2
+  du tour où cette phrase a été écrite) : les huit écarts (quatre bas,
+  quatre hauts) vont de 226,6875 à 409,90625 px.
+
+  Occurrence connue laissée verbatim : la ligne portant « `wallCenterY`
+  EST encadré par `vpTop.y`/`vpBottom.y` sur les 4 presets » (corps du
+  rapport 7a, sous « Hypothèse NON VÉRIFIÉE » plus haut dans ce
+  fichier) classe des presets sans polarité dans sa propre phrase — 
+  connue comme telle, non réécrite, parce qu'elle appartient au corps
+  versionné du rapport 7a qui fait foi tel que consigné plus haut.
+
+  Règle d'inclusion, portée explicite : toute phrase classant des
+  presets par encadrement doit être suivie, avant la fin du bloc de
+  constat (la fin du bloc étant la première ligne de niveau supérieur
+  suivante, ici `- **P9**`), d'une phrase portant la polarité. Ne
+  compte pas comme portée de cette règle le corps du rapport 7a
+  lui-même, versionné et non réécrit, référencé ci-dessus comme
+  occurrence connue.
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
