@@ -1866,10 +1866,23 @@ et P8a) ci-dessous.
   (`edge_detect.dart:37`) est strictement encadré par `0,20 < 0,22 <
   0,35` : la ligne 577 (`if (confidence < _minConfidence) return
   null;`) rejette donc EXACTEMENT le cas où les quatre indicateurs sont
-  faux, et rien d'autre. La valeur `0,75` n'admet qu'une seule
-  décomposition parmi les 16, `0,35 + 0,40` (un seul de
-  `hasCeil`/`hasFloor` faux, les deux diagonales présentes) — confirmé
-  par énumération ce tour.
+  faux, et rien d'autre. **Correction P9f** — la valeur `0,75` admet
+  deux combinaisons parmi les 16 (`c=0,f=1,l=1,r=1` et
+  `c=1,f=0,l=1,r=1`, énumérées ce tour), pas une seule : ce qui est
+  unique n'est que la structure `0,35 + 0,40` (un seul de
+  `hasCeil`/`hasFloor` faux, les deux diagonales présentes) — donc
+  `conf = 0,75` NE DIT PAS lequel du plafond ou du plancher manque.
+  `[REFUTE]` sur l'inférence antérieure « `0,75` ⟹ `hasCeil`
+  false » : la désambiguïsation moderne/scandinave ne vient pas de la
+  confidence mais de `ceil det_yPct = 0,220000` strictement égal au
+  repli `ceilY = wH * 0.22` (`edge_detect.dart:521`, `floorY = wH *
+  0.78` en `edge_detect.dart:532`, les deux confirmés ce tour). Faute
+  de méthode actée : au commit `55a4379`, plusieurs valeurs numériques
+  ont été insérées dans une sortie partiellement élidée par
+  l'affichage (têtes/queues tronquées) sans être rejouées découpées —
+  règle ajoutée pour la suite : chaque commande de mesure ne doit
+  produire qu'un nombre de lignes borné et vérifié, toute sortie
+  incomplète doit être rejouée découpée avant tout usage numérique.
 
   **`confidence` compte des lignes classées, pas des lignes justes** :
   sur haussmann, `conf=1,0000` (les quatre indicateurs vrais, mesuré ce
