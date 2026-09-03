@@ -1350,14 +1350,17 @@ et P8a) ci-dessous.
   (`docs/logs/point8a_encadrement.txt`, `grep "^\[p8a\]"`) : les 8
   valeurs (haussmann 409,9063/286,4063 ; moderne 343,6875/226,6875 ;
   provencal 359,4035/247,3816 ; scandinave 323,2833/228,0833)
-  correspondent bit-à-bit aux `gap_top`/`gap_bottom` du log — la dette
-  de confrontation est close.
+  correspondent numériquement (à la précision affichée) aux
+  `gap_top`/`gap_bottom` du log — pas « bit-à-bit » : le log stocke en
+  notation scientifique (ex. `4.643438e+2`) et le calcul recomputé
+  produit une décimale distincte en représentation (`464,34375`),
+  formats de sortie différents, valeur numérique identique. La dette
+  de confrontation est close sur cette base.
 
   Polarité, modalité exacte relue au SHA `9eaac52` (deux passages, PAS
   fusionnés), citations verbatim avec leur position AU SHA `9eaac52`
-  (`git show 9eaac52:docs/ETAT.md`, pas l'arbre courant — ces deux
-  passages sont aujourd'hui aux lignes 424/419 et 491 respectivement,
-  déplacés par les insertions depuis), sans trancher entre elles : le
+  (`git show 9eaac52:docs/ETAT.md`, pas l'arbre courant), sans
+  trancher entre elles : le
   premier, ligne 239 à `9eaac52`, sous le titre « Hypothèse NON
   VÉRIFIÉE » (ligne 235 à `9eaac52`) : « `wallCenterY` EST encadré par
   `vpTop.y`/`vpBottom.y` sur les 4 presets ». Le second, ligne 303 à
@@ -1439,6 +1442,57 @@ et P8a) ci-dessous.
   Homologue structurel de `wallCenterY` (mêmes quatre points sources,
   division par 4.0), pas fonctionnel (grandeur en mètres 3D dans un
   plan, pas une ordonnée en pixels comparée à `vpTop`/`vpBottom`).
+
+- **P8b** — sonde δ=0 sur `pA`/`pB`, prédictions écrites AVANT
+  l'existence de la sonde (`/tmp/p8b_predictions.txt`, hors dépôt),
+  puis confrontées à une exécution Dart réelle du chemin de
+  production (`VanishingPoint.toward`/`frac`, formule lue en clair :
+  `frac(p,depthPx)=depthPx/dist(p,vpPos)`, `toward(p,frac)=p+(vpPos-p)*frac`,
+  composition `= p + depthPx·unit(p→vpPos)` — donc `Δ(pA)` ne dépend
+  que de l'angle entre les directions `topA→vpTop` et `topA→vpBottom`,
+  pas de la distance au VP). Entrées : `depthPx = pH·0.140`
+  (`StripThickness.corniceDefault`/`corniceDefaultPx`, segment fond,
+  cas de repli sans profil JSON — chemin reconstructible hors
+  application ; le chemin avec profil JSON réel, `ProfileDimsCache`
+  asynchrone, ne l'est pas et n'a pas été sondé), `topA=ceilL`,
+  `topB=ceilR`, sur les mêmes 4 presets et la même géométrie canvas
+  (`kCanvasW=1400.0`, `kCanvasH=975.0`) que P8a — `wallCenterY`
+  recomputés ce tour identiques à ceux du log P8a, confirmant la
+  géométrie commune.
+
+  Prédictions (verbatim, `/tmp/p8b_predictions.txt`, écrites avant
+  création de `test/p8b_sonde_tmp_1.dart`) : haussmann `depthPx=106.4700`,
+  `Δ_pA=95.2429`, `Δ_pB=100.4359` ; moderne `depthPx=85.3125`,
+  `Δ_pA=Δ_pB=71.9864` ; provencal `depthPx=90.1776`,
+  `Δ_pA=Δ_pB=75.2128` ; scandinave `depthPx=81.6340`,
+  `Δ_pA=Δ_pB=63.9277`. Classement prédit : les 8 valeurs ≥ seuil
+  `s=1,0 px`, confirmation attendue sur les 4/4.
+
+  Mesures (sonde jetable Dart, détruite après usage, aucune trace
+  dans l'index) : `[p8b] preset=haussmann depthPx=106.4700
+  delta_pA=95.2429 delta_pB=100.4359` ; `preset=moderne
+  depthPx=85.3125 delta_pA=71.9864 delta_pB=71.9864` ;
+  `preset=provencal depthPx=90.1776 delta_pA=75.2128
+  delta_pB=75.2128` ; `preset=scandinave depthPx=81.6340
+  delta_pA=63.9277 delta_pB=63.9277`. Écart prédiction/mesure : `0,0000`
+  sur les 8 valeurs (même chemin de calcul, exécuté deux fois — pas
+  une confirmation indépendante de la formule elle-même, seulement de
+  sa cohérence entre lecture du code et exécution).
+
+  Verdict, selon le seuil `s=1,0 px` : les 8 écarts (`63,9277` à
+  `100,4359` px) sont TOUS ≥ `s`, par un facteur d'environ 64 à 100.
+  L'énoncé de `9eaac52` (« le seul défaut identifié qui affecte
+  réellement ce que l'application affiche ») est **confirmé** dans sa
+  portée visuelle sur ce chemin (`_drawCorniceStrip`, segment fond,
+  4 presets, δ=0). Aucune cause, aucun correctif, aucune
+  recommandation n'accompagne ce verdict.
+
+  Statut P8a après ce verdict : passe de « constat classé » à
+  « mesure confirmée » sur la portée sondée (segment fond, 4 presets,
+  δ=0) ; la décision de reclassement formel du point dans la liste
+  reste hors sandbox. Ne rien commencer sur un correctif sans accord
+  explicite utilisateur.
+
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
