@@ -1397,8 +1397,8 @@ et P8a) ci-dessous.
   retenue par `VanishingPoint.compute` est construite `x: vpTop.dx`
   (ligne 255), `y: vpTop.dy` (ligne 256) — convention documentée comme
   arbitraire, le résidu local `residual` (ligne 250, exposé comme champ
-  `residualPx` ligne 258 du même bloc) étant toujours conservé à part,
-  jamais fusionné à la position.
+  `residualPx` ligne 262 du même bloc, corrigée ce tour) étant toujours
+  conservé à part, jamais fusionné à la position.
   L'identité `vp.x = vpTop.dx` / `vp.y = vpTop.dy`, utilisée dans le
   constat sur `_drawCorniceStrip`/`_drawPlinthStrip` ci-dessous, est
   donc mesurée ce tour, pas seulement supposée.
@@ -1463,27 +1463,35 @@ et P8a) ci-dessous.
   était fausse par confusion de portée, voir la formule candidate
   testée et rejetée ci-dessous.
 
-  wallCenterY, formule candidate testée et rejetée.
+  wallCenterY, formule candidate testée et rejetée sur les 4 presets.
   Recomputée ce tour (script Python jetable, hors dépôt, même géométrie
-  canvas `1400×975` et mêmes 4 presets), la moyenne arithmétique des
-  quatre coins muraux (`wallTL`, `wallTR`, `wallBL`, `wallBR`) donne :
-  haussmann `4.838438e+02`, moderne `4.119375e+02`, provencal
+  canvas `1400×975` et mêmes 4 presets, entrées transcrites à la main
+  depuis le log P8a — pas lues depuis `lib/`), la moyenne arithmétique
+  des quatre coins muraux (`wallTL`, `wallTR`, `wallBL`, `wallBR`)
+  donne : haussmann `4.838438e+02`, moderne `4.119375e+02`, provencal
   `4.875000e+02`, scandinave `4.537833e+02`. Confrontée à la valeur
-  journalisée `wallCenterY` du log P8a (`grep "^\[p8a\]" ... | grep
-  wallCenterY`) : seul haussmann a été confronté ce tour-là
-  (journalisé `4.643438e+02` — écart net avec le `4.838438e+02`
-  calculé, `+1,95×10¹` px, pas un résidu d'arrondi) ; les trois autres
-  presets n'ont pas fait l'objet de cette confrontation ce même tour —
-  affirmer l'échec de la formule sur les 4 presets excéderait ce qui a
-  été mesuré alors. Seuls `vpTop.y` et `vpBottom.y` se reproduisent à
-  l'identique entre calcul et log. Ce qui est mesuré est l'échec d'UNE
-  formule candidate sur haussmann, pas l'identité de la formule
-  réelle ni son échec généralisé aux 4 presets : `wallCenterY`
-  n'apparaît que sous `test/` (`grep -rn "wallCenterY" lib/ test/
-  tools/` : 0 occurrence sous `lib/`, 7 occurrences dans
-  `test/core/perspective/vp_frac_degenere_test.dart`, lignes 365, 367,
-  371, 586, 588, 733, 735) — son site de calcul dans `lib/` reste une
-  dette ouverte, non résolue par ce tour ni par le précédent.
+  journalisée `wallCenterY` du log P8a (`docs/logs/point8a_encadrement.txt`,
+  4 lignes `[p8a]`, relues intégralement ce tour) : haussmann
+  `4.643438e+02`, moderne `3.973125e+02`, provencal `4.734973e+02`,
+  scandinave `4.418833e+02`. Écarts (formule − journalisé), calculés
+  ce tour sur les 4 presets : haussmann Δ=`19,500`, moderne Δ=`14,625`,
+  provencal Δ=`14,003`, scandinave Δ=`11,900` px — la formule
+  candidate (moyenne arithmétique des 4 coins muraux) ne reproduit la
+  valeur journalisée sur AUCUN des 4 presets, elle est donc rejetée
+  sur les 4, pas seulement sur haussmann comme l'affirmait la portée
+  antérieure ici. Seuls `vpTop.y` et `vpBottom.y` se reproduisent à
+  l'identique entre calcul et log. Ce qui est mesuré est l'échec de
+  CETTE formule candidate sur les 4 presets, pas l'identité de la
+  formule réelle : `wallCenterY` n'apparaît que sous `test/` (`grep -n
+  "wallCenterY" test/core/perspective/vp_frac_degenere_test.dart` de
+  ce tour, liste complète remplaçant intégralement l'ancienne : lignes
+  365, 367, 371, 586, 588, 702, 733, 735, 764 — 9 occurrences, pas 7 —
+  et `grep -rn "wallCenterY" lib/` : 0 occurrence, le symbole n'a donc
+  jamais eu d'existence en production) — son site de calcul dans
+  `lib/` reste une dette ouverte, non résolue par ce tour ni par le
+  précédent. Ligne d'affectation, verbatim
+  (`vp_frac_degenere_test.dart:365-366`) :
+  `final wallCenterY = (cp.ceilL.dy + cp.ceilR.dy + cp.floorL.dy + cp.floorR.dy) / 4;`
 
   Prédictions (verbatim, `/tmp/p8b_predictions.txt`, écrites avant
   création de `test/p8b_sonde_tmp_1.dart`) : haussmann `depthPx=106.4700`,
@@ -1493,20 +1501,20 @@ et P8a) ci-dessous.
   `Δ_pA=Δ_pB=63.9277`. Classement prédit : les 8 valeurs ≥ seuil
   `s=1,0 px`, confirmation attendue sur les 4/4.
 
-  Provenance des prédictions. `/tmp/p8b_predictions.txt`
-  a été écrit deux fois au tour précédent (une v1 avant la création de
-  la sonde Dart, puis une v2 après son exécution, sur le même chemin de
-  fichier) ; l'écrasement ne laisse sur disque qu'un seul mtime — le
-  disque seul ne peut donc plus établir laquelle des deux écritures a
-  précédé la sonde. Le fichier actuellement sur disque (mtime le plus
-  récent des deux) est la v2. L'antériorité réelle des prédictions par
-  rapport à la mesure ne repose pas sur le fichier ni sur son mtime,
-  mais sur l'ORDRE DES BLOCS affichés dans la sortie brute du tour
-  précédent : le `cat /tmp/p8b_predictions.txt` affichant les huit
-  valeurs prédites a été exécuté avant la création de
-  `test/p8b_sonde_tmp_1.dart` et avant son exécution — c'est cet ordre
-  de sortie qui établit l'antériorité, pas une propriété du fichier lui-
-  même.
+  Provenance des prédictions, mtimes vérifiés ce tour
+  (`stat`) : `/tmp/p8b_predictions.txt` porte le mtime `13:43:35`,
+  `/tmp/p8b_sonde.txt` porte le mtime `13:44:17` — le premier est
+  antérieur de 42 s au second. Le fichier survivant sur disque est
+  donc la version écrite AVANT l'exécution de la sonde, ce qui rend
+  fausse et retire l'affirmation antérieure ici selon laquelle ce
+  serait la version finale écrite après la mesure. La règle du mtime
+  le plus récent, évoquée au tour précédent pour
+  arbitrer entre deux écritures concurrentes, est sans objet : il
+  n'existe qu'un seul chemin de fichier pour les prédictions
+  (`/tmp/p8b_predictions.txt`) et un seul pour la sonde
+  (`/tmp/p8b_sonde.txt`), donc pas d'écrasement entre deux versions du
+  même fichier — seulement deux fichiers distincts dont l'ordre des
+  mtimes établit directement l'antériorité.
 
   Mesures (sonde jetable Dart, détruite après usage, aucune trace
   dans l'index) : `[p8b] preset=haussmann depthPx=106.4700
@@ -1575,7 +1583,7 @@ et P8a) ci-dessous.
   | Profils LED | `paintHorizontalBandSet` | `moulure_painter.dart:201` | 2 (même fonction que Moulures, même dépendance) |
   | Lambris | `paintLambris` | `other_families_painter.dart:17` | 2 (`lerpPt(vp.fTL, vp.fBL, tL)` ligne 24, `vp.fBR`/`vp.fBL` lignes 30-31) |
   | Parements | `paintParements` | `other_families_painter.dart:46` | 2 (`vp.fTL`/`vp.fTR`/`vp.fBR`/`vp.fBL` lignes 52-55) |
-  | Colonnes | `paintColonne` | `other_families_painter.dart:91` | 2 (`lerpPt(vp.fTL, vp.fBL, t)` ligne 66) |
+  | Colonnes | `paintColonne` | `other_families_painter.dart:91` | 2 (`lerpPt(vp.fTL, vp.fTR, xPct)` ligne 97 — et non 66, qui appartient à `paintParements` (46-90), corrigé ce tour) |
   | Encadrements | `paintRosace` | `other_families_painter.dart:167` | 2 (`vp.fTL.dy` lignes 177/179/182) |
   | Ornements | `paintOrnement` | `other_families_painter.dart:247` | 2 (`vp.fTL.dy`/`vp.fBL.dy` ligne 260) |
 
@@ -1587,6 +1595,38 @@ et P8a) ci-dessous.
   `_drawPlinthStrip` (lignes 424/469) mais sans dépendance `vp`
   propre ; il n'apparaît donc pas comme fonction dispatchée par une
   `case` du `switch (fam)`.
+
+  **Colonne `canvas.draw*` par famille** (grep de ce tour,
+  `canvas\.draw` sur `lib/`, distinction primitive/`drawPath` — le
+  compte « deux `drawPath` en tout » qui traînait depuis le 8k est
+  faux : il y a 12 `drawPath` sous `lib/` (2 dans `profile_strip.dart`
+  lignes 83/146, 2 dans `cornice_plinth_painter.dart` lignes 443/487,
+  1 dans `moulure_painter.dart` ligne 166, 6 dans
+  `other_families_painter.dart` lignes 33/57/357/358/361/362, 1 dans
+  `room_painter.dart` ligne 369) :
+
+  | Famille | Primitive(s) atteinte(s) | Fichier:ligne |
+  |---|---|---|
+  | Corniches | `drawPath` | `cornice_plinth_painter.dart:443` |
+  | Plinthes | `drawPath` | `cornice_plinth_painter.dart:487` |
+  | Moulures | `drawVertices`, `drawLine`, `drawPath` | `moulure_painter.dart:80,140,166,169` |
+  | Profils LED | `drawVertices`, `drawLine`, `drawPath` | `moulure_painter.dart:80,140,166,169` (même fonction que Moulures) |
+  | Lambris | `drawPath`, `drawLine` | `other_families_painter.dart:33,35` |
+  | Parements | `drawPath`, `drawLine` | `other_families_painter.dart:57,68,84` |
+  | Colonnes | `drawRect`, `drawLine` | `other_families_painter.dart:117,130,131,134,135,143` |
+  | Encadrements | `drawOval`, `drawLine`, `drawCircle` | `other_families_painter.dart:187,199,214,221` |
+  | Ornements | `drawRRect`, `drawImageRect`, `drawPath` | `other_families_painter.dart:272,282,299,302,309,320,321,357,358,361,362` |
+
+  Aucune famille n'atteint zéro `canvas.draw` — résultat mesuré, pas
+  une lacune du relevé : les 9 familles peignent toutes, mais 7 sur 9
+  ne construisent jamais de `Path` seul (Moulures/Profils LED mêlent
+  `drawVertices`/`drawLine`/`drawPath` ; Lambris/Parements mêlent
+  `drawPath`/`drawLine` ; Colonnes/Encadrements n'utilisent AUCUN
+  `drawPath`, seulement `drawRect`/`drawLine`/`drawOval`/`drawCircle`).
+  `edge_detect.dart:102` et `mesh_painter.dart:119` atteignent aussi
+  `canvas.draw*` (`drawImageRect`, `drawVertices`) mais hors dispatch
+  de famille (pipeline de détection et pipeline 3D orphelin,
+  respectivement).
 
   **Drapeau de détection automatique**, nature exacte (`grep -n
   "autoApplyDetection" lib/state/app_state.dart` de ce tour) :
@@ -1602,14 +1642,14 @@ et P8a) ci-dessous.
   occurrence).
 
   **Onglets, partage code/commentaire** (grep de ce tour,
-  `cornice_plinth_painter.dart`) : sur les 29 occurrences de
-  `onglet`/`miter`/`lineIntersect` dans ce fichier, 9 sont en
-  commentaire `///` (lignes 1, 10, 18, 19, 36, 43, 48, 61, 197, 400 —
-  10 lignes en réalité) et le reste est du CODE réel — les variables
+  `cornice_plinth_painter.dart`) : sur les 30 occurrences (`grep -c`
+  de ce tour — et non 29, corrigé) de `onglet`/`miter`/`lineIntersect`
+  dans ce fichier, 10 sont en commentaire `///` (lignes 1, 10, 18, 19,
+  36, 43, 48, 61, 197, 400) et le reste est du CODE réel — les variables
   `ongletL`/`ongletR` (déclarées lignes 222-223 et 329-330,
   réassignées lignes 251-252/262-263 et 343-344/354-355 via des
   appels directs à `lineIntersect`, ligne 252/263/344/355). Côté 3D,
-  `_computeMiteredRing` (`sweep.dart:440`) est also du CODE réel,
+  `_computeMiteredRing` (`sweep.dart:440`) est du CODE réel,
   appelé ligne 644 (`ring = _computeMiteredRing(`), avec une seule
   mention `///` en commentaire (ligne 701) ; les deux occurrences
   restantes (lignes 449, 459) sont des messages d'exception internes
@@ -1704,6 +1744,45 @@ et P8a) ci-dessous.
   `_autoApplyDetection` à true une fois le bug du rendu en "X"
   définitivement corrigé et vérifié sur les 4 scènes démo + import
   utilisateur. »
+
+  **Séparation inverse de `confidence`**, constatée sur les 4 lignes
+  `[p9a]` ci-dessus : `conf=1.0000` associé à `d_max` PLUS GRAND
+  (haussmann `479,00` px, provencal `366,60` px) et `conf=0.7500`
+  associé à `d_max` PLUS PETIT (moderne `275,48` px, scandinave
+  `198,96` px) — les quatre couples (haussmann 1,0000→479,00 ;
+  provencal 1,0000→366,60 ; moderne 0,7500→275,48 ; scandinave
+  0,7500→198,96) montrent une séparation parfaite des deux groupes de
+  `conf`, dans le sens inverse de ce qu'un score de confiance devrait
+  produire. Portée exacte : deux valeurs de `conf` seulement sur 4
+  scènes, donc une séparation de deux groupes, pas une corrélation
+  coin par coin — échantillon de taille `n=4` insuffisant pour exclure
+  la coïncidence. Conséquence opérationnelle qui tient malgré cette
+  réserve : rien dans la mesure ne montre que `edgeDetectConfidence`
+  sélectionne les bons cas, donc aucune garde ne peut être posée
+  dessus en l'état.
+
+  **Portée du harnais 9a** : il ne mesure que l'écart sur les quatre
+  points `f*` (`ceilL`/`ceilR`/`floorL`/`floorR`) — les quatre points
+  `wall*` (`wallTL`/`wallTR`/`wallBL`/`wallBR`) ne sont JAMAIS produits
+  par `detectRoomEdges` (absents du type `EdgeDetectResult`), donc
+  aucun écart ne peut être mesuré dessus. L'écart du point de fuite
+  lui-même (`vpTop`/`vpBottom`, recalculable via `lineIntersect` à
+  partir des `wall*` du preset et des `f*` détectés) reste NON mesuré
+  par ce harnais, alors qu'il est calculable.
+
+  **Dette `expect(true, isTrue)`** : le fichier gelé
+  `p9a_edge_detect_baseline_test.dart` se termine par
+  `expect(true, isTrue)`, une assertion toujours vraie par
+  construction (instrument de mesure, jamais de rouge) — assumée
+  telle quelle, non corrigée ce tour.
+
+  **Baseline `flutter analyze`/`flutter test` après le commit
+  `8e99134`** (`/tmp/p9c_analyze.txt`, `/tmp/p9c_test.txt`, journaux
+  transitoires hors `docs/logs/`) : `106` info (`avoid_print` compris,
+  `grep -c avoid_print` = `97`), `1` warning
+  (`unused_local_variable`, `_debug_grid_zoom_test.dart:38:9`), `0`
+  erreur — `107 issues found.` ; `234` tests, `All tests passed!` (pas
+  de test en échec, warning resté unique).
 
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
