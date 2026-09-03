@@ -382,7 +382,7 @@ _Classified? _classifyLines(List<_HLine> lines, int w, int h) {
 
   final hmid = h * 0.5;
   final ceilLines =
-      horizontals.where((l) => (l.y1 + l.y2) / 2 < hmid * 1.1).toList()
+      horizontals.where((l) => (l.y1 + l.y2) / 2 < h * 0.35).toList()
         ..sort((a, b) => (a.y1 + a.y2).compareTo(b.y1 + b.y2));
   final floorLines =
       horizontals.where((l) => (l.y1 + l.y2) / 2 >= hmid * 0.65).toList()

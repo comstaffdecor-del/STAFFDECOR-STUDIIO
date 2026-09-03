@@ -1906,6 +1906,97 @@ et P8a) ci-dessous.
   plafond (`121,8750`) y est plus petite, non plus grande, que son
   erreur de plancher (`224,2500`, Bloc 2 de ce tour).
 
+  **P9g — hypothèse `marginFrac` FALSIFIÉE, 40/40 points
+  identiques** : test du changement `marginFrac: 1.0 → 0.15`
+  (`edge_detect.dart:517-518/528-529`), rejoué et annulé ce tour.
+  Instrumentation ad hoc (retirée) sur `_lineYAtX` :
+  `xMin0=0.0 xMax0=240.0` (= `wW` entier) sur les 4 presets, plafond
+  ET plancher, `clamped=false` sur les 12 échantillons observés — le
+  clamp d'extrapolation ne s'active JAMAIS, quelle que soit la valeur
+  de `marginFrac`, parce que le segment retourné par
+  `_rhoThetaToSegment` (`edge_detect.dart:272-303`) est TOUJOURS
+  découpé aux bords de l'image de travail (droite analytique en
+  `(rho, theta)`, pas un segment borné par le support réel du vote).
+  Les huit `moy_abs_dy` mesurées avant/après sont identiques au
+  chiffre près (`431,3791`/`121,8750`/`238,2656`/`141,3750` ceil,
+  `58,1205`/`224,2500`/`31,6875`/`17,2059` floor) : `marginFrac` est un
+  no-op sur ce jeu de données, `git checkout -- lib/` appliqué, aucun
+  commit. **Dette actée** : le commentaire `edge_detect.dart:514-516`
+  (« marginFrac généreux... peuvent être hors du segment détecté...
+  extrapolant modérément ») décrit un mécanisme qui ne peut pas se
+  produire dans cette représentation — reste en l'état, non corrigé,
+  à traiter avec la ligne elle-même.
+
+  **9g-bis — arbitrage de sélection écarté** : instrumentation ad hoc
+  (retirée) listant tous les candidats horizontaux post-clustering
+  par preset. Sur haussmann et provencal, un seul candidat existe déjà
+  dans la zone plafond de l'ANCIEN filtre (`hmid * 1.1`, 55 % de la
+  hauteur) et il est déjà loin de la référence (`0,5299`/`0,5479` vs
+  vérité `≈0,090` sur haussmann ; `0,3844` vs `≈0,140` sur provencal) —
+  pas de meilleur candidat évincé par le tri. Sur moderne et
+  scandinave, `cls.ceiling = null` : AUCUN candidat n'existe sous
+  l'ancien seuil. Un prior de position sur `cls.ceiling` n'avait donc
+  rien à corriger dans l'ancien filtre.
+
+  **9g-ter — énergie Sobel `|Gy|` par ligne, sans seuil, haussmann**
+  (instrumentation ad hoc, retirée) : la ligne `y=15`
+  (`yPct=0,0898`, quasi exactement la référence `0,090`) a une énergie
+  de `4504,1`, classée `160e/167` — parmi les plus faibles de toute
+  l'image, PAS seulement sous le seuil Hough (`_houghThFrac = 0.35`).
+  Baisser ce seuil n'aurait fait remonter que du bruit, pas la vraie
+  arête ; cette sous-piste est fermée par la mesure, sans modification
+  de `lib/`. Les deux lignes de plus forte énergie (`y=1`, `y=165`,
+  >100 000) ont une uniformité colonne-à-colonne de `99,6-100 %` —
+  signature d'un artefact de bord de l'image de travail, pas d'une
+  arête architecturale réelle ; non exploité, non corrigé.
+
+  **P9h — resserrement `hmid * 1.1` → `h * 0.35` sur `ceilLines`
+  (`edge_detect.dart:385`), UNE ligne modifiée, commit ce tour** :
+  `git diff` confirmé à une ligne unique, `hmid`/`floorLines`
+  (ligne 388, `hmid * 0.65`)/`marginFrac` non touchés. Résultat mesuré
+  (Bloc 3, log régénéré) : `ceil` haussmann `431,3791 → 129,1875`,
+  `ceil` provencal `238,2656 → 78,0000`, `ceil` moderne et scandinave
+  inchangés au chiffre près (`121,8750`/`141,3750`), les huit `floor`
+  strictement inchangés. `conf` haussmann et provencal
+  `1,0000 → 0,7500` (effet de bord attendu, `hasCeil` passe à `false`
+  quand le seul candidat de l'ancien filtre — les lignes `0,53`/`0,38`
+  ci-dessus — sort désormais du nouveau seuil `h * 0.35`, et le repli
+  `wH * 0.22` prend le relais). `235` tests toujours verts. Les quatre
+  critères de commit (`ceil` haussmann `< 200`, `ceil` provencal
+  `< 150`, huit `floor` inchangés, `235` verts) sont réunis
+  simultanément.
+
+  **Le gain est une réduction d'erreur PAR ABSTENTION, pas par
+  détection** : `hmid * 1.1` acceptait jusqu'à 55 % de la hauteur
+  comme zone plafond admissible, ce qui laissait passer les candidats
+  à `0,5299` (haussmann) et `0,3844` (provencal) — des arêtes réelles
+  et fortes (score Hough `≈0,79`/`≈0,83`) mais SANS RAPPORT avec le
+  plafond de la photo — et les faisait classer `ceiling`. Le nouveau
+  seuil `h * 0.35` les exclut ; faute de candidat restant, le repli
+  constant `wH * 0.22` (déjà mesuré `≈3×` plus précis que ces deux
+  détections erronées, point précédent) prend leur place. Aucune
+  vraie ligne de plafond n'est mieux détectée après P9h qu'avant —
+  la ligne à `y≈15px` (`yPct≈0,09` sur haussmann) reste invisible au
+  pipeline Sobel/Hough (9g-ter ci-dessus). P9h ferme la sur-détection
+  la plus grossière, pas le défaut de fond.
+
+  **Troisième piste, notée sans agir** : `floorLines.last` retient le
+  candidat le plus BAS de la zone plancher — sur moderne, le candidat
+  retenu est à `yPct=0,9500` contre une référence à `0,7200`
+  (`floor moy=224,2500`, seul plancher qui dérape parmi
+  `58,1205`/`31,6875`/`17,2059` sur les trois autres presets),
+  vraisemblablement une plinthe ou un bord de tapis plutôt que la
+  vraie jonction sol/mur. Brief distinct, non traité ce tour.
+
+  **Résolution de travail, noté sans agir** : `_workW = 240`
+  (`edge_detect.dart:23`) place la vraie arête de plafond de haussmann
+  vers `y≈15px`, une épaisseur de quelques pixels seulement à cette
+  échelle — plausible que cela rende la ligne non exploitable par
+  Sobel/Hough indépendamment des seuils `_sobelTh = 26.0` et
+  `_houghThFrac = 0.35` (9g-ter le confirme : énergie brute déjà
+  quasi minimale, pas seulement sous seuil). Troisième levier
+  possible, après les deux ci-dessus, non testé ce tour.
+
   **Plancher détecté 4/4, plafond 2/4, moyennes absolues** (ce tour,
   distinctes du `FAM moy_dy` signé ci-dessous) : `floorL ≠ floorR` sur
   les 4 presets (`0,850299≠0,760479` haussmann ; `0,936667≠0,963333`
