@@ -1394,10 +1394,11 @@ et P8a) ci-dessous.
 
   Position mesurée ce tour (`vanishing_point.dart:249-256`) : dans le
   cas des 4 presets (`vpTop != null && vpBottom != null`), la position
-  retenue par `VanishingPoint.compute` est construite `x: vpTop.dx,
-  y: vpTop.dy` (lignes 254-256) — convention documentée comme
-  arbitraire, le résidu `dist(vpTop, vpBottom)` étant toujours
-  conservé à part dans `residualPx`, jamais fusionné à la position.
+  retenue par `VanishingPoint.compute` est construite `x: vpTop.dx`
+  (ligne 255), `y: vpTop.dy` (ligne 256) — convention documentée comme
+  arbitraire, le résidu local `residual` (ligne 250, exposé comme champ
+  `residualPx` ligne 258 du même bloc) étant toujours conservé à part,
+  jamais fusionné à la position.
   L'identité `vp.x = vpTop.dx` / `vp.y = vpTop.dy`, utilisée dans le
   constat sur `_drawCorniceStrip`/`_drawPlinthStrip` ci-dessous, est
   donc mesurée ce tour, pas seulement supposée.
@@ -1459,24 +1460,30 @@ et P8a) ci-dessous.
   (`kCanvasW=1400.0`, `kCanvasH=975.0`) que P8a — la sonde P8b ne
   calcule PAS `wallCenterY` (seulement `vpTop`/`vpBottom`/`pH`/
   `depthPx`) ; la phrase antérieure affirmant sa reproduction ici
-  était fausse par confusion de portée, voir Écriture A ci-dessous.
+  était fausse par confusion de portée, voir la formule candidate
+  testée et rejetée ci-dessous.
 
-  **Écriture A — wallCenterY, formule candidate testée et rejetée.**
+  wallCenterY, formule candidate testée et rejetée.
   Recomputée ce tour (script Python jetable, hors dépôt, même géométrie
   canvas `1400×975` et mêmes 4 presets), la moyenne arithmétique des
   quatre coins muraux (`wallTL`, `wallTR`, `wallBL`, `wallBR`) donne :
   haussmann `4.838438e+02`, moderne `4.119375e+02`, provencal
   `4.875000e+02`, scandinave `4.537833e+02`. Confrontée à la valeur
   journalisée `wallCenterY` du log P8a (`grep "^\[p8a\]" ... | grep
-  wallCenterY`) : haussmann journalisé `4.643438e+02` — écart net avec
-  le `4.838438e+02` calculé (`+1,95×10¹` px, pas un résidu d'arrondi).
-  Seuls `vpTop.y` et `vpBottom.y` se reproduisent à l'identique entre
-  calcul et log ; la formule « moyenne des 4 coins muraux » ne
-  reproduit PAS `wallCenterY`. Ce qui est mesuré ici est l'échec
-  d'UNE formule candidate, pas l'identité de la formule réelle :
-  l'origine exacte de `wallCenterY` (site de calcul dans `lib/`,
-  jamais localisé à ce jour dans ce dossier) reste une dette ouverte,
-  non résolue par ce tour ni par le précédent.
+  wallCenterY`) : seul haussmann a été confronté ce tour-là
+  (journalisé `4.643438e+02` — écart net avec le `4.838438e+02`
+  calculé, `+1,95×10¹` px, pas un résidu d'arrondi) ; les trois autres
+  presets n'ont pas fait l'objet de cette confrontation ce même tour —
+  affirmer l'échec de la formule sur les 4 presets excéderait ce qui a
+  été mesuré alors. Seuls `vpTop.y` et `vpBottom.y` se reproduisent à
+  l'identique entre calcul et log. Ce qui est mesuré est l'échec d'UNE
+  formule candidate sur haussmann, pas l'identité de la formule
+  réelle ni son échec généralisé aux 4 presets : `wallCenterY`
+  n'apparaît que sous `test/` (`grep -rn "wallCenterY" lib/ test/
+  tools/` : 0 occurrence sous `lib/`, 7 occurrences dans
+  `test/core/perspective/vp_frac_degenere_test.dart`, lignes 365, 367,
+  371, 586, 588, 733, 735) — son site de calcul dans `lib/` reste une
+  dette ouverte, non résolue par ce tour ni par le précédent.
 
   Prédictions (verbatim, `/tmp/p8b_predictions.txt`, écrites avant
   création de `test/p8b_sonde_tmp_1.dart`) : haussmann `depthPx=106.4700`,
@@ -1486,7 +1493,7 @@ et P8a) ci-dessous.
   `Δ_pA=Δ_pB=63.9277`. Classement prédit : les 8 valeurs ≥ seuil
   `s=1,0 px`, confirmation attendue sur les 4/4.
 
-  **Écriture B — provenance des prédictions.** `/tmp/p8b_predictions.txt`
+  Provenance des prédictions. `/tmp/p8b_predictions.txt`
   a été écrit deux fois au tour précédent (une v1 avant la création de
   la sonde Dart, puis une v2 après son exécution, sur le même chemin de
   fichier) ; l'écrasement ne laisse sur disque qu'un seul mtime — le
@@ -1512,7 +1519,7 @@ et P8a) ci-dessous.
   une confirmation indépendante de la formule elle-même, seulement de
   sa cohérence entre lecture du code et exécution).
 
-  **Écriture C — requalification du verdict.** Retrait de « confirmé
+  Requalification du verdict. Retrait de « confirmé
   dans sa portée visuelle » (formulation antérieure erronée). Ce que
   la sonde établit : les 8 écarts (`63,9277` à `100,4359` px) sont
   TOUS ≥ `s=1,0 px` — la sensibilité de `pA`/`pB` (points de la face
@@ -1520,40 +1527,112 @@ et P8a) ci-dessous.
   utilisée est mesurée, sur les 4 presets, à cette amplitude. Ce
   qu'elle n'établit PAS : l'énoncé de `9eaac52` sur l'encadrement de
   `wallCenterY` par `vpTop.y`/`vpBottom.y`, car (i) `wallCenterY`
-  n'est calculé nulle part dans la sonde P8b (voir Écriture A), et
-  (ii) la mesure porte sur un contrefactuel — `vp = vpBottom` comme
-  position substituée à `vp = vpTop` — que `VanishingPoint.compute`
-  ne produit JAMAIS en production (`compute` retient toujours `x:
-  vpTop.dx, y: vpTop.dy` quand les deux couples sont finis, lignes
-  254-256 ; `vpBottom` n'entre dans `residualPx` que comme second
-  terme d'écart, jamais comme position retenue). L'énoncé de
-  `9eaac52` n'est donc ici NI confirmé NI infirmé par cette sonde.
-  Aucune cause, aucun correctif, aucune recommandation n'accompagne
-  ce constat.
+  n'est calculé nulle part dans la sonde P8b (voir la formule
+  candidate testée et rejetée ci-dessus), et (ii) la mesure porte sur
+  un contrefactuel — `vp = vpBottom` comme position substituée à
+  `vp = vpTop` — que `VanishingPoint.compute` ne produit JAMAIS en
+  production (`compute` retient toujours `x: vpTop.dx` (ligne 255),
+  `y: vpTop.dy` (ligne 256) quand les deux couples sont finis ;
+  `vpBottom` n'entre dans `residualPx` que comme second terme d'écart
+  via la variable locale `residual = dist(vpTop, vpBottom)` (ligne
+  250), jamais comme position retenue). L'énoncé de `9eaac52` n'est
+  donc ici NI confirmé NI infirmé par cette sonde. Aucune cause, aucun
+  correctif, aucune recommandation n'accompagne ce constat.
 
-  **Écriture D — note sur la garde.** La sonde construit `vpTop` et
+  Note sur la garde. La sonde construit `vpTop` et
   `vpBottom` par deux appels directs à `lineIntersect` (couple haut,
   couple bas), puis les injecte séparément dans le constructeur
   positionnel `VanishingPoint({required Offset vp, ...})` (ligne 144)
-  — jamais via `VanishingPoint.compute` (ligne 217). La garde qui, à
-  ce site, décide du repli en cas de couple dégénéré
-  (`VpFallbackMode`, cas `vpTop == null` ou `vpBottom == null` dans
-  `compute`) n'a donc pas été exercée par cette sonde : sur les 4
-  presets sondés, les deux couples sont finis dans tous les cas, donc
-  cette garde ne se serait probablement pas déclenchée même via
-  `compute` — mais ce n'est pas ce qui a été vérifié ici, faute
-  d'emprunter ce chemin. Aucune formulation antérieure de ce fait
-  précis n'a été trouvée en clair dans ce fichier par le grep du
-  Bloc 2 (« garde »/« dégénér » ne rend, dans cette section, aucune
-  phrase portant spécifiquement sur ce contournement) : cette note
-  est donc rédigée neuve, pas une citation remplacée.
+  — jamais via `VanishingPoint.compute` (ligne 217). Le paramètre qui,
+  à ce site, décide de la conduite à tenir en cas de couple dégénéré
+  (`fallbackMode: VpFallbackMode`, enum déclaré ligne 38, testé par le
+  `switch (fallbackMode)` ligne 271 sous la garde
+  `if (vpTop != null || vpBottom != null)`) n'a donc pas été exercé
+  par cette sonde : sur les 4 presets sondés, les deux couples sont
+  finis dans tous les cas (branche `if (vpTop != null && vpBottom !=
+  null)`, jamais celle du `switch`), et ce n'est pas ce qui a été
+  vérifié ici, faute d'emprunter le chemin `compute`.
 
   Statut P8a après ces quatre requalifications : reste au statut
   antérieur à ce tour (« constat classé », P8a lui-même inchangé) —
   le passage à « mesure confirmée » écrit au tour précédent est
-  retiré avec l'Écriture C. La décision de qualification finale du
-  point reste hors sandbox. Ne rien commencer sur un correctif sans
-  accord explicite utilisateur.
+  retiré avec la requalification du verdict ci-dessus. La décision de
+  qualification finale du point reste hors sandbox. Ne rien commencer
+  sur un correctif sans accord explicite utilisateur.
+
+  **Tableau des neuf familles**, `fam_constants.dart:77` (`famColors`,
+  9 clés, pas 8) confronté au `switch (fam)` de `room_painter.dart`
+  (`case` lignes 207/246/260/276/292/296/300/304/320) et à la
+  classification Classe 1 (`vp.x`/`vp.y` = position calculée,
+  `_safeToward`/`.toward(`/`.frac(`) / Classe 2 (coins bruts
+  `fTL`/`fTR`/`fBL`/`fBR` via `lerpPt`, sans position calculée) :
+
+  | Famille | Fonction appelée | Fichier:ligne | Classe |
+  |---|---|---|---|
+  | Corniches | `paintCorniceSet` | `cornice_plinth_painter.dart:200` | 1 (`_safeToward` ligne 97/99, `pA`/`pB` lignes 419-420) |
+  | Plinthes | `paintPlintheSet` | `cornice_plinth_painter.dart:309` | 1 (`_safeToward` ligne 97/99, `sA`/`sB` lignes 464-465) |
+  | Moulures | `paintHorizontalBandSet` | `moulure_painter.dart:201` | 2 (`lerpPt(vp.fTL, vp.fBL, t)` ligne 215) |
+  | Profils LED | `paintHorizontalBandSet` | `moulure_painter.dart:201` | 2 (même fonction que Moulures, même dépendance) |
+  | Lambris | `paintLambris` | `other_families_painter.dart:17` | 2 (`lerpPt(vp.fTL, vp.fBL, tL)` ligne 24, `vp.fBR`/`vp.fBL` lignes 30-31) |
+  | Parements | `paintParements` | `other_families_painter.dart:46` | 2 (`vp.fTL`/`vp.fTR`/`vp.fBR`/`vp.fBL` lignes 52-55) |
+  | Colonnes | `paintColonne` | `other_families_painter.dart:91` | 2 (`lerpPt(vp.fTL, vp.fBL, t)` ligne 66) |
+  | Encadrements | `paintRosace` | `other_families_painter.dart:167` | 2 (`vp.fTL.dy` lignes 177/179/182) |
+  | Ornements | `paintOrnement` | `other_families_painter.dart:247` | 2 (`vp.fTL.dy`/`vp.fBL.dy` ligne 260) |
+
+  `profile_strip.dart` (`drawProfileFace`/`_drawTexturedFace`/
+  `drawEdgeLine`) : grep de ce tour (motif
+  `vp\.x|vp\.y|vpPos|_safeToward|\.toward\(|\.frac\(|lerpPt|fTL|fTR|fBL|fBR`)
+  ne retourne AUCUNE ligne — ce fichier trace la face MUR
+  (`topA`/`topB`/`botA`/`botB`), appelé depuis `_drawCorniceStrip`/
+  `_drawPlinthStrip` (lignes 424/469) mais sans dépendance `vp`
+  propre ; il n'apparaît donc pas comme fonction dispatchée par une
+  `case` du `switch (fam)`.
+
+  **Drapeau de détection automatique**, nature exacte (`grep -n
+  "autoApplyDetection" lib/state/app_state.dart` de ce tour) :
+  `const autoApplyDetection = false;` (`app_state.dart:181`) — une
+  constante LOCALE déclarée à l'intérieur de la méthode
+  `autoDetectEdges()` (pas un champ de classe, pas un paramètre
+  nommé), immédiatement précédée d'un commentaire `TODO: repasser
+  `_autoApplyDetection` à true une fois le bug…` et d'un
+  `// ignore: dead_code` (ligne 180). `detectRoomEdges` reste défini
+  dans `edge_detect.dart:55` (`Future<EdgeDetectResult?>
+  detectRoomEdges(ui.Image image) async`), jamais concerné par ce
+  drapeau (`grep -n "autoApplyDetection"` sur ce fichier : aucune
+  occurrence).
+
+  **Onglets, partage code/commentaire** (grep de ce tour,
+  `cornice_plinth_painter.dart`) : sur les 29 occurrences de
+  `onglet`/`miter`/`lineIntersect` dans ce fichier, 9 sont en
+  commentaire `///` (lignes 1, 10, 18, 19, 36, 43, 48, 61, 197, 400 —
+  10 lignes en réalité) et le reste est du CODE réel — les variables
+  `ongletL`/`ongletR` (déclarées lignes 222-223 et 329-330,
+  réassignées lignes 251-252/262-263 et 343-344/354-355 via des
+  appels directs à `lineIntersect`, ligne 252/263/344/355). Côté 3D,
+  `_computeMiteredRing` (`sweep.dart:440`) est also du CODE réel,
+  appelé ligne 644 (`ring = _computeMiteredRing(`), avec une seule
+  mention `///` en commentaire (ligne 701) ; les deux occurrences
+  restantes (lignes 449, 459) sont des messages d'exception internes
+  à la fonction, pas des commentaires.
+
+  **Orphelins, comptes séparés** (grep de ce tour, hors `build/`) :
+  `buildCalibratedScene`/`sweepMoulure`/`paintMeshOnCanvas` sont
+  définis dans **3 fichiers sous `lib/`**
+  (`mesh_painter.dart`, `sweep.dart`, `calib_to_camera.dart`, 1 site
+  de définition chacun) et apparaissent en **62 occurrences réparties
+  sur 13 fichiers sous `test/`** — aucun appelant sous `lib/` en
+  dehors de leur propre fichier de déclaration.
+
+  **Arbitrage `efa73e3`** (`git show --stat efa73e3` de ce tour) :
+  commit touchant EXCLUSIVEMENT `docs/ETAT.md` (1 file changed, 255
+  insertions(+), aucune suppression), message de commit
+  `"docs(ETAT): cree docs/ETAT.md - SHA, points 0-5 acquis avec
+  chiffres verifies, points 6-11 restants, discipline push apres
+  chaque point"` — un commit de documentation pure, jamais de code
+  sous `lib/`. Le périmètre 3D qu'il décrit (câblage `RoomPainter →
+  buildCalibratedScene → sweepMoulure → paintMeshOnCanvas`) reste
+  documenté mais jamais câblé, cohérent avec le compte d'orphelins
+  ci-dessus (0 appelant sous `lib/`).
 
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
