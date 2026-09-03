@@ -1761,14 +1761,137 @@ et P8a) ci-dessous.
   sélectionne les bons cas, donc aucune garde ne peut être posée
   dessus en l'état.
 
-  **Portée du harnais 9a** : il ne mesure que l'écart sur les quatre
-  points `f*` (`ceilL`/`ceilR`/`floorL`/`floorR`) — les quatre points
-  `wall*` (`wallTL`/`wallTR`/`wallBL`/`wallBR`) ne sont JAMAIS produits
-  par `detectRoomEdges` (absents du type `EdgeDetectResult`), donc
-  aucun écart ne peut être mesuré dessus. L'écart du point de fuite
-  lui-même (`vpTop`/`vpBottom`, recalculable via `lineIntersect` à
-  partir des `wall*` du preset et des `f*` détectés) reste NON mesuré
-  par ce harnais, alors qu'il est calculable.
+  **Portée du harnais 9a, CORRIGÉE (P9b)** : il ne mesure que l'écart
+  sur les quatre points `f*` (`ceilL`/`ceilR`/`floorL`/`floorR`) — mais
+  la phrase précédente affirmant que les quatre points `wall*`
+  (`wallTL`/`wallTR`/`wallBL`/`wallBR`) « ne sont JAMAIS produits par
+  `detectRoomEdges` » était FAUSSE : ils SONT produits, via
+  `wallTopYPct = clamp01(ceilYPct * 0.5)` et `wallBotYPct =
+  clamp01(floorYPct + (1 - floorYPct) * 0.5)` (`edge_detect.dart:589-
+  590`), puis affectés `wallTL: CalibPoint(xPct: 0.0, yPct:
+  wallTopYPct)`, `wallTR: CalibPoint(xPct: 1.0, yPct: wallTopYPct)`,
+  `wallBL: CalibPoint(xPct: 0.0, yPct: wallBotYPct)`, `wallBR:
+  CalibPoint(xPct: 1.0, yPct: wallBotYPct)` (`edge_detect.dart:597-
+  600`). C'est ce même site unique qui explique `wallTL = wallTR` et
+  `wallBL = wallBR` sur 4/4 presets (murs plats par construction,
+  aucune pente latérale n'est mesurée côté détection).
+
+  **Harnais P9b, décomposition signée** — fichier permanent
+  `test/core/perspective/p9b_edge_decomp_test.dart`, log
+  `docs/logs/p9b_edge_decomp.txt`, `40` lignes `[p9b]` (8 familles de
+  points × 4 presets = 32 lignes, + 4 lignes de synthèse + 4 lignes de
+  point de fuite), `+1: All tests passed!`, 1 seule tentative de
+  compilation. Comptage `grep -c` du couple clé/valeur portant la
+  valeur non numérique du point de fuite haut, sur ce fichier : `0`
+  occurrence — aucune des 4 scènes ne produit de point de fuite
+  dégénéré, `vpTop`/`vpBottom` détectés et de référence sont tous
+  numériques sur les 4 presets.
+
+  **La sortie du détecteur est réductible à quatre scalaires**
+  `ceilYL`/`ceilYR`/`floorYL`/`floorYR` : les positions X du mur du
+  fond sont des constantes `xL = wW * 0.20` / `xR = wW * 0.80`
+  (`edge_detect.dart:507-508`), et les `wall*` sont des demi-sommes de
+  `ceilYPct`/`floorYPct` (`edge_detect.dart:589-590` ci-dessus) — donc
+  entièrement dérivés des quatre mêmes scalaires, sans degré de liberté
+  propre. Test d'identité `vpTop.y = 1,75·ceilY` et `vpBottom.y =
+  1,75·floorY − 0,75·H`, calculé ce tour depuis les 40 lignes du log :
+  l'identité tient EXACTEMENT (écart = `0,000000`) sur moderne et
+  scandinave (les deux presets à plafond détecté PLAT, `ceilYL =
+  ceilYR`), mais PAS en général — haussmann (`ceilY=516,6920`,
+  `vpTop_obs=891,1186` contre `vpTop_pred=904,2110`, écart
+  `-13,092378` ; `vpBot_obs=693,4693` contre `vpBot_pred=642,9450`,
+  écart `+50,524319`) et provencal (`ceilY=374,7656`,
+  `vpTop_obs=520,9599` contre `vpTop_pred=655,8398`, écart
+  `-134,879944` ; écart `vpBottom` `+7,977275`) s'en écartent largement
+  au-delà de tout seuil de bruit d'arrondi — l'identité algébrique
+  simple ne vaut que dans le cas symétrique/plat, pas comme formule
+  générale. Reporté tel quel, sans ajuster l'hypothèse : la
+  RÉDUCTION à quatre scalaires reste vraie (aucun autre degré de
+  liberté n'entre dans la construction des `wall*`/vp), mais la
+  formule affine de prédiction du point de fuite testée ce tour ne la
+  capture pas fidèlement en dehors du cas plat.
+
+  **Repli plafond/plancher, disculpe `clampTilt`** : `if (cls.ceiling
+  != null) { ... } else { ceilY = wH * 0.22; ceilYL = ceilY; ceilYR =
+  ceilY; }` (`edge_detect.dart:512/521-523`) — même structure pour le
+  plancher, `floorY = wH * 0.78` (`edge_detect.dart:532`). C'est ce
+  repli, PAS `clampTilt`, qui produit les égalités `d_ceilL =
+  d_ceilR = 185,6166` (moderne) et `d_ceilL = d_ceilR = 198,9645`
+  (scandinave) du 9a : `ceilY = 975 * 0,22 = 214,5`, valeur mesurée à
+  l'identique sur moderne ET scandinave au test d'identité ci-dessus —
+  aucune ligne de plafond n'a été classifiée sur ces deux photos
+  (`hasCeil = false`), d'où le plafond plat par défaut. Sur ces deux
+  mêmes presets, `floorY` vaut `926,2500` (moderne) et `788,6029`
+  (scandinave) — DIFFÉRENT de `975 * 0,78 = 760,5` — donc `hasFloor =
+  true`, le plancher est réellement détecté. `_minConfidence = 0.22`
+  (`edge_detect.dart:37`) est numériquement identique au coefficient du
+  repli plafond `0.22` (`edge_detect.dart:521`) mais gouverne une
+  variable distincte (seuil de rejet vs position Y par défaut) — pas
+  la même quantité, coïncidence numérique non causale à ce stade.
+
+  **Formule de confidence complète, verbatim**
+  (`edge_detect.dart:567-575`) : `hasCeil = cls.ceiling != null`,
+  `hasFloor = cls.floor != null`, `hasLeft = cls.leftDiags.isNotEmpty`,
+  `hasRight = cls.rightDiags.isNotEmpty`, puis `confidence = (hasCeil ?
+  0.30 : 0.05) + (hasFloor ? 0.30 : 0.05) + (hasLeft ? 0.20 : 0.05) +
+  (hasRight ? 0.20 : 0.05)`. Sur moderne/scandinave (`conf = 0,7500`),
+  le plafond détecté (`hasCeil = false`, repli `0.22` ci-dessus) est
+  identifié comme le signal manquant, pas le plancher — confirmé par
+  `floorY` mesuré différent du repli `wH * 0.78` sur ces deux mêmes
+  presets alors que `ceilY` s'y trouve exactement au repli `wH *
+  0.22`. Ce plafond détecté-mais-absent est donc trois fois plus
+  large en amplitude d'erreur que le simple repli X (`xL`/`xR` fixes) :
+  il fait dériver TOUTE l'ordonnée du plafond, pas seulement sa
+  position latérale.
+
+  **`sum_abs_dx`/`dominante` non informatives** : `xL`/`xR` étant des
+  constantes (`edge_detect.dart:507-508`), `sum_abs_dx` mesuré ce tour
+  vaut `448,0000` (haussmann) ou `560,0000` (moderne/provencal/
+  scandinave) — deux valeurs seulement, l'écartement fixe propre à
+  chaque preset (`xPct` de référence différent), pas une erreur de
+  détection. `dominante` en dépend directement (`y` sur haussmann/
+  moderne/provencal, `x` sur scandinave dans ce tirage) et n'est donc
+  pas non plus un signal de détection exploitable en l'état.
+
+  **`FAM ceil`, recalculé ce tour depuis les 40 lignes** : moyenne de
+  `dy` sur `{ceilL, ceilR}` par preset, POSITIVE sur les 4 presets
+  (haussmann `+431,3791`, moderne `+121,8750`, provencal `+238,2656`,
+  scandinave `+141,3750`) — signal cohérent et exploitable, contraire
+  au `signe_dy` global du log (mixte sur 2/4 presets), qui agrège des
+  familles à conventions de signe opposées et doit être ignoré au
+  profit de `FAM` par famille de point.
+
+  **Log sain, contamination confinée au rapport** : `DIFF` (sommes
+  déclarées par le harnais moins sommes recalculées depuis les lignes
+  de points, recalculé ce tour) vaut `delta_dx = 0,0000` strictement
+  sur les 4 presets, `delta_dy` de l'ordre de `10⁻⁴` (`+0,0001` /
+  `0,0000` / `-0,0001` / `-0,0000`) — cohérent avec un résidu d'arrondi
+  d'affichage à 4 décimales, pas avec une erreur de calcul du harnais
+  committé. Le comptage `grep -c` du couple clé/valeur portant la
+  valeur non numérique du point de fuite haut donne `0` occurrence
+  dans ce même fichier (re-vérifié ce tour) : une conclusion contraire
+  énoncée dans un rapport de conversation d'un tour antérieur ne
+  correspond à aucune ligne du dépôt — la contamination est restée
+  confinée à ce rapport, aucun fichier versionné n'en porte trace.
+
+  **Trois écarts entre prédiction et mesure, et deux éléments retirés
+  faute de source, actés tels quels** : (1) le compte de lignes
+  `[p9b]` mesuré ce tour est `40`, différent de la valeur plus petite
+  anticipée avant lecture ; (2) le comptage de la valeur non numérique
+  du point de fuite haut évoqué au point précédent contredit une
+  conclusion différente tirée dans un rapport antérieur ; (3)
+  l'hypothèse d'un site de construction des `wall*` distinct de
+  `edge_detect.dart:589-600` ne s'est pas confirmée, ce site unique
+  explique intégralement les égalités mesurées entre coins gauche et
+  droit d'un même palier. Par ailleurs, deux éléments avancés dans un
+  rapport antérieur sont retirés faute de source : une paire de
+  valeurs distinctes pour `wallTL`/`wallTR` sur provencal ne
+  correspond à aucune ligne du fichier committé (mesuré ce tour :
+  les deux coins portent la MÊME valeur, `0,192188`) ; et un
+  désaccord de convention entre deux plages de fraction n'a pas de
+  source établie dans ce tour, les fractions de référence des murs
+  latéraux mesurées se trouvant proches des bords de l'image sur les
+  4 presets (ex. `wallTL ref_yPct` de `0,075000` à `0,150000`).
 
   **Dette `expect(true, isTrue)`** : le fichier gelé
   `p9a_edge_detect_baseline_test.dart` se termine par
