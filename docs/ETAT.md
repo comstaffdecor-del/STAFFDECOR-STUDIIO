@@ -1338,6 +1338,20 @@ et P8a) ci-dessous.
   Les 4 presets classent **encadré** (aucun cas frontière, aucun cas non
   encadré). Aucune cause ni correctif ni recommandation n'accompagne ce
   constat.
+
+  Circularité de la sonde : la prédiction ci-dessus est sourcée sur les
+  valeurs déjà versionnées de `9eaac52`, et la sonde emprunte le même
+  chemin de production (`PerspCalib.forDemoScene` →
+  `CalibCanvasPoints.fromCalib` → `lineIntersect`) que celui utilisé
+  pour produire ces valeurs. Ce qui est établi est la reproductibilité
+  du calcul à travers les commits, PAS une confirmation indépendante.
+  Les huit écarts se retrouvent à la décimale depuis les valeurs de
+  `9eaac52` (par exemple 464,34375 − 54,4375 = 409,90625).
+
+  Polarité : `9eaac52` énonce l'encadrement de `wallCenterY` par
+  `vpTop`/`vpBottom` comme « le défaut identifié pour le Point 8 ». Le
+  classement « encadré » des quatre presets ci-dessus constate donc ce
+  défaut sur les quatre, avec des marges allant de 227 à 410 px.
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
