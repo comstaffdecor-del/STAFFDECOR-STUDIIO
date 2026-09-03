@@ -1781,11 +1781,11 @@ et P8a) ci-dessous.
   `docs/logs/p9b_edge_decomp.txt`, `40` lignes `[p9b]` (8 familles de
   points × 4 presets = 32 lignes, + 4 lignes de synthèse + 4 lignes de
   point de fuite), `+1: All tests passed!`, 1 seule tentative de
-  compilation. Comptage `grep -c` du couple clé/valeur portant la
-  valeur non numérique du point de fuite haut, sur ce fichier : `0`
-  occurrence — aucune des 4 scènes ne produit de point de fuite
-  dégénéré, `vpTop`/`vpBottom` détectés et de référence sont tous
-  numériques sur les 4 presets.
+  compilation. `[REFUTE] "d_vpTop=null"` : comptage `grep -c` de ce
+  motif sur ce fichier, recalculé ce tour : `0` occurrence — aucune
+  des 4 scènes ne produit de point de fuite dégénéré,
+  `vpTop`/`vpBottom` détectés et de référence sont tous numériques sur
+  les 4 presets.
 
   **La sortie du détecteur est réductible à quatre scalaires**
   `ceilYL`/`ceilYR`/`floorYL`/`floorYR` : les positions X du mur du
@@ -1793,23 +1793,40 @@ et P8a) ci-dessous.
   (`edge_detect.dart:507-508`), et les `wall*` sont des demi-sommes de
   `ceilYPct`/`floorYPct` (`edge_detect.dart:589-590` ci-dessus) — donc
   entièrement dérivés des quatre mêmes scalaires, sans degré de liberté
-  propre. Test d'identité `vpTop.y = 1,75·ceilY` et `vpBottom.y =
-  1,75·floorY − 0,75·H`, calculé ce tour depuis les 40 lignes du log :
-  l'identité tient EXACTEMENT (écart = `0,000000`) sur moderne et
-  scandinave (les deux presets à plafond détecté PLAT, `ceilYL =
-  ceilYR`), mais PAS en général — haussmann (`ceilY=516,6920`,
-  `vpTop_obs=891,1186` contre `vpTop_pred=904,2110`, écart
-  `-13,092378` ; `vpBot_obs=693,4693` contre `vpBot_pred=642,9450`,
-  écart `+50,524319`) et provencal (`ceilY=374,7656`,
-  `vpTop_obs=520,9599` contre `vpTop_pred=655,8398`, écart
-  `-134,879944` ; écart `vpBottom` `+7,977275`) s'en écartent largement
-  au-delà de tout seuil de bruit d'arrondi — l'identité algébrique
-  simple ne vaut que dans le cas symétrique/plat, pas comme formule
-  générale. Reporté tel quel, sans ajuster l'hypothèse : la
-  RÉDUCTION à quatre scalaires reste vraie (aucun autre degré de
-  liberté n'entre dans la construction des `wall*`/vp), mais la
-  formule affine de prédiction du point de fuite testée ce tour ne la
-  capture pas fidèlement en dehors du cas plat.
+  propre. **Correction P9e — formule fermée générale**, calculée ce
+  tour depuis les 40 lignes du log, avec `h = (ceilYL + ceilYR) / 4` et
+  `ceilY = 2h` : `vpTop.x = W * (ceilYR − h) / ceilY`, `vpTop.y = h +
+  vpTop.x * (ceilYL − h) / xL` (`xL = 0,20 * W`) ; forme homologue en
+  bas avec `g = (H + floorY) / 2` : `vpBottom.x = W * (floorYR − g) /
+  (floorY − H)`, `vpBottom.y = g + vpBottom.x * (floorYL − g) / xL`.
+  Seize résidus observé-prédit calculés ce tour, tous sous `1e-2` :
+  TOP haussmann `res_x=-0,000189 res_y=-0,000725`, TOP moderne
+  `res_x=0,000000 res_y=0,000000`, TOP provencal `res_x=0,000044
+  res_y=0,000011`, TOP scandinave `res_x=0,000000 res_y=0,000000`, BOT
+  haussmann `res_x=0,001637 res_y=0,000828`, BOT moderne
+  `res_x=-0,009300 res_y=0,000833`, BOT provencal `res_x=-0,000027
+  res_y=0,000002`, BOT scandinave `res_x=0,003180 res_y=-0,000369`. Le
+  plus grand écart (`0,0093`, sur moderne) est imputable à l'arrondi
+  d'affichage des `det_yPct` à 6 décimales (tiers `0,936667`/
+  `0,963333`). Ce résultat REMPLACE la conclusion « falsifiée en
+  général » actée dans un commit antérieur : la formule `1,75·ceilY`
+  testée alors n'était que le cas symétrique (`ceilYL = ceilYR`) d'une
+  forme générale non dérivée à ce moment-là ; une fois correctement
+  posée, la formule générale ci-dessus tient sur les 4 presets, pas
+  seulement sur le cas plat. La RÉDUCTION à quatre scalaires est donc
+  démontrée par calcul, et non plus seulement structurelle.
+
+  **`d_vpTop`/`d_vpBottom`, redondance et non mesure indépendante** :
+  couples mesurés ce tour depuis le log — haussmann `d_vpTop=848,5889
+  d_vpBottom=300,5852`, moderne `d_vpTop=321,7500
+  d_vpBottom=468,4854`, provencal `d_vpTop=566,0397
+  d_vpBottom=153,6836`, scandinave `d_vpTop=341,2500
+  d_vpBottom=140,4493`. La formule fermée ci-dessus montre que
+  `vpTop`/`vpBottom` détectés sont des fonctions exactes des quatre
+  scalaires `ceilYL`/`ceilYR`/`floorYL`/`floorYR` : ces quatre
+  distances ne mesurent donc rien de plus que ce que mesurent déjà
+  `d_ceilL`/`d_ceilR`/`d_floorL`/`d_floorR` — une redondance
+  algébrique, pas une mesure indépendante de la pose de caméra.
 
   **Repli plafond/plancher, disculpe `clampTilt`** : `if (cls.ceiling
   != null) { ... } else { ceilY = wH * 0.22; ceilYL = ceilY; ceilYR =
@@ -1839,10 +1856,59 @@ et P8a) ci-dessous.
   identifié comme le signal manquant, pas le plancher — confirmé par
   `floorY` mesuré différent du repli `wH * 0.78` sur ces deux mêmes
   presets alors que `ceilY` s'y trouve exactement au repli `wH *
-  0.22`. Ce plafond détecté-mais-absent est donc trois fois plus
-  large en amplitude d'erreur que le simple repli X (`xL`/`xR` fixes) :
-  il fait dériver TOUTE l'ordonnée du plafond, pas seulement sa
-  position latérale.
+  0.22`. **Correction P9e — ensemble des valeurs de `confidence`**,
+  calculé ce tour par énumération exhaustive des 16 combinaisons de
+  `(hasCeil, hasFloor, hasLeft, hasRight)` : neuf valeurs distinctes
+  `{0,20 ; 0,35 ; 0,45 ; 0,50 ; 0,60 ; 0,70 ; 0,75 ; 0,85 ; 1,00}`,
+  minimum `0,20` (les quatre indicateurs faux), et non six
+  valeurs/minimum `0,35` comme énoncé par erreur dans un message de ce
+  même tour avant vérification outillée. `_minConfidence = 0.22`
+  (`edge_detect.dart:37`) est strictement encadré par `0,20 < 0,22 <
+  0,35` : la ligne 577 (`if (confidence < _minConfidence) return
+  null;`) rejette donc EXACTEMENT le cas où les quatre indicateurs sont
+  faux, et rien d'autre. La valeur `0,75` n'admet qu'une seule
+  décomposition parmi les 16, `0,35 + 0,40` (un seul de
+  `hasCeil`/`hasFloor` faux, les deux diagonales présentes) — confirmé
+  par énumération ce tour.
+
+  **`confidence` compte des lignes classées, pas des lignes justes** :
+  sur haussmann, `conf=1,0000` (les quatre indicateurs vrais, mesuré ce
+  tour dans le log) alors que le plafond détecté porte `ceilL
+  det_yPct=0,567665` contre `ref_yPct=0,090000` (`dy=465,7231`) et
+  `ceilR det_yPct=0,492216` contre `ref_yPct=0,085000`
+  (`dy=397,0352`) — un plafond franchement mal placé obtient le score
+  maximal, parce que la formule ne compte que la présence d'une ligne
+  classifiée par famille, jamais l'écart à une référence. Aucune garde
+  ne peut donc être posée sur `edgeDetectConfidence` seul.
+
+  **Plafond détecté contre repli, comparaison réelle (remplace la
+  phrase du « facteur 3 », retirée faute de source)** : sur les deux
+  presets à plafond RÉELLEMENT détecté (`hasCeil = true`), l'erreur
+  moyenne absolue de plafond (Bloc 2 de ce tour) vaut `431,3791`
+  (haussmann) et `238,2656` (provencal) ; sur les deux presets au
+  repli `wH * 0.22` (`hasCeil = false`), elle vaut `121,8750`
+  (moderne) et `141,3750` (scandinave) — sur ces quatre scènes, le
+  repli fait strictement mieux que la détection. moderne contredit
+  directement l'ancienne affirmation d'un facteur 3 : son erreur de
+  plafond (`121,8750`) y est plus petite, non plus grande, que son
+  erreur de plancher (`224,2500`, Bloc 2 de ce tour).
+
+  **Plancher détecté 4/4, plafond 2/4, moyennes absolues** (ce tour,
+  distinctes du `FAM moy_dy` signé ci-dessous) : `floorL ≠ floorR` sur
+  les 4 presets (`0,850299≠0,760479` haussmann ; `0,936667≠0,963333`
+  moderne ; `0,847500≠0,877500` provencal ; `0,791176≠0,826471`
+  scandinave), donc `hasFloor = true` partout, alors que `hasCeil`
+  n'est vrai que sur 2/4 (haussmann, provencal). `moy_abs_dy` par
+  famille : plancher `58,1205` (haussmann) / `224,2500` (moderne) /
+  `31,6875` (provencal) / `17,2059` (scandinave) ; plafond `431,3791`
+  (haussmann) / `121,8750` (moderne) / `238,2656` (provencal) /
+  `141,3750` (scandinave). Le plancher bat le plafond sur 3/4 presets ;
+  moderne est la seule exception (`224,2500 > 121,8750`).
+  **Hypothèse non mesurée** : sur moderne, le détecteur de Hough
+  aurait capté un bord de cadre photo comme ligne de plancher plutôt
+  que la ligne plancher/mur réelle — hypothèse non appuyée par une
+  mesure de ce tour, actée comme piste à instrumenter, pas comme fait
+  établi.
 
   **`sum_abs_dx`/`dominante` non informatives** : `xL`/`xR` étant des
   constantes (`edge_detect.dart:507-508`), `sum_abs_dx` mesuré ce tour
@@ -1867,17 +1933,18 @@ et P8a) ci-dessous.
   sur les 4 presets, `delta_dy` de l'ordre de `10⁻⁴` (`+0,0001` /
   `0,0000` / `-0,0001` / `-0,0000`) — cohérent avec un résidu d'arrondi
   d'affichage à 4 décimales, pas avec une erreur de calcul du harnais
-  committé. Le comptage `grep -c` du couple clé/valeur portant la
-  valeur non numérique du point de fuite haut donne `0` occurrence
-  dans ce même fichier (re-vérifié ce tour) : une conclusion contraire
-  énoncée dans un rapport de conversation d'un tour antérieur ne
-  correspond à aucune ligne du dépôt — la contamination est restée
-  confinée à ce rapport, aucun fichier versionné n'en porte trace.
+  committé. `[REFUTE] "d_vpTop=null"` : comptage `grep -c` de ce même
+  motif, donne `0` occurrence dans ce même fichier (re-vérifié ce
+  tour) : une conclusion contraire énoncée dans un rapport de
+  conversation d'un tour antérieur ne correspond à aucune ligne du
+  dépôt — la contamination est restée confinée à ce rapport, aucun
+  fichier versionné n'en porte trace.
 
   **Trois écarts entre prédiction et mesure, et deux éléments retirés
   faute de source, actés tels quels** : (1) le compte de lignes
-  `[p9b]` mesuré ce tour est `40`, différent de la valeur plus petite
-  anticipée avant lecture ; (2) le comptage de la valeur non numérique
+  `[p9b]` mesuré ce tour est `40`, différent de `[REFUTE] "24
+  lignes"` — la valeur anticipée avant lecture, jamais confirmée par
+  aucun fichier du dépôt ; (2) le comptage de la valeur non numérique
   du point de fuite haut évoqué au point précédent contredit une
   conclusion différente tirée dans un rapport antérieur ; (3)
   l'hypothèse d'un site de construction des `wall*` distinct de
