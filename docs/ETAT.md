@@ -1345,18 +1345,18 @@ et P8a) ci-dessous.
   `CalibCanvasPoints.fromCalib` → `lineIntersect`) que celui utilisé
   pour produire ces valeurs. Ce qui est établi est la reproductibilité
   du calcul à travers les commits, PAS une confirmation indépendante.
-  Les huit écarts se retrouvent à la décimale depuis les valeurs de
-  `9eaac52` (par exemple 464,34375 − 54,4375 = 409,90625).
+  Huit écarts recomputés depuis les valeurs de `9eaac52` (par exemple
+  464,34375 − 54,4375 = 409,90625) ; aucun confronté au log de sonde
+  (`docs/logs/point8a_encadrement.txt`) — cette confrontation reste
+  une dette.
 
   Polarité, modalité exacte relue au SHA `9eaac52` (deux passages, PAS
-  fusionnés) : le premier, sous « Hypothèse NON VÉRIFIÉE, à ne pas
-  confondre avec le fait ci-dessus », porte l'apposition « (le défaut
-  identifié pour le Point 8, voir plus bas) » — la réserve modale du
-  paragraphe porte sur « déclencherait cette garde », pas sur cette
-  apposition elle-même, mais le paragraphe qui la contient reste titré
-  « Hypothèse NON VÉRIFIÉE » et cette réserve n'est pas retirée ici. Le
-  second, en constat sans réserve : « L'encadrement de `wallCenterY`
-  par `vpTop`/`vpBottom`, à la calibration de PRODUCTION (δ=0, sans
+  fusionnés), citations verbatim avec leur position, sans trancher
+  entre elles : le premier, ligne 424, sous le titre « Hypothèse NON
+  VÉRIFIÉE » (ligne 419) : « `wallCenterY` EST encadré par
+  `vpTop.y`/`vpBottom.y` sur les 4 presets ». Le second, ligne 491, en
+  constat gras : « L'encadrement de `wallCenterY` par
+  `vpTop`/`vpBottom`, à la calibration de PRODUCTION (δ=0, sans
   balayage), sur les 4 presets, reste le seul défaut identifié à ce
   jour qui affecte réellement ce que l'application affiche ». Les deux
   passages sont du même SHA `9eaac52` ; aucun ne prime sur l'autre ici,
@@ -1364,8 +1364,8 @@ et P8a) ci-dessous.
   ci-dessus se lit à la lumière de ces deux modalités, pas d'une
   formule fusionnée.
 
-  Plage recomputée ce tour depuis les valeurs de `9eaac52` (Bloc 1/2
-  du tour où cette phrase a été écrite) : les huit écarts (quatre bas,
+  Plage recomputée ce tour depuis les valeurs de `9eaac52` (commit
+  `9cd1471`) : les huit écarts (quatre bas,
   quatre hauts) vont de 226,6875 à 409,90625 px.
 
   Occurrence connue laissée verbatim, en échec au test ci-dessous : la
@@ -1383,18 +1383,41 @@ et P8a) ci-dessous.
   constat (la fin du bloc étant la première ligne de niveau supérieur
   suivante, ici `- **P9**`), d'une phrase portant la polarité.
 
-  Observable de production (chemins balayés sous `lib/` : `room_painter.dart`
-  → `cornice_plinth_painter.dart` → `moulure_painter.dart`) : sous
-  `_drawCorniceStrip`/`_drawPlinthStrip` (`cornice_plinth_painter.dart`),
-  la face plafond des corniches/plinthes (points `pA`/`pB`, tracés par
-  `canvas.drawPath` à la ligne 443 et son homologue plinthe) dépend de
-  `vp.x`/`vp.y` via `_safeToward` → `VanishingPoint.toward`, c'est-à-dire
-  de `vpTop.dx`/`vpTop.dy`. Sous `paintHorizontalBandSet`/
-  `drawMoulureBand` (`moulure_painter.dart`, familles Moulures/Profils
-  LED), la grandeur dessinée (`mL`/`mR`) dépend des coins sources
-  `vp.fTL`/`vp.fBL` stockés dans l'instance, pas de la position
-  calculée `vp.x`/`vp.y` — ce second chemin ne fait pas transiter
-  `vpTop`/`vpBottom` jusqu'au pixel.
+  Position mesurée ce tour (`vanishing_point.dart:249-256`) : dans le
+  cas des 4 presets (`vpTop != null && vpBottom != null`), la position
+  retenue par `VanishingPoint.compute` est construite `x: vpTop.dx,
+  y: vpTop.dy` (lignes 254-256) — convention documentée comme
+  arbitraire, le résidu `dist(vpTop, vpBottom)` étant toujours
+  conservé à part dans `residualPx`, jamais fusionné à la position.
+  L'identité `vp.x = vpTop.dx` / `vp.y = vpTop.dy`, utilisée dans le
+  paragraphe suivant, est donc mesurée ce tour, pas seulement
+  supposée.
+
+  Chaîne corniche/plinthe restreinte au mesuré
+  (`cornice_plinth_painter.dart`) : `_drawCorniceStrip` trace une face
+  PLAFOND (points `pA`/`pB` = `_safeToward(vp, topA/topB, depthPx)`,
+  dépendant de `vp.x`/`vp.y` = `vpTop.dx`/`vpTop.dy`) → `canvas.drawPath`
+  ligne 443. `_drawPlinthStrip` trace une face SOL (points `sA`/`sB` =
+  `_safeToward(vp, botA/botB, depthPx)`, même dépendance) →
+  `canvas.drawPath` ligne 487 — pas une « face plafond des plinthes » :
+  la plinthe est au sol, sa face convergente vers le VP est le sol, pas
+  le plafond ; la mention précédente en était une, corrigée ici. Les
+  deux fonctions appellent aussi `drawProfileFace`
+  (`lib/core/perspective/profile_strip.dart:62`, lignes 424/469) pour
+  la face MUR (`topA`/`topB`/`botA`/`botB`, sans `vp` en paramètre) —
+  atteint bien un `draw*` (`canvas.drawPath` lignes 83/146, ou
+  `canvas.drawVertices` ligne 213 en chemin texture), mais ne dépend
+  PAS de `vp` : cette face mur reste hors du périmètre mesuré ici.
+
+  Sous `paintHorizontalBandSet`/`drawMoulureBand` (`moulure_painter.dart`,
+  familles Moulures/Profils LED), la grandeur dessinée (`mL`/`mR`)
+  dépend des coins sources `vp.fTL`/`vp.fBL` stockés dans l'instance,
+  pas de la position calculée `vp.x`/`vp.y` — ce chemin ne fait pas
+  transiter `vpTop`/`vpBottom` jusqu'au pixel.
+
+  `other_families_painter.dart` (`paintLambris`, `paintParements`,
+  `paintColonne`) : reçoit `vp` en paramètre — chaîne non balayée ce
+  tour, dette explicite.
 
   `wallCentroid` (`lib/core/geometry/calib_to_camera.dart:201`) :
   `final wallCentroid = (ceilL3D + ceilR3D + floorL3D + floorR3D) / 4.0;`
