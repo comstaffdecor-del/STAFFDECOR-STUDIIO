@@ -1325,6 +1325,19 @@ et P8a) ci-dessous.
   remplacer. Le travail sur P8a ne constitue pas de l'avancement sur
   le périmètre de P8 : une relecture future ne doit pas le compter
   comme un acompte sur P8.
+
+  Constat brut (sonde jetable, `test/core/perspective/`, détruite après
+  usage, log complet en `docs/logs/point8a_encadrement.txt`) : sur les 4
+  presets, à δ=0 (calibration de production, sans balayage),
+  `vpTop.y < vpBottom.y` sur les 4 (haussmann, moderne, provencal,
+  scandinave). Écarts signés (`wallCenterY − vpTop.y` /
+  `vpBottom.y − wallCenterY`) : haussmann 4,099063×10² / 2,864063×10² ;
+  moderne 3,436875×10² / 2,266875×10² ; provencal 3,594035×10² /
+  2,473816×10² ; scandinave 3,232833×10² / 2,280833×10². Seuil
+  `s = 1,0 px` retenu avant toute sortie : aucun écart sous ce seuil.
+  Les 4 presets classent **encadré** (aucun cas frontière, aucun cas non
+  encadré). Aucune cause ni correctif ni recommandation n'accompagne ce
+  constat.
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
