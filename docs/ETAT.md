@@ -1997,6 +1997,144 @@ et P8a) ci-dessous.
   quasi minimale, pas seulement sous seuil). Troisième levier
   possible, après les deux ci-dessus, non testé ce tour.
 
+  **P9j — Bloc 1, pattern grep initial fautif, corrigé** : le motif
+  `grep -o "preset=[a-z]* pt=floor[LR] det_yPct=[0-9.]*"` donne un
+  résultat vide (exit `1`) sur `docs/logs/p9b_edge_decomp.txt`, un
+  champ `det_xPct=...` intercalé entre `pt=` et `det_yPct=` n'étant
+  pas prévu par le motif. Corrigé en
+  `pt=floor[LR] det_xPct=[0-9.]* det_yPct=[0-9.]*`, huit lignes
+  obtenues. Verdict : moderne seul au-dessus de `0,93`
+  (`floorL=0,936667`, `floorR=0,963333`), le plus proche concurrent
+  (provencal, `floorR=0,877500`) restant nettement sous ce seuil —
+  condition de poursuite du brief remplie, passage au Bloc 2.
+
+  **P9j — Bloc 2, borne haute `h * 0.90` sur `floorLines`
+  (`edge_detect.dart:388`), UNE ligne modifiée, PAS commitée** :
+  `git diff` confirmé à une ligne unique, `ceilLines` (ligne 385,
+  `h * 0.35`)/`hmid`/`marginFrac` non touchés. **Prédiction écrite
+  avant mesure — FALSIFIÉE** : la prédiction annonçait un repli
+  complet de moderne sur `wH * 0.78` (`floor moy=58,5000` exactement,
+  `conf 0,75 → 0,50`). Mesure réelle : `floor moy=121,3333` (pas
+  `58,5000`, pas `< 100`). Les trois autres planchers et les quatre
+  plafonds restent inchangés au chiffre près
+  (`58,1205`/`31,6875`/`17,2059` floor ;
+  `129,1875`/`121,8750`/`78,0000`/`141,3750` ceil). **Trois des cinq
+  critères de commit sur cinq sont réunis, un seul manque
+  (`moderne floor < 100`) → `git checkout -- lib/` puis
+  `docs/logs/p9b_edge_decomp.txt` restaurés, aucun commit de code**,
+  conformément à la règle « tout critère manquant, pas de commit ».
+
+  **Arithmétique de la falsification, `kCanvasH=975` reconfirmé une
+  troisième fois** : les nouvelles valeurs de moderne après l'ajout de
+  la borne sont `floorL det_yPct=0,751111` (référence `0,720000`,
+  `0,031111 × 975 = 30,33`px) et `floorR det_yPct=0,937778`
+  (référence `0,720000`, `0,217778 × 975 = 212,33`px). Moyenne
+  `(30,33 + 212,33) / 2 = 121,33`, conforme au chiffre près à la
+  mesure `121,3333`.
+
+  **Trouvaille structurelle — le filtre de position et la métrique
+  d'erreur ne vivent pas au même endroit** : la borne `h * 0.90`
+  teste `(l.y1 + l.y2) / 2`, le MILIEU du segment, alors que le log
+  `p9b` évalue `det_yPct` aux abscisses fixes `xL=0,2` et `xR=0,8`
+  (`edge_detect.dart:507-508`), soit `x=48` et `x=192` sur
+  `wW=240`. Or 9g a établi que le segment Hough est TOUJOURS découpé
+  aux deux bords de l'image entière (`_rhoThetaToSegment`, droite
+  analytique, pas un support borné). Pour la ligne retenue chez
+  moderne : pente
+  `(0,937778 − 0,751111) / (0,8 − 0,2) = 0,311111`, d'où
+  `y(x=0) = 0,688889` et `y(x=240) = 1,000000` (recalculé,
+  algébriquement exact), milieu `= (0,688889 + 1,000000) / 2 =
+  0,844444`, strictement sous `0,90` : une ligne fortement inclinée
+  franchit n'importe quelle borne posée sur le milieu tout en ayant
+  une extrémité (`floorR`, ici `212,33`px d'écart) très éloignée de
+  la vérité mesurée aux points fixes du harnais.
+
+  **Corollaire 1** : `y(x=240) = 1,000000` EXACTEMENT — la ligne
+  retenue sort au coin inférieur droit de l'image de travail. À
+  surveiller au regard des artefacts de bord déjà repérés en 9g-ter
+  (`y=1`/`y=165`, uniformité colonne `99,6-100 %`) ; non exploité,
+  non corrigé ce tour.
+
+  **Corollaire 2, affine 9g-bis** : `floorLines` contenait déjà AU
+  MOINS DEUX candidats chez moderne avant même l'ajout de cette
+  borne — `.last` se contentait de préférer le plus bas des deux
+  (`0,963333` avant, contre `0,937778`+`0,751111` après élimination
+  du premier). 9g-bis n'avait établi le cas « un seul candidat
+  restant après filtre » que pour le PLAFOND (haussmann, provencal) ;
+  cette généralisation au plancher de moderne n'était pas mesurée et
+  se révèle fausse pour ce preset.
+
+  **Asymétrie, le défaut change de nature** : l'erreur de moderne
+  passe de `224,2500` (quasi symétrique par construction du point
+  précédent, un seul mauvais candidat aux deux abscisses) à un couple
+  franchement asymétrique `30,33`px (gauche) / `212,33`px (droite).
+  Le défaut dominant n'est plus un problème de POSITION global de la
+  ligne mais d'INCLINAISON : une ligne à peu près juste à `x=48`
+  dérive fortement vers `x=192`.
+
+  **Piste candidate testée par le calcul seul, tuée avant tout test**
+  — une borne d'inclinaison `((l.y2 - l.y1) / h).abs() < seuil`
+  paraît naturelle après le corollaire précédent. Écarts
+  `floorR − floorL` recalculés sur les cinq candidats connus (log
+  committé `fd04e9a` pour les quatre premiers, mesure de ce Bloc pour
+  le cinquième) :
+  `moderne(ancien) = +0,026666`, `provencal = +0,030000`,
+  `scandinave = +0,035295`, `haussmann = -0,089820`,
+  `moderne(nouveau) = +0,186667`. L'ANCIEN candidat de moderne — celui
+  qui coûtait `224,2500`px avant ce tour — est le DEUXIÈME MOINS
+  INCLINÉ des cinq, loin derrière haussmann en valeur absolue. Une
+  borne d'inclinaison seule ne l'aurait donc JAMAIS rejeté : elle n'a
+  de sens que combinée à la borne de position de ce Bloc (paramètre
+  additionnel, deux seuils simultanés), acceptable ici uniquement
+  parce que l'état intermédiaire est mesuré et documenté ligne par
+  ligne ci-dessus.
+
+  **Prédiction écrite d'avance pour un éventuel prochain tour** (non
+  exécutée ce tour, notée pour mémoire) : `floorLines` avec les deux
+  bornes de position PLUS
+  `&& ((l.y2 - l.y1) / h).abs() < 0.12` → moderne perd ses deux
+  candidats, replie sur `wH * 0.78` (référence `0,72`), soit
+  `58,5000` EXACTEMENT ; `conf` moderne `0,75 → 0,50` ; les trois
+  autres planchers et les quatre plafonds inchangés. Haussmann
+  (`0,0898`) est le seul candidat proche de `0,12` et doit être
+  surveillé en premier si ce tour est un jour exécuté.
+
+  **Réserve à écrire avant tout nouveau seuil** : ce serait le
+  TROISIÈME seuil calibré sur les quatre mêmes photos de démo, après
+  `h * 0.35` (9h) et `h * 0.90` (ce Bloc), et le troisième gain
+  obtenu par abstention plutôt que par détection. Passé ce point, la
+  conclusion honnête n'est plus « le détecteur s'améliore » mais
+  « sur ce pipeline (Sobel `_workW=240` + Hough tel que configuré),
+  il ne produit aucune détection exploitable sur ces quatre scènes,
+  et les constantes de repli (`wH * 0.22`, `wH * 0.78`) SONT le
+  livrable » — défendable et mesuré, préférable à un quatrième seuil
+  ajouté sans changer cette conclusion de fond.
+
+  **Formulation dure de l'effet réel de P9h** (question fermée ce
+  tour) : `cls.ceiling = null` sur moderne et scandinave AVANT MÊME
+  P9h (9g-bis, ci-dessus — aucun candidat n'existait sous l'ancien
+  seuil `hmid * 1.1` sur ces deux presets) ; P9h n'a donc pu
+  NEUTRALISER qu'haussmann et provencal, les deux seuls presets où un
+  faux candidat de plafond existait et était classé. Sur l'ensemble
+  des quatre scènes de démo, le détecteur de plafond n'a JAMAIS
+  produit une détection correcte — il a produit du bruit exploité à
+  tort sur deux scènes (corrigé par abstention en 9h) et rien du tout
+  sur les deux autres (repli constant depuis le début). Corollaire
+  mesuré ce tour sur le log actuellement committé (`fd04e9a`,
+  `grep conf= docs/logs/p9b_edge_decomp.txt`) : `conf = 0,7500` sur
+  LES QUATRE presets après P9h, sans aucune exception — la confidence
+  est devenue une CONSTANTE non discriminante sur ce jeu de données,
+  fermant définitivement la question ouverte depuis P9e/P9f
+  (« `confidence` compte des lignes classées, pas des lignes
+  justes ») : elle ne distingue même plus les quatre scènes entre
+  elles.
+
+  **Levier prioritaire pour un prochain tour, noté sans agir** :
+  `_workW: 240 → 480` reste le seul changement susceptible de
+  produire une VRAIE détection plutôt qu'une nouvelle abstention —
+  passe devant tout brief `9k` de bornage supplémentaire s'il ne
+  reste qu'un seul tour disponible.
+
   **Plancher détecté 4/4, plafond 2/4, moyennes absolues** (ce tour,
   distinctes du `FAM moy_dy` signé ci-dessous) : `floorL ≠ floorR` sur
   les 4 presets (`0,850299≠0,760479` haussmann ; `0,936667≠0,963333`
