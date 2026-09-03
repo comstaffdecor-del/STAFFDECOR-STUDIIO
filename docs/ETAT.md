@@ -1634,6 +1634,77 @@ et P8a) ci-dessous.
   documenté mais jamais câblé, cohérent avec le compte d'orphelins
   ci-dessus (0 appelant sous `lib/`).
 
+- **P9a** — harnais de mesure de `detectRoomEdges`, écart aux presets sur
+  les 4 scènes démo. Fichier permanent (pas un `_tmp_`) :
+  `test/core/perspective/p9a_edge_detect_baseline_test.dart`. Aucun
+  `expect` qui échoue — instrument de mesure, aucun changement sous
+  `lib/`.
+
+  **Espace de coordonnées et formule de conversion**, établis ce tour
+  (Blocs 1-3) : `detectRoomEdges` retourne un `EdgeDetectResult{calib:
+  PerspCalib, confidence: double}` (`edge_detect.dart:41-49`) ; les
+  points de `calib` sont construits par `norm(x,y) =>
+  CalibPoint(xPct: clamp01(x/wW), yPct: clamp01(y/wH))`
+  (`edge_detect.dart:579-580`), donc en fraction 0-1 de l'image
+  source — exactement l'espace des presets démo (`persp_calib.dart`,
+  docstring ligne 78-79 : « en pourcentage, xPct/yPct de l'image
+  source »). Formule retenue, reproduite depuis
+  `CalibCanvasPoints.fromCalib` (`calib_canvas.dart:38-46`), branche
+  `imgDraw == null`, jamais inventée pour ce harnais : `Offset(p.xPct
+  * w, p.yPct * h)`, appliquée aux deux calibrations avec `w=kCanvasW
+  =1400.0`, `h=kCanvasH=975.0` (convention déjà utilisée dans
+  `vp_frac_degenere_test.dart`/`vp_fallback_mode_test.dart`). Site de
+  réconciliation (`app_state.dart:150-200`, `autoDetectEdges`) : le
+  résultat `geo.calib` y est affecté directement à `perspCalib` sans
+  transformation supplémentaire quand le drapeau est levé — confirme
+  que `PerspCalib` est bien l'unité de comparaison commune, sans
+  conversion intermédiaire à ajouter.
+
+  **Vérité terrain conventionnelle, pas mesurée indépendamment** : les
+  8 points de chaque preset (`persp_calib.dart:78-92`) ont été calés à
+  la main par analyse pixel des photos (`assets/demo_scenes/*.jpg`) —
+  la comparaison ci-dessous mesure un écart à cette convention, pas à
+  une référence extérieure indépendante.
+
+  **Les quatre lignes `[p9a]`**, verbatim
+  (`docs/logs/p9a_edge_detect_baseline.txt`, `flutter test
+  test/core/perspective/p9a_edge_detect_baseline_test.dart --reporter
+  expanded`, `+1: All tests passed!`, 1 seule tentative de
+  compilation) :
+  ```
+  [p9a] preset=haussmann conf=1.0000 d_ceilL=479.0010 d_ceilR=412.5299 d_floorL=113.6352 d_floorR=148.1870 d_max=479.0010
+  [p9a] preset=moderne conf=0.7500 d_ceilL=185.6166 d_ceilR=185.6166 d_floorL=253.4296 d_floorR=275.4770 d_max=275.4770
+  [p9a] preset=provencal conf=1.0000 d_ceilL=196.3834 d_ceilR=366.5977 d_floorL=141.0359 d_floorR=147.4613 d_max=366.5977
+  [p9a] preset=scandinave conf=0.7500 d_ceilL=198.9645 d_ceilR=198.9645 d_floorL=141.1978 d_floorR=140.9180 d_max=198.9645
+  ```
+  Aucune scène introuvable, aucun `detectRoomEdges` renvoyant `null`
+  sur ces 4 photos — les 4 lignes portent des valeurs numériques, pas
+  `null`.
+
+  **Seuil candidat, PROPOSÉ, pas décidé** : `d_max` mesuré va de
+  `198.9645` (scandinave) à `479.0010` (haussmann) — aucune valeur
+  sous 200px, aucun regroupement net « petit écart / grand écart » qui
+  isolerait une seule scène (les 4 `d_max` sont du même ordre de
+  grandeur, 198.96 à 479.00, pas un cas isolé à 10× les trois autres).
+  Un seuil candidat à `d_max < 50 px` (repris de l'ordre de grandeur
+  du seuil `s=1,0 px` de P8a, mais élargi d'un facteur 50 pour tenir
+  compte du fait que ceci mesure un écart de PIXELS entre deux
+  calibrations indépendantes, pas un encadrement d'ordonnée sur la
+  même calibration) ne serait franchi par AUCUNE des 4 scènes en
+  l'état — la décision du seuil, comme celle de lever
+  `autoApplyDetection`, reste à l'utilisateur.
+
+  **Statut de production de la détection** : `detectRoomEdges`
+  s'exécute déjà en production, à chaque chargement de photo (import
+  ou scène démo), via `AppState.autoDetectEdges()`
+  (`app_state.dart:161-200`) — seule l'APPLICATION du résultat à
+  `perspCalib` est court-circuitée par `const autoApplyDetection =
+  false;` (`app_state.dart:181`), motif documenté dans le commentaire
+  qui la précède (`app_state.dart:177-179`) : « TODO: repasser
+  `_autoApplyDetection` à true une fois le bug du rendu en "X"
+  définitivement corrigé et vérifié sur les 4 scènes démo + import
+  utilisateur. »
+
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
