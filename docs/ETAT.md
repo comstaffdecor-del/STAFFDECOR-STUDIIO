@@ -1258,38 +1258,54 @@ ci-dessous.
   hypothèse). Voie B (erreur explicite, comportement observé rapporté).
   Rapport mesurable 4 presets × 2 modes + scène synthétique, sans
   arbitrer.
-- **P8** — bloqué, accord explicite requis. Consignation des deux
-  énoncés versionnés trouvés en archéologie (aucune hiérarchie entre
-  eux) :
-  - `efa73e3` : « Focale depuis fuyantes latérales, normale au mur via
-    homographie, câblage `RoomPainter → buildCalibratedScene →
-    sweepMoulure → paintMeshOnCanvas`, abandon du chemin 2D pour
-    Corniches/Plinthes/Moulures/Profils LED uniquement (erreur
-    explicite pour les autres familles). »
-  - `9eaac52` : « L'encadrement de `wallCenterY` par
-    `vpTop`/`vpBottom`, à la calibration de PRODUCTION (δ=0, sans
-    balayage), sur les 4 presets, reste le seul défaut identifié à ce
-    jour qui affecte réellement ce que l'application affiche. »
-  - Chaîne de reformulation du premier énoncé (mesurée, `git log --all
-    -S"Focale fuyantes" -- docs/`) : introduit par `fd2b335`, retiré
-    par `3d3c9b1` (aucun maillon intermédiaire) ; le message de
-    `3d3c9b1` ne mentionne ni « Point 8 » ni « P8 » — retrait non
-    annoncé.
-  - Asymétrie (comparaison par blocs entiers avant/après `3d3c9b1`) :
-    P8 est le seul point de la liste réduit à un statut nu ; les
-    autres points de la liste voisins de ce retrait sont compressés
-    sans perte de substance.
-  - Câblage nommé par l'énoncé `efa73e3` : `grep` direct sur
-    `lib/core/perspective/room_painter.dart` ne mentionne aucun des
-    symboles `buildCalibratedScene`/`sweepMoulure`/`paintMeshOnCanvas`
-    (sortie vide) ; un balayage large de `lib/` montre que ces trois
-    symboles existent bien, mais répartis dans
-    `mesh_painter.dart`/`sweep.dart`/`calib_to_camera.dart` — jamais
-    dans `room_painter.dart`. Ceci ne dit rien sur l'état du câblage
-    lui-même (les maillons ne font pas la chaîne).
-  - Question ouverte : lequel de ces deux périmètres est le Point 8,
-    ou faut-il les scinder en deux points, le second étant
-    éventuellement un sous-cas du premier ?
+- **P8** — périmètre arbitré : « Focale depuis fuyantes latérales,
+  normale au mur via homographie, câblage `RoomPainter →
+  buildCalibratedScene → sweepMoulure → paintMeshOnCanvas`, abandon du
+  chemin 2D pour Corniches/Plinthes/Moulures/Profils LED uniquement
+  (erreur explicite pour les autres familles) » (`efa73e3`).
+  - Chaîne à trois maillons (mesurée, `git log --all -G"homographie"
+    -- docs/` — `-S"Focale fuyantes"` ne compte que les occurrences du
+    fragment exact et ne verrait pas une reformulation qui le
+    remplace sans changer le total ; la sonde `-G` couvre ce cas) :
+    énoncé `efa73e3` → reformulation condensée par `fd2b335` (`grep -n
+    "Focale\|homographie"` sur ce commit montre le couple attendu,
+    une ligne `-` portant le texte long et une ligne `+` portant le
+    condensé) → retrait par `3d3c9b1`, dont le message ne mentionne ni
+    « Point 8 » ni « P8 ». La prédiction d'un maillon supplémentaire
+    éventuel a été testée par deux sondes : `-G"[Ff]ocale"` remonte 14
+    SHA (contre 3 attendus), mais les 11 SHA surnuméraires portent sur
+    la focale de caméra (`estimateFocalFromBackWallRectangle`,
+    `FocaleOrigine.defaut`), un sujet distinct ; `-G"homographie"`
+    remonte exactement les 3 maillons de la chaîne plus `91050e6`
+    (la consignation elle-même). Les deux sondes convergent sur le
+    même sous-ensemble de 3 — c'est cette convergence, pas une
+    relecture de contexte, qui écarte les 11 SHA de la focale caméra.
+    Comparaison par blocs entiers avant/après `3d3c9b1` : P8 est le
+    seul point de la liste réduit à un statut nu (4 lignes → 1) ; les
+    points voisins (P7, P9, P10, P11) sont compressés ou enrichis sans
+    perte de substance — asymétrie confirmée, retrait non annoncé.
+  - Câblage, dans les limites mesurées : les trois symboles nommés par
+    l'énoncé `efa73e3` sont déclarés dans `mesh_painter.dart`,
+    `sweep.dart` et `calib_to_camera.dart` ; aucun site d'appel sous
+    `lib/` ; des appels existent sous `test/` (fichiers de rendu et de
+    diagnostic). Le pipeline n'est donc atteint par aucun chemin sous
+    `lib/`.
+- **P8a** — sous-cas de P8, traité en premier. L'énoncé de `9eaac52`,
+  dans le rapport 7a (« ce rapport » n'a pas de référent autonome dans
+  cette liste de points restants — précision ajoutée ici ; retours à
+  la ligne de la source reflués) : « L'encadrement de `wallCenterY`
+  par `vpTop`/`vpBottom`, à la calibration de PRODUCTION (δ=0, sans
+  balayage), sur les 4 presets, reste le seul défaut identifié à ce
+  jour qui affecte réellement ce que l'application affiche — tout le
+  reste de ce rapport (bascule de branche à δ_deg, discontinuité,
+  régimes) concerne un point de calibration synthétique
+  (δ_deg=−0,01) jamais atteint par la calibration réelle des 4
+  presets. » Retenu comme sous-cas traité d'abord au motif mesuré
+  qu'il est le seul défaut affectant réellement l'affichage, et qu'il
+  siège dans le chemin que le périmètre P8 (`efa73e3`) propose de
+  remplacer. Le travail sur P8a ne constitue pas de l'avancement sur
+  le périmètre de P8 : une relecture future ne doit pas le compter
+  comme un acompte sur P8.
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
