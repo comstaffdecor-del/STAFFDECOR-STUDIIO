@@ -418,7 +418,8 @@ garde.
 
 **Hypothèse NON VÉRIFIÉE, à ne pas confondre avec le fait ci-dessus** :
 que l'encadrement de `wallCenterY` par `vpTop`/`vpBottom` (le défaut
-identifié pour le Point 8, voir plus bas) déclencherait cette garde.
+identifié pour le Point 8, voir plus bas — P8a, pas P8) déclencherait
+cette garde.
 Vérifié par calcul sur les 4 presets à δ=0 (calibration de production,
 sans balayage) : `wallCenterY` EST encadré par `vpTop.y`/`vpBottom.y`
 sur les 4 presets (haussmann 54,4375 ≤ 464,34375 ≤ 750,75 ; moderne
@@ -481,6 +482,11 @@ commit `ec36eb0` — l'hypothèse initiale erronée n'a jamais été
 committée.
 
 ### Une ligne pour le Point 8, à ne pas laisser enterrer par le Point 7
+
+Ce périmètre est enregistré comme P8a depuis `78c79aa` (voir « Points
+restants »). Le corps de ce rapport 7a n'est pas réécrit ci-dessous ;
+il fait foi tel que versionné, y compris sa propre mention
+« Point 8 ».
 
 **L'encadrement de `wallCenterY` par `vpTop`/`vpBottom`, à la
 calibration de PRODUCTION (δ=0, sans balayage), sur les 4 presets,
@@ -1244,8 +1250,8 @@ de `5,76×10¹⁶`, sans rapport avec 700,0. La dégradation en tautologie
 reste correcte, seule sa justification initiale l'était mal.
 
 **Point 8 : ne rien commencer sans accord explicite utilisateur.**
-Consignation des énoncés historiques : voir « Points restants » (P8)
-ci-dessous.
+Consignation des énoncés historiques : voir « Points restants » (P8
+et P8a) ci-dessous.
 
 ## Points restants (ordre imposé)
 
@@ -1284,12 +1290,25 @@ ci-dessous.
     seul point de la liste réduit à un statut nu (4 lignes → 1) ; les
     points voisins (P7, P9, P10, P11) sont compressés ou enrichis sans
     perte de substance — asymétrie confirmée, retrait non annoncé.
-  - Câblage, dans les limites mesurées : les trois symboles nommés par
-    l'énoncé `efa73e3` sont déclarés dans `mesh_painter.dart`,
-    `sweep.dart` et `calib_to_camera.dart` ; aucun site d'appel sous
-    `lib/` ; des appels existent sous `test/` (fichiers de rendu et de
-    diagnostic). Le pipeline n'est donc atteint par aucun chemin sous
-    `lib/`.
+  - Câblage, critère et mesure : compte comme appelant l'appel ou le
+    tear-off d'un des trois noms (`sweepMoulure`, `buildCalibratedScene`,
+    `paintMeshOnCanvas`) hors de son fichier déclarant ; mesuré par
+    `grep -rn` en nom nu (sans parenthèse) sur `lib/ --include="*.dart"`
+    — ce grep ferme le trou du parenthésage (tear-off, appel espacé)
+    sans rien remonter de plus que le motif littéral. Résultat : **0**
+    appelant, **0** tear-off. Sur 26 lignes remontées : 5 déclarations
+    (`void paintMeshOnCanvas(` dans `mesh_painter.dart` ; `Mesh
+    sweepMoulure({` dans `sweep.dart` ; `class CalibratedScene {`,
+    `const CalibratedScene({` et `CalibratedScene buildCalibratedScene({`
+    dans `calib_to_camera.dart`), 17 commentaires dartdoc (`///`), 3
+    littéraux de chaîne (messages d'erreur), et 1 construction interne
+    du type de retour (`return CalibratedScene(`, dans le corps de
+    `buildCalibratedScene` elle-même — la fonction construit et
+    retourne son propre type, ce qui n'est pas un appel de l'une des
+    trois fonctions du pipeline depuis un fichier tiers, donc pas un
+    câblage). Des appels existent sous `test/` (fichiers de rendu et
+    de diagnostic). Le pipeline n'est donc atteint par aucun chemin
+    sous `lib/`.
 - **P8a** — sous-cas de P8, traité en premier. L'énoncé de `9eaac52`,
   dans le rapport 7a (« ce rapport » n'a pas de référent autonome dans
   cette liste de points restants — précision ajoutée ici ; retours à
