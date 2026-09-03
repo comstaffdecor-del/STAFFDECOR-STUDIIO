@@ -1456,9 +1456,27 @@ et P8a) ci-dessous.
   application ; le chemin avec profil JSON réel, `ProfileDimsCache`
   asynchrone, ne l'est pas et n'a pas été sondé), `topA=ceilL`,
   `topB=ceilR`, sur les mêmes 4 presets et la même géométrie canvas
-  (`kCanvasW=1400.0`, `kCanvasH=975.0`) que P8a — `wallCenterY`
-  recomputés ce tour identiques à ceux du log P8a, confirmant la
-  géométrie commune.
+  (`kCanvasW=1400.0`, `kCanvasH=975.0`) que P8a — la sonde P8b ne
+  calcule PAS `wallCenterY` (seulement `vpTop`/`vpBottom`/`pH`/
+  `depthPx`) ; la phrase antérieure affirmant sa reproduction ici
+  était fausse par confusion de portée, voir Écriture A ci-dessous.
+
+  **Écriture A — wallCenterY, formule candidate testée et rejetée.**
+  Recomputée ce tour (script Python jetable, hors dépôt, même géométrie
+  canvas `1400×975` et mêmes 4 presets), la moyenne arithmétique des
+  quatre coins muraux (`wallTL`, `wallTR`, `wallBL`, `wallBR`) donne :
+  haussmann `4.838438e+02`, moderne `4.119375e+02`, provencal
+  `4.875000e+02`, scandinave `4.537833e+02`. Confrontée à la valeur
+  journalisée `wallCenterY` du log P8a (`grep "^\[p8a\]" ... | grep
+  wallCenterY`) : haussmann journalisé `4.643438e+02` — écart net avec
+  le `4.838438e+02` calculé (`+1,95×10¹` px, pas un résidu d'arrondi).
+  Seuls `vpTop.y` et `vpBottom.y` se reproduisent à l'identique entre
+  calcul et log ; la formule « moyenne des 4 coins muraux » ne
+  reproduit PAS `wallCenterY`. Ce qui est mesuré ici est l'échec
+  d'UNE formule candidate, pas l'identité de la formule réelle :
+  l'origine exacte de `wallCenterY` (site de calcul dans `lib/`,
+  jamais localisé à ce jour dans ce dossier) reste une dette ouverte,
+  non résolue par ce tour ni par le précédent.
 
   Prédictions (verbatim, `/tmp/p8b_predictions.txt`, écrites avant
   création de `test/p8b_sonde_tmp_1.dart`) : haussmann `depthPx=106.4700`,
@@ -1467,6 +1485,21 @@ et P8a) ci-dessous.
   `Δ_pA=Δ_pB=75.2128` ; scandinave `depthPx=81.6340`,
   `Δ_pA=Δ_pB=63.9277`. Classement prédit : les 8 valeurs ≥ seuil
   `s=1,0 px`, confirmation attendue sur les 4/4.
+
+  **Écriture B — provenance des prédictions.** `/tmp/p8b_predictions.txt`
+  a été écrit deux fois au tour précédent (une v1 avant la création de
+  la sonde Dart, puis une v2 après son exécution, sur le même chemin de
+  fichier) ; l'écrasement ne laisse sur disque qu'un seul mtime — le
+  disque seul ne peut donc plus établir laquelle des deux écritures a
+  précédé la sonde. Le fichier actuellement sur disque (mtime le plus
+  récent des deux) est la v2. L'antériorité réelle des prédictions par
+  rapport à la mesure ne repose pas sur le fichier ni sur son mtime,
+  mais sur l'ORDRE DES BLOCS affichés dans la sortie brute du tour
+  précédent : le `cat /tmp/p8b_predictions.txt` affichant les huit
+  valeurs prédites a été exécuté avant la création de
+  `test/p8b_sonde_tmp_1.dart` et avant son exécution — c'est cet ordre
+  de sortie qui établit l'antériorité, pas une propriété du fichier lui-
+  même.
 
   Mesures (sonde jetable Dart, détruite après usage, aucune trace
   dans l'index) : `[p8b] preset=haussmann depthPx=106.4700
@@ -1479,19 +1512,48 @@ et P8a) ci-dessous.
   une confirmation indépendante de la formule elle-même, seulement de
   sa cohérence entre lecture du code et exécution).
 
-  Verdict, selon le seuil `s=1,0 px` : les 8 écarts (`63,9277` à
-  `100,4359` px) sont TOUS ≥ `s`, par un facteur d'environ 64 à 100.
-  L'énoncé de `9eaac52` (« le seul défaut identifié qui affecte
-  réellement ce que l'application affiche ») est **confirmé** dans sa
-  portée visuelle sur ce chemin (`_drawCorniceStrip`, segment fond,
-  4 presets, δ=0). Aucune cause, aucun correctif, aucune
-  recommandation n'accompagne ce verdict.
+  **Écriture C — requalification du verdict.** Retrait de « confirmé
+  dans sa portée visuelle » (formulation antérieure erronée). Ce que
+  la sonde établit : les 8 écarts (`63,9277` à `100,4359` px) sont
+  TOUS ≥ `s=1,0 px` — la sensibilité de `pA`/`pB` (points de la face
+  plafond du segment fond, `_drawCorniceStrip`) à la position du VP
+  utilisée est mesurée, sur les 4 presets, à cette amplitude. Ce
+  qu'elle n'établit PAS : l'énoncé de `9eaac52` sur l'encadrement de
+  `wallCenterY` par `vpTop.y`/`vpBottom.y`, car (i) `wallCenterY`
+  n'est calculé nulle part dans la sonde P8b (voir Écriture A), et
+  (ii) la mesure porte sur un contrefactuel — `vp = vpBottom` comme
+  position substituée à `vp = vpTop` — que `VanishingPoint.compute`
+  ne produit JAMAIS en production (`compute` retient toujours `x:
+  vpTop.dx, y: vpTop.dy` quand les deux couples sont finis, lignes
+  254-256 ; `vpBottom` n'entre dans `residualPx` que comme second
+  terme d'écart, jamais comme position retenue). L'énoncé de
+  `9eaac52` n'est donc ici NI confirmé NI infirmé par cette sonde.
+  Aucune cause, aucun correctif, aucune recommandation n'accompagne
+  ce constat.
 
-  Statut P8a après ce verdict : passe de « constat classé » à
-  « mesure confirmée » sur la portée sondée (segment fond, 4 presets,
-  δ=0) ; la décision de reclassement formel du point dans la liste
-  reste hors sandbox. Ne rien commencer sur un correctif sans accord
-  explicite utilisateur.
+  **Écriture D — note sur la garde.** La sonde construit `vpTop` et
+  `vpBottom` par deux appels directs à `lineIntersect` (couple haut,
+  couple bas), puis les injecte séparément dans le constructeur
+  positionnel `VanishingPoint({required Offset vp, ...})` (ligne 144)
+  — jamais via `VanishingPoint.compute` (ligne 217). La garde qui, à
+  ce site, décide du repli en cas de couple dégénéré
+  (`VpFallbackMode`, cas `vpTop == null` ou `vpBottom == null` dans
+  `compute`) n'a donc pas été exercée par cette sonde : sur les 4
+  presets sondés, les deux couples sont finis dans tous les cas, donc
+  cette garde ne se serait probablement pas déclenchée même via
+  `compute` — mais ce n'est pas ce qui a été vérifié ici, faute
+  d'emprunter ce chemin. Aucune formulation antérieure de ce fait
+  précis n'a été trouvée en clair dans ce fichier par le grep du
+  Bloc 2 (« garde »/« dégénér » ne rend, dans cette section, aucune
+  phrase portant spécifiquement sur ce contournement) : cette note
+  est donc rédigée neuve, pas une citation remplacée.
+
+  Statut P8a après ces quatre requalifications : reste au statut
+  antérieur à ce tour (« constat classé », P8a lui-même inchangé) —
+  le passage à « mesure confirmée » écrit au tour précédent est
+  retiré avec l'Écriture C. La décision de qualification finale du
+  point reste hors sandbox. Ne rien commencer sur un correctif sans
+  accord explicite utilisateur.
 
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
