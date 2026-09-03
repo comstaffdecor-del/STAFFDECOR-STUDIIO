@@ -1243,8 +1243,9 @@ configuration symétrique mesurée (`vy=0`, `ux=1,0`,
 de `5,76×10¹⁶`, sans rapport avec 700,0. La dégradation en tautologie
 reste correcte, seule sa justification initiale l'était mal.
 
-**Point 8 : ne rien commencer sans accord explicite utilisateur —
-toujours bloqué, sans intitulé enregistré.**
+**Point 8 : ne rien commencer sans accord explicite utilisateur.**
+Consignation des énoncés historiques : voir « Points restants » (P8)
+ci-dessous.
 
 ## Points restants (ordre imposé)
 
@@ -1257,7 +1258,38 @@ toujours bloqué, sans intitulé enregistré.**
   hypothèse). Voie B (erreur explicite, comportement observé rapporté).
   Rapport mesurable 4 presets × 2 modes + scène synthétique, sans
   arbitrer.
-- **P8** — bloqué, accord explicite requis.
+- **P8** — bloqué, accord explicite requis. Consignation des deux
+  énoncés versionnés trouvés en archéologie (aucune hiérarchie entre
+  eux) :
+  - `efa73e3` : « Focale depuis fuyantes latérales, normale au mur via
+    homographie, câblage `RoomPainter → buildCalibratedScene →
+    sweepMoulure → paintMeshOnCanvas`, abandon du chemin 2D pour
+    Corniches/Plinthes/Moulures/Profils LED uniquement (erreur
+    explicite pour les autres familles). »
+  - `9eaac52` : « L'encadrement de `wallCenterY` par
+    `vpTop`/`vpBottom`, à la calibration de PRODUCTION (δ=0, sans
+    balayage), sur les 4 presets, reste le seul défaut identifié à ce
+    jour qui affecte réellement ce que l'application affiche. »
+  - Chaîne de reformulation du premier énoncé (mesurée, `git log --all
+    -S"Focale fuyantes" -- docs/`) : introduit par `fd2b335`, retiré
+    par `3d3c9b1` (aucun maillon intermédiaire) ; le message de
+    `3d3c9b1` ne mentionne ni « Point 8 » ni « P8 » — retrait non
+    annoncé.
+  - Asymétrie (comparaison par blocs entiers avant/après `3d3c9b1`) :
+    P8 est le seul point de la liste réduit à un statut nu ; les
+    autres points de la liste voisins de ce retrait sont compressés
+    sans perte de substance.
+  - Câblage nommé par l'énoncé `efa73e3` : `grep` direct sur
+    `lib/core/perspective/room_painter.dart` ne mentionne aucun des
+    symboles `buildCalibratedScene`/`sweepMoulure`/`paintMeshOnCanvas`
+    (sortie vide) ; un balayage large de `lib/` montre que ces trois
+    symboles existent bien, mais répartis dans
+    `mesh_painter.dart`/`sweep.dart`/`calib_to_camera.dart` — jamais
+    dans `room_painter.dart`. Ceci ne dit rien sur l'état du câblage
+    lui-même (les maillons ne font pas la chaîne).
+  - Question ouverte : lequel de ces deux périmètres est le Point 8,
+    ou faut-il les scinder en deux points, le second étant
+    éventuellement un sous-cas du premier ?
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
