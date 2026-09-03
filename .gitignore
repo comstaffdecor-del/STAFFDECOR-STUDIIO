@@ -50,3 +50,4 @@ app.*.map.json
 # commit explicite. A ne jamais versionner.
 /tmp_review/
 tools/dxf_pipeline/logs/
+docs/logs/*_json.txt

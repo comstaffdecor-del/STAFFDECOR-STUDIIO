@@ -1368,20 +1368,40 @@ et P8a) ci-dessous.
   du tour où cette phrase a été écrite) : les huit écarts (quatre bas,
   quatre hauts) vont de 226,6875 à 409,90625 px.
 
-  Occurrence connue laissée verbatim : la ligne portant « `wallCenterY`
-  EST encadré par `vpTop.y`/`vpBottom.y` sur les 4 presets » (corps du
-  rapport 7a, sous « Hypothèse NON VÉRIFIÉE » plus haut dans ce
-  fichier) classe des presets sans polarité dans sa propre phrase — 
-  connue comme telle, non réécrite, parce qu'elle appartient au corps
-  versionné du rapport 7a qui fait foi tel que consigné plus haut.
+  Occurrence connue laissée verbatim, en échec au test ci-dessous : la
+  ligne portant « `wallCenterY` EST encadré par `vpTop.y`/`vpBottom.y`
+  sur les 4 presets » (corps du rapport 7a, sous « Hypothèse NON
+  VÉRIFIÉE » plus haut dans ce fichier) classe des presets sans
+  polarité dans sa propre phrase — échec connu, volontairement non
+  réécrit, parce qu'elle appartient au corps versionné du rapport 7a
+  qui fait foi tel que consigné plus haut. Ce n'est pas une exemption :
+  la règle qui suit peut échouer sur ce texte, et échoue effectivement
+  sur cette ligne.
 
   Règle d'inclusion, portée explicite : toute phrase classant des
   presets par encadrement doit être suivie, avant la fin du bloc de
   constat (la fin du bloc étant la première ligne de niveau supérieur
-  suivante, ici `- **P9**`), d'une phrase portant la polarité. Ne
-  compte pas comme portée de cette règle le corps du rapport 7a
-  lui-même, versionné et non réécrit, référencé ci-dessus comme
-  occurrence connue.
+  suivante, ici `- **P9**`), d'une phrase portant la polarité.
+
+  Observable de production (chemins balayés sous `lib/` : `room_painter.dart`
+  → `cornice_plinth_painter.dart` → `moulure_painter.dart`) : sous
+  `_drawCorniceStrip`/`_drawPlinthStrip` (`cornice_plinth_painter.dart`),
+  la face plafond des corniches/plinthes (points `pA`/`pB`, tracés par
+  `canvas.drawPath` à la ligne 443 et son homologue plinthe) dépend de
+  `vp.x`/`vp.y` via `_safeToward` → `VanishingPoint.toward`, c'est-à-dire
+  de `vpTop.dx`/`vpTop.dy`. Sous `paintHorizontalBandSet`/
+  `drawMoulureBand` (`moulure_painter.dart`, familles Moulures/Profils
+  LED), la grandeur dessinée (`mL`/`mR`) dépend des coins sources
+  `vp.fTL`/`vp.fBL` stockés dans l'instance, pas de la position
+  calculée `vp.x`/`vp.y` — ce second chemin ne fait pas transiter
+  `vpTop`/`vpBottom` jusqu'au pixel.
+
+  `wallCentroid` (`lib/core/geometry/calib_to_camera.dart:201`) :
+  `final wallCentroid = (ceilL3D + ceilR3D + floorL3D + floorR3D) / 4.0;`
+  — alimente `backWallPlane` (ligne 203, via `Plane3.fromPointAndNormal`).
+  Homologue structurel de `wallCenterY` (mêmes quatre points sources,
+  division par 4.0), pas fonctionnel (grandeur en mètres 3D dans un
+  plan, pas une ordonnée en pixels comparée à `vpTop`/`vpBottom`).
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
