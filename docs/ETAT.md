@@ -2273,3 +2273,72 @@ et P8a) ci-dessous.
   couple `727,998`/`741,9966` mal attribué avant correction (Point
   7b-3-bis) — aucune généralisation de motif au-delà des cas
   effectivement sourcés n'est écrite ici sans grep dédié.
+
+## T-WEB : démo web sur port 8080 — Chrome requis, notes Playwright
+
+- **Serveur** : la démo web est servie sur le port 8080 (mode debug,
+  `flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0`,
+  ou build release + `python3 -m http.server 8080` depuis `build/web`).
+  `proxy.py` n'est PAS nécessaire pour cette conclusion — voir plus bas
+  sur les 37/350 CORS.
+- **Navigateur requis : Chromium (Chrome/Edge), pas Firefox.** Testé
+  directement dans ce sandbox avec Firefox (capture utilisateur) :
+  échec `Failed to create WebGL context ...
+  FEATURE_FAILURE_WEBGL_EXHAUSTED_DRIVERS`, `WARNING: Falling back to
+  CPU-only rendering, WebGL support not detected` — driver Firefox en
+  environnement distant, pas une limite de la machine. Testé avec
+  `google-chrome-stable --headless=new --use-gl=swiftshader
+  --no-sandbox` (binaire présent : `/usr/bin/google-chrome-stable`) :
+  WebGL s'initialise via SwiftShader (rasteriseur logiciel), CanvasKit
+  peint, écran d'accueil ET écran Catalogue (350 produits, grille de
+  cartes avec images) rendus correctement — capture + analyse d'image
+  à l'appui. Confirmé aussi via Playwright (`chromium`, mêmes flags) :
+  navigation par clic fonctionnelle, console ne montre que des
+  avertissements de performance (`GL Driver Message ... GPU stall due
+  to ReadPixels`, auto-supprimé après répétition), aucune exception.
+- **Pas de contournement HTML-renderer côté build** : le renderer
+  HTML (`--web-renderer html`) a été retiré de Flutter en 3.29 et
+  n'existe plus du tout en 3.35.4 — ni flag CLI, ni `--dart-define`,
+  ni configuration `flutter_bootstrap.js`. `flutter build web --help`
+  ne liste que `--wasm` (skwasm) comme alternative à CanvasKit, et
+  skwasm a aussi besoin de WebGL — n'aurait donc pas réparé Firefox
+  dans cet environnement. Seul le changement de navigateur répare le
+  symptôme, pas un flag de build.
+- **Faux négatif `curl -I` sur le serveur debug** : `curl -sI
+  http://localhost:8080/` (HEAD) renvoie `404 Not Found` sur le
+  serveur `shelf` du mode `flutter run -d web-server`, alors que `curl
+  -s -D - -o /dev/null http://localhost:8080/` (GET) renvoie bien
+  `200 OK`. Le serveur shelf du mode debug ne répond simplement pas à
+  HEAD — ne pas conclure à un serveur mort sur la seule foi d'un HEAD
+  en 404. (N'affecte pas le serveur `python3 -m http.server`
+  classique utilisé pour les builds release, qui répond correctement
+  à HEAD.)
+- **Coordonnées de clic Playwright : mesurer, ne jamais calculer à la
+  main.** L'app est rendue dans un mockup mobile centré à l'intérieur
+  du canvas/viewport (ex. viewport 1400×900, cadre mobile mesuré à
+  x≈485-915), PAS étirée en pleine largeur. Une première tentative de
+  clic sur la bottom-nav basée sur une hypothèse de répartition
+  uniforme sur toute la largeur du viewport (`ex. x=623` sur 1400px de
+  large) a raté la cible deux fois de suite (aucune erreur, mais aucun
+  changement d'écran observé sur la capture suivante). Le clic n'a
+  fonctionné qu'après une mesure explicite des coordonnées réelles sur
+  une capture *viewport* préalable (analyse d'image dédiée pour
+  extraire x,y du bouton visé) — toujours mesurer sur la capture
+  précédente, jamais deviner sur une hypothèse de layout.
+- **37 des 350 réfs affichées (`catalogueGedAvecDwg`) restent cassées
+  sans proxy.** Répartition confirmée par parsing multi-ligne de
+  `catalogue_data.dart` (pas par `grep` mono-ligne, qui sous-compte —
+  la plupart des champs `img:` sont écrits sur deux lignes) : sur les
+  350 produits réellement affichés par `filterCatalogue`, 313 sont
+  hébergés sur `staffdecor.fr` (CORS ouvert, wildcard `*`
+  inconditionnel, vérifié avec et sans `Origin` cross-site) et 37 sur
+  `ged.staffdecor.fr` (aucun header CORS, vérifié de la même façon).
+  Ces 37 resteront en icône de repli (`errorBuilder` dans
+  `catalogue_screen.dart`) tant qu'aucun proxy same-origin ou
+  rehébergement local n'est mis en place — préparé mais non déployé
+  (`/home/user/proxy.py`, hors dépôt, non écrit à ce jour). Un
+  catalogue « vide » n'est PAS explicable par ces 37 réfs seules (elles
+  ne sont que 10,6 % du total, et le fallback `errorBuilder` affiche
+  quand même la carte avec une icône) — la cause d'un écran vide
+  observé était le rendu (WebGL/Firefox), pas le réseau : voir
+  ci-dessus.
