@@ -2443,6 +2443,121 @@ et P8a) ci-dessous.
   Aucune correction de libellé appliquée ici (lecture seule demandée),
   la décision de reformuler revient à l'utilisateur.
 
+  **Contrôle — la prédiction 2 de P9d était fausse, et la vraie cause
+  est topologique, pas une dilution.** Reprise à la main de `haussmann`
+  (`grep -n "ceilL\|ceilR\|wallTL\|wallTR\|floorL\|floorR\|wallBL\|
+  wallBR" lib/models/persp_calib.dart`, sortie confirmée à l'identique
+  des 4 presets + `defaultCalib`) : plafond détecté = repli constant
+  `0,22`, vérité `0,090`, écart `0,130` ; point mural détecté =
+  `0,22×0,5=0,11`, vérité `0,100`, écart `0,010`. Le petit écart mural
+  n'est PAS de la dilution : c'est une coïncidence numérique — la
+  formule `×0,5` appliquée à un plafond faux atterrit par hasard près
+  de la vérité.
+
+  **Offsets topologiques vérité-terrain, calculés sur les 4 presets**
+  (`wallT − ceil`, `wallB − floor`) :
+
+  | scène       | wallTL−ceilL | wallTR−ceilR | wallBL−floorL | wallBR−floorR |
+  |-------------|:---:|:---:|:---:|:---:|
+  | haussmann   | +0,010 | +0,010 | +0,030 | +0,030 |
+  | moderne     | +0,010 | +0,010 | +0,020 | +0,020 |
+  | provencal   | +0,010 | +0,010 | +0,020 | +0,020 |
+  | scandinave  | +0,010 | +0,010 | +0,020 | +0,020 |
+
+  L'offset `wallT−ceil` est **constant à +0,010 sur les 4 presets** —
+  le coin mural est systématiquement légèrement SOUS le plafond, pas à
+  mi-hauteur. La formule actuelle (`wallTopYPct = ceilYPct * 0.5`,
+  `edge_detect.dart:589`) place le mur à mi-hauteur, donc très AU-DESSUS
+  du plafond — relation inversée par rapport à la vérité terrain.
+
+  **Conséquence vérifiée : si le plafond seul est corrigé (formule
+  `×0,5` inchangée), l'erreur murale RÉGRESSE**, elle ne s'améliore pas :
+
+  | scène       | erreur wallT actuelle | erreur wallT si ceil corrigé | facteur |
+  |-------------|:---:|:---:|:---:|
+  | haussmann   | 0,0100 / 0,0150 | 0,0563 / 0,0513 | ×5,6 / ×3,4 |
+  | moderne     | 0,0050 / 0,0050 | 0,0575 / 0,0575 | ×11,5 / ×11,5 |
+  | provencal   | 0,0400 / 0,0400 | 0,0800 / 0,0800 | ×2,0 / ×2,0 |
+  | scandinave  | 0,0250 / 0,0250 | 0,0475 / 0,0475 | ×1,9 / ×1,9 |
+
+  Les 4 scènes dégradent, aucune n'améliore — confirmé par calcul
+  indépendant (script Python jetable, non committé), résultat conforme
+  à l'ordre de grandeur annoncé (« cinq fois pire » sur haussmann,
+  confirmé exactement : ×5,6 sur wallTL). **Conclusion : la formule
+  `×0,5` doit être remplacée par un offset additif (`ceilYPct + 0,01`),
+  pas ajustée en gain — ceci est indépendant de tout choix RANSAC/VP.**
+
+  **Requalification de la barrière P9d — spread L/R vérifié** :
+
+  | scène       | ceilL−ceilR | floorL−floorR | wallTL−wallTR | wallBL−wallBR |
+  |-------------|:---:|:---:|:---:|:---:|
+  | haussmann   | +0,005 | +0,010 | +0,005 | +0,010 |
+  | moderne     | 0,000 | 0,000 | 0,000 | 0,000 |
+  | provencal   | 0,000 | 0,000 | 0,000 | 0,000 |
+  | scandinave  | 0,000 | 0,000 | 0,000 | 0,000 |
+
+  3 des 4 presets sont **parfaitement plats L/R** (écart nul), le 4ᵉ
+  (haussmann) ne distingue que de 5 millièmes — au niveau du bruit
+  d'annotation manuelle, pas d'une géométrie de mur oblique réelle.
+  **Confirmé : P9d ne peut pas servir de cible d'amélioration pour un
+  futur détecteur de murs** (rien de non-trivial à détecter contre ces
+  presets). Son rôle légitime reste celui déjà rempli : détecteur de
+  RÉGRESSION sur les figures actuelles (`wallTL` moy=0,0200/max=0,0400,
+  `wallTR` moy=0,0212/max=0,0400, `wallBL` moy=0,0983/max=0,2350,
+  `wallBR` moy=0,1008/max=0,2350).
+
+  **Étape A (« porte zéro ») — pourquoi la ligne sol `moderne` est
+  choisie, pas seulement où elle tombe. LECTURE SEULE**, sonde
+  temporaire (instrumentation `print` scoping `_classifyLines`,
+  `edge_detect.dart:383-394`, appliquée après backup + vérification
+  `git diff --stat lib/` vide, fichier de test `_tmp_*` déclenchant
+  `detectRoomEdges` sur `assets/demo_scenes/moderne.jpg`, résultat
+  capturé puis **instrumentation intégralement revertie** [`git
+  checkout`] et sonde supprimée avant toute autre opération — aucune
+  trace committée, `git diff --stat lib/` re-vérifié vide après coup,
+  suite complète 237/237 relancée pour confirmer le retour à l'état de
+  référence).
+
+  Liste complète des 6 candidats `_HLine` horizontaux détectés pour
+  `moderne` (h=180 dans le repère de travail interne, seuil ceiling
+  `y<62,99`, seuil floor `y≥58,5` — donc TOUS les 6 tombent côté floor,
+  ZÉRO côté ceiling) :
+
+  | y | yFrac | score | angle |
+  |---|---|---|---|
+  | 114,00 | 0,6333 | 0,7600 | 178° |
+  | 128,50 | 0,7139 | 0,7745 | 167° |
+  | 142,00 | 0,7889 | **0,8182 (meilleur score)** | 179° |
+  | 144,00 | 0,8000 | 0,7964 | 8° |
+  | 152,00 | 0,8444 | 0,7818 | 167° |
+  | 171,00 | 0,9500 | **0,7673 (pire score, mais SÉLECTIONNÉ)** | 178° |
+
+  **Critère exact de sélection confirmé** (`edge_detect.dart:387-393`) :
+  `floorLines` est trié ASCENDANT par `y`, puis `cls.floor =
+  floorLines.last` — c'est-à-dire la ligne la PLUS BASSE en position
+  (`yFrac=0,9500`), indépendamment de son `score`. Le candidat au score
+  le plus élevé (`yFrac=0,7889`, `score=0,8182`) était disponible mais
+  écarté uniquement parce qu'il se trouve plus haut dans le cadre.
+
+  **Réponse à la question diagnostique posée** : la sélection prend la
+  ligne LA PLUS BASSE, pas la plus forte — **confirmé**. Le défaut est
+  bien dans le CLASSEMENT/critère de sélection (`floorLines.last` par
+  position), pas dans la qualité de détection Hough brute elle-même
+  (les 6 scores sont proches, 0,76-0,82, aucun n'est un artefact
+  franchement dégénéré). **Conséquence directe : un futur remplacement
+  LSD+RANSAC hériterait du même biais si le critère de sélection
+  post-classification n'est pas revu en premier** — le problème n'est
+  pas la méthode de détection de segments, mais la règle qui choisit
+  lequel des segments horizontaux détectés représente le sol.
+
+  **Étape B (Tour 3) — reste BLOQUÉ tant que ce constat n'est pas
+  acquitté** par l'utilisateur, conformément à l'instruction de
+  séquencement (« Ensuite, et seulement ensuite, le Tour 3... »).
+  Aucune ligne sous `lib/` n'a été modifiée de façon persistante dans
+  cette étape — `git diff --stat lib/` vide, `flutter analyze` 107
+  infos/warnings pré-existants (0 nouveau), suite `flutter test`
+  237/237 verte, confirmés après nettoyage complet de la sonde.
+
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
