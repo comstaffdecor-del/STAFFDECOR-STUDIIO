@@ -77,7 +77,8 @@ Future<EdgeDetectResult?> detectRoomEdges(ui.Image image) async {
     if (lines.isEmpty) return null;
 
     final clustered = _clusterLines(lines, _clusterAngleDeg, _clusterRho);
-    final cls = _classifyLines(clustered, wW, wH);
+    final capped = _capParBande(clustered, 20);
+    final cls = _classifyLines(capped, wW, wH);
     if (cls == null) return null;
 
     final vp = _computeVanishingPoint(cls, wW, wH);
@@ -266,7 +267,7 @@ List<_HLine> _houghLines(Uint8List edges, int w, int h, double threshFrac) {
   }
 
   lines.sort((a, b) => b.score.compareTo(a.score));
-  return lines.length > 60 ? lines.sublist(0, 60) : lines;
+  return lines; // cap deplace apres clustering, par bande angulaire
 }
 
 /// Convertit (rho, theta) en segment (x1,y1,x2,y2) dans la bbox image.
@@ -318,6 +319,7 @@ List<_HLine> _clusterLines(
     used[i] = true;
     for (var j = i + 1; j < lines.length; j++) {
       if (used[j]) continue;
+      if (_bandeAngulaire(lines[i]) != _bandeAngulaire(lines[j])) continue;
       final dAngle = math.min(
         (lines[i].angle - lines[j].angle).abs(),
         180 - (lines[i].angle - lines[j].angle).abs(),
@@ -352,6 +354,37 @@ class _Classified {
 /// Angle de la LIGNE (0-180°) déduit de l'angle Hough (thêta = angle de
 /// la normale à la droite).
 double _lineAngle(_HLine l) => (90 - l.angle + 360) % 180;
+
+/// Bande angulaire grossière : 0 = horizontal (plafond/sol), 1 = fuyante
+/// gauche, 2 = fuyante droite. Utilisée pour (a) empêcher le clustering
+/// de fusionner une horizontale faible avec une diagonale forte proche
+/// en rho, et (b) capper le nombre de candidats PAR bande plutôt que
+/// globalement (une bande dominée par des doublons diagonaux non fusionnés
+/// ne doit plus évincer les rares candidats horizontaux).
+int _bandeAngulaire(_HLine l) {
+  final a = _lineAngle(l);
+  if (a <= 15 || a >= 165) return 0; // horizontal
+  if (a <= 55) return 1; // fuyante gauche
+  return 2; // fuyante droite
+}
+
+/// Cap le nombre de lignes gardées, séparément par bande angulaire, pour
+/// que les diagonales (souvent majoritaires) ne masquent plus les rares
+/// candidats horizontaux plafond/sol.
+List<_HLine> _capParBande(List<_HLine> lines, int nParBande) {
+  final bandes = <List<_HLine>>[[], [], []];
+  for (final l in lines) {
+    bandes[_bandeAngulaire(l)].add(l);
+  }
+  for (final b in bandes) {
+    b.sort((x, y) => y.score.compareTo(x.score));
+  }
+  return [
+    ...bandes[0].take(nParBande),
+    ...bandes[1].take(nParBande),
+    ...bandes[2].take(nParBande),
+  ]..sort((x, y) => y.score.compareTo(x.score));
+}
 
 /// Classifie les droites en horizontales (plafond/sol), fuyantes gauche
 /// et fuyantes droite, puis sépare les horizontales en "plafond" (haut
@@ -586,8 +619,8 @@ EdgeDetectResult? _buildGeometry(_Classified cls, _Pt vp, int wW, int wH) {
   // 35% de hauteur) créerait une bande murale latérale disproportionnée.
   final ceilYPct = clamp01(ceilY / wH);
   final floorYPct = clamp01(floorY / wH);
-  final wallTopYPct = clamp01(ceilYPct * 0.5);
-  final wallBotYPct = clamp01(floorYPct + (1 - floorYPct) * 0.5);
+  final wallTopYPct = clamp01(ceilYPct + 0.010);
+  final wallBotYPct = clamp01(floorYPct + 0.020);
 
   final calib = PerspCalib(
     ceilL: norm(xL, ceilYL),
