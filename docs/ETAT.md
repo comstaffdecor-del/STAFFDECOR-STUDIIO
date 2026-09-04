@@ -2234,6 +2234,69 @@ et P8a) ci-dessous.
   erreur — `107 issues found.` ; `234` tests, `All tests passed!` (pas
   de test en échec, warning resté unique).
 
+- **P9c** — harnais de mesure permanent (pas un `_tmp_`), écart ABSOLU
+  en `yPct` entre `detectRoomEdges` et les presets, sur les 4 scènes
+  démo. Fichier : `test/core/perspective/p9c_edge_detect_ypct_gate_test.dart`.
+  Complète P9a sans le remplacer : P9a convertit les deux calibrations
+  en pixels sur un canvas 1400×975 avant de mesurer une distance
+  euclidienne (utile pour juger l'écart visuel à l'écran) ; P9c mesure
+  l'écart BRUT en `yPct`, sans conversion canvas intermédiaire, parce
+  que les deux calibrations sont déjà dans le même espace
+  (`xPct`/`yPct`, confirmé par la docstring de P9a elle-même) — c'est
+  cette métrique-là, pas la distance en pixels, qui a été retenue
+  comme critère de décision pour un futur détecteur (LSD+RANSAC ou
+  autre). Aucun `expect` qui échoue : instrument de mesure, jamais
+  rouge par construction, même philosophie que P9a. Portée : les 4
+  points `f*` (`ceilL`/`ceilR`/`floorL`/`floorR`) uniquement — les
+  points `wall*` ne sont pas mesurés (voir P9b : dérivés
+  proportionnellement de `ceilY`/`floorY`, jamais produits
+  indépendamment par `detectRoomEdges`).
+
+  **Seuil de décision, fixé AVANT toute réécriture du détecteur** (règle
+  explicite du protocole, pour ne pas rejouer P9j où des seuils avaient
+  été réglés sans référence de mesure) : erreur absolue MOYENNE en
+  `yPct` `< 0,02` sur les 4 scènes, ET aucune scène au-delà de `0,04`.
+  Constantes nommées dans le fichier (`kMeanThreshold = 0.02`,
+  `kPerSceneMaxThreshold = 0.04`), pour qu'un futur changement de seuil
+  laisse une trace de diff claire.
+
+  **Résultat mesuré ce tour**, `flutter test
+  test/core/perspective/p9c_edge_detect_ypct_gate_test.dart --reporter
+  expanded`, `+1: All tests passed!`, 1 seule tentative de
+  compilation (après correction d'une erreur de guillemets imbriqués
+  dans la construction du message `VERDICT`, corrigée avant tout
+  résultat numérique retenu) :
+  ```
+  [p9c] preset=haussmann conf=0.7500 yErr_ceilL=0.1300 yErr_ceilR=0.1350 yErr_floorL=0.0197 yErr_floorR=0.0995 mean=0.0961 max=0.1350 (seuil scène: 0.04)
+  [p9c] preset=moderne conf=0.7500 yErr_ceilL=0.1250 yErr_ceilR=0.1250 yErr_floorL=0.2167 yErr_floorR=0.2433 mean=0.1775 max=0.2433 (seuil scène: 0.04)
+  [p9c] preset=provencal conf=0.7500 yErr_ceilL=0.0800 yErr_ceilR=0.0800 yErr_floorL=0.0175 yErr_floorR=0.0475 mean=0.0563 max=0.0800 (seuil scène: 0.04)
+  [p9c] preset=scandinave conf=0.7500 yErr_ceilL=0.1450 yErr_ceilR=0.1450 yErr_floorL=0.0188 yErr_floorR=0.0165 mean=0.0813 max=0.1450 (seuil scène: 0.04)
+  [p9c] GLOBAL mean_yPct_error=0.1028 (seuil<0.02, DEPASSE) max_yPct_error=0.2433 sur scene=moderne (seuil<0.04, DEPASSE) scenes_mesurees=4/4 scenes_ignorees=aucune
+  [p9c] VERDICT (mean<0.02 ET max<0.04 sur les scenes mesurees) = SEUIL NON ATTEINT - ne pas brancher, detecteur actuel trop loin de la verite terrain
+  ```
+  Aucune scène introuvable, `detectRoomEdges` ne renvoie `null` sur
+  aucune des 4 photos — les 4 lignes portent des valeurs numériques.
+
+  **Verdict, chiffré** : erreur moyenne globale `0,1028`, contre un
+  seuil `< 0,02` — dépassement d'un facteur ≈5. Pire scène : moderne,
+  `max=0,2433`, contre un seuil `< 0,04` — dépassement d'un facteur
+  ≈6. Aucune des 4 scènes n'atteint le seuil individuellement (les 4
+  `max` vont de `0,0800` à `0,2433`, tous au-dessus de `0,04`). Le
+  détecteur `wH*0.22`/Hough actuel est donc, sur cette mesure et ce
+  seuil fixés à l'avance, loin de la vérité terrain — chiffre à l'appui
+  de ce qui n'était jusqu'ici qu'une conviction qualitative (« la
+  corniche est 160e sur 167 »). Conséquence directe et actée : **ne
+  pas brancher** `autoApplyDetection` sur l'état actuel du détecteur ;
+  ceci ne préjuge en rien du bien-fondé de l'approche LSD+RANSAC
+  proposée (Étages 1-3, non implémentés, `edge_detect.dart` toujours
+  intouché) — seul l'existant `wH*0.22`/Hough est mesuré ici.
+
+  **Aucun changement sous `lib/`** : ce commit ne touche que
+  `test/core/perspective/p9c_edge_detect_ypct_gate_test.dart` et cette
+  section de `docs/ETAT.md`. `edge_detect.dart` reste strictement
+  intouché (`git diff --stat` vide sur ce fichier, revérifié après ce
+  commit).
+
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
