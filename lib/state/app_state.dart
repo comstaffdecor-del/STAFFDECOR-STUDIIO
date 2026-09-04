@@ -164,25 +164,31 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       final geo = await detectRoomEdges(roomImage!);
-      // ⚠️ SÉCURITÉ TEMPORAIRE : un résidu de bug géométrique dans
-      // `edge_detect.dart` peut encore produire, sur certaines photos,
-      // un rendu de produit totalement aberrant (grand "X" en diagonale
-      // au lieu d'une bande suivant le plafond) malgré les garde-fous de
-      // sanité déjà ajoutés (span mini, X gauche<droite, écart Y mini).
-      // Tant que ce résidu n'est pas totalement corrigé et vérifié
-      // visuellement sur toutes les scènes démo, on N'APPLIQUE PAS
-      // encore automatiquement le résultat à [perspCalib] — on le
-      // calcule et l'expose (confiance, etc.) pour debug/tests, mais on
-      // conserve la calibration par défaut fiable comme valeur active.
-      // TODO: repasser `_autoApplyDetection` à true une fois le bug du
-      // rendu en "X" définitivement corrigé et vérifié sur les 4 scènes
-      // démo + import utilisateur.
+      // P9k/P9l : le "X" historique (croisement diagonal des coins) est
+      // structurellement écarté depuis la suppression de
+      // `_estimateWallX` — X fixes (0.20/0.80), seul Y varie avec un
+      // tilt borné. Vérifié visuellement sans croisement sur les 4
+      // scènes démo (voir docs/ETAT.md, section P9l). L'application
+      // automatique est donc branchée.
       const autoApplyDetection = true;
       if (geo != null && autoApplyDetection) {
         perspCalib = geo.calib;
-        calibAutoDetected = true;
+        // P9k : la geometrie auto est appliquee (grille posee sans clic)
+        // mais NE vaut PAS calibration certifiee : erreur mesuree 0,058
+        // a 0,079 sur le plafond, 0,2433 sur le sol moderne, barrieres
+        // P9c (mean<0,02) et P9d non franchies. Laisser false pour que
+        // EstimBadge reste "Estimatif +-15%" et que chiffrage.dart:172
+        // n'annonce pas une precision inexistante. Passe a true par
+        // updateCalibPoint des que l'utilisateur touche une poignee.
+        calibAutoDetected = false;
         edgeDetectConfidence = geo.confidence;
-        isCalibrated = true;
+        // isCalibrated reste a sa valeur courante (false par defaut ici,
+        // via setRoomImageBytes/loadDemoScene) — PAS mis a true : c'est
+        // ce booleen, pas calibAutoDetected, qui pilote le badge
+        // "Calibre +-3%" de chiffrage.dart/EstimBadge. Le laisser a
+        // true aurait annonce la precision exacte que ce commentaire dit
+        // justement ne pas encore atteindre. Voir updateCalibPoint (seul
+        // point qui doit legitimement lever isCalibrated).
       } else if (geo != null) {
         // Détection calculée mais non appliquée (sécurité) — on garde
         // la calibration par défaut active, tout en mémorisant la
