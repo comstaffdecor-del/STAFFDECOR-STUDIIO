@@ -2558,6 +2558,155 @@ et P8a) ci-dessous.
   infos/warnings pré-existants (0 nouveau), suite `flutter test`
   237/237 verte, confirmés après nettoyage complet de la sonde.
 
+- **P9k** — diagnostic ordre d'étapes (Étape C) + correctif clustering
+  avant cap, cap par bande angulaire, garde orientation, dérivation
+  murale en offset additif. Commit `9932cb1`, un seul fichier touché
+  (`lib/core/perspective/edge_detect.dart`, +37/-4).
+
+  **Étape C (lecture seule, tour précédent) — diagnostic confirmé** :
+  le signal plafond EXISTE au seuil de vote Hough de production
+  (scores 0,60-0,85 sur les 4 scènes), ce qui écarte les deux
+  hypothèses proposées au départ (« zéro signal » et « `minVote` trop
+  haut »). Le vrai défaut est un bug d'ORDONNANCEMENT en deux temps :
+  (a) `_houghLines` triait puis coupait à 60 lignes AVANT le
+  clustering (`edge_detect.dart:268-269`, ancien code) — les diagonales
+  quasi-dupliquées (pics voisins non fusionnés de l'accumulateur) sont
+  bien plus nombreuses que les horizontales et repoussent les
+  meilleurs candidats plafond hors du top-60 (rang 133 sur haussmann,
+  rang 44 sur provencal) ; (b) le rare survivant du cap-60 (provencal,
+  score=0,8539) se faisait absorber par `_clusterLines` dans un
+  cluster mené par une diagonale, faute de vérification d'orientation
+  dans la fusion angle+rho.
+
+  **Correctif appliqué, un seul commit, quatre volets** :
+  1. `_houghLines` (`edge_detect.dart:268-270`) : suppression du cap
+     global à 60 — `return lines;` sans troncature, le cap est
+     déplacé après le clustering.
+  2. Deux fonctions nouvelles (`edge_detect.dart:364-386`) :
+     `_bandeAngulaire(_HLine)` classifie une droite en bande 0
+     (horizontale, `a≤15||a≥165`), bande 1 (fuyante gauche, `a≤55`) ou
+     bande 2 (fuyante droite, sinon) ; `_capParBande(lines, 20)` cappe
+     à 20 lignes PAR bande plutôt que globalement, pour qu'une bande
+     dominée par des doublons diagonaux non fusionnés n'évince plus
+     les rares candidats horizontaux.
+  3. `_clusterLines` (`edge_detect.dart:322`) : garde d'orientation
+     ajoutée en tête de la boucle interne — `if (_bandeAngulaire(lines[i])
+     != _bandeAngulaire(lines[j])) continue;` — empêche désormais la
+     fusion d'une horizontale faible avec une diagonale forte proche
+     en rho.
+  4. Site d'appel dans `detectRoomEdges` (`edge_detect.dart:79-81`) :
+     séquence changée en cluster → cap par bande (20/bande) →
+     classify, au lieu de cluster → cap global → classify.
+  5. **Couplage mural, même commit** (`edge_detect.dart:622-623`,
+     `_buildGeometry`) : `wallTopYPct`/`wallBotYPct` passent d'une
+     formule proportionnelle sans rapport avec l'image
+     (`ceilYPct * 0.5` / `floorYPct + (1-floorYPct)*0.5`) à un offset
+     additif mesuré sur les 4 presets (`ceilYPct + 0.010` /
+     `floorYPct + 0.020`), cf. section précédente « wallT ≈ ceil +
+     0,010 constant sur les 4 presets ».
+
+  **Prédictions posées AVANT mesure** (protocole) : haussmann plafond
+  ≈0,060 si le candidat correct-mais-faible (yFrac≈0,15) est
+  sélectionné, vs ≈0,23 si un candidat incorrect-mais-fort
+  (yFrac≈0,32, probablement cimaise/linteau/tablette) sort à sa place.
+
+  **Mesuré (P9c, `ceilL`/`ceilR` seuls, avant → après)** :
+
+  | scène | avant | après | facteur |
+  |---|---:|---:|---:|
+  | haussmann | 0,1325 | **0,0576** | ×2,3 |
+  | moderne | 0,1250 | **0,0617** | ×2,0 |
+  | provencal | 0,0800 | 0,0795 | ≈1,0 (voir note L/R ci-dessous) |
+  | scandinave | 0,1450 | **0,0794** | ×1,8 |
+
+  **Verdict prédiction haussmann : CONFIRMÉE** — mesuré 0,0576 contre
+  une prédiction « autour de 0,060 ». La prédiction pessimiste (~0,23)
+  ne s'est réalisée sur AUCUNE des 4 scènes. Le diagnostic Étape C est
+  donc validé par la mesure : le cap-60 pré-clustering évinçait bien le
+  signal, pas `minVote`.
+
+  **Provencal — cas à surveiller, pas traité ce soir** : `ceilR`
+  s'améliore fortement (0,08→0,019, sous la barrière) mais `ceilL`
+  empire (0,08→0,14) — les deux côtés sélectionnent désormais des
+  candidats différents. Symptôme compatible avec une ligne de plafond
+  réellement inclinée sur cette photo, ou un candidat parasite d'un
+  seul côté. Non investigué, à lire plus tard.
+
+  **P9c GLOBAL (ceil+floor, seuil de branchement) : quasi inchangé**
+  — mean 0,1028→0,0989, max 0,2433 sur `moderne` (identique). Le terme
+  dominant du global n'est plus le plafond mais le SOL de `moderne`
+  (0,2167/0,2433, contre 0,017-0,020 partout ailleurs sur les autres
+  scènes) — facteur ×10 par rapport au reste, non touché par ce
+  commit. Suspect déjà identifié (voir Étape A « porte zéro »
+  ci-dessus) : `floorLines.last`, sélecteur POSITIONNEL (ligne la plus
+  basse) et non par score — explicitement HORS PÉRIMÈTRE de ce commit,
+  à traiter séparément, une variable à la fois.
+
+  **P9d wall\* — régression mesurée, mais assumée comme fidèle et non
+  comme une dégradation réelle** :
+
+  | point | baseline (moy/max) | mesuré (moy/max) |
+  |---|---|---|
+  | wallTL | 0,0200/0,0400 | 0,0729/0,0904 |
+  | wallTR | 0,0212/0,0400 | 0,0716/0,0904 |
+  | wallBL | 0,0983/0,2350 | 0,1264/0,2300 |
+  | wallBR | 0,1008/0,2350 | 0,1289/0,2300 |
+
+  Moyennes en hausse sur les 4 points, max quasi stable (légèrement
+  meilleur sur BL/BR). Lecture : ce n'est pas une régression du code
+  mais l'exposition directe de l'erreur plafond réelle, désormais
+  couplée par construction (`wallT ≈ ceilY + 0,010`). L'ancienne
+  formule `ceilYPct * 0.5` donnait un faible écart mural PAR HASARD
+  quand `ceilY` traînait au repli `0,22` (coïncidence numérique déjà
+  identifiée au tour précédent, « Contrôle — prédiction 2 fausse ») —
+  ce chiffre ne mesurait rien de réel. La nouvelle dérivation rend
+  l'erreur murale strictement dépendante de l'erreur plafond mesurée ;
+  toute amélioration future du plafond (ex. correctif `floorLines.last`
+  ou traitement provencal) améliore désormais AUTOMATIQUEMENT les
+  points muraux, ce qui n'était pas le cas avant. Le verdict formel
+  reste néanmoins **SEUIL NON ATTEINT** (P9d demande mean<0,02 —
+  0,0729 en est loin) et n'est pas requalifié en amélioration à ce
+  tour, seulement en couplage architectural correct.
+
+  **Double critère de sortie (P9c + P9d) : NON ATTEINT**, comme
+  anticipé par l'utilisateur avant mesure — P9c global bloqué par le
+  sol `moderne`, P9d bloqué par le couplage mural désormais fidèle à
+  un plafond encore imprécis sur 3/4 scènes. Flags `autoApplyDetection`
+  (voir ci-dessous) reste `false` — aucun impact production dans les
+  deux cas.
+
+  **Correction d'une erreur de nommage du tour précédent** : le flag
+  cité `usePerspectiveVP` N'EXISTE PAS dans le code (`grep -rn` vide
+  sur `lib/`). Le seul garde-fou de branchement est
+  `autoApplyDetection`, constante `false` dans
+  `lib/state/app_state.dart:181`, confirmé inchangé après ce commit.
+
+  **Vérification** : `flutter analyze` → 0 erreur (`grep -c "error •"`
+  = 0). `flutter test --reporter compact` → 237/237 verts. `git diff
+  --stat` avant commit → un seul fichier, `edge_detect.dart` (+37/-4).
+  Commit `9932cb1` : "P9k : clustering avant cap, cap par bande
+  angulaire, garde orientation dans clustering, derivation murale en
+  offset additif".
+
+  **Suite explicitement différée (hors périmètre ce tour)** :
+  `floorLines.last` (défaut positionnel du sol, coûte 0,2433 sur
+  `moderne`, terme dominant du P9c global désormais) — prochaine
+  étape proposée : lecture seule d'abord, lister tous les candidats
+  horizontaux de la bande sol (`y >= hmid*0.65`) sur les 4 scènes avec
+  score/y/rang, comparer le choix de `.last` à celui le plus proche de
+  la vérité terrain. Prédiction à poser avant mesure : si un candidat
+  mieux noté est plus proche de la vérité sur `moderne`, un sélecteur
+  par score suffit (correctif trivial, erreur <0,05 attendue) ; si
+  tous les candidats de `moderne` sont loin de la vérité, la jonction
+  mur-sol est absente de l'image et aucun sélecteur ne la retrouvera
+  (verdict « moderne inexploitable », à retirer du jeu de validation
+  plutôt qu'à corriger).
+
+  **Sauvegarde** : `OB6T8nhV` couvre `1e70ba5`, désormais deux commits
+  en retard (`a4bd80f`, `9932cb1`) — ce dernier contient la seule
+  amélioration algorithmique réelle de la session. Nouvelle archive
+  complète à faire après ce commit de documentation.
+
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
