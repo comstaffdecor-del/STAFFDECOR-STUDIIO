@@ -2297,6 +2297,152 @@ et P8a) ci-dessous.
   intouché (`git diff --stat` vide sur ce fichier, revérifié après ce
   commit).
 
+- **P9d** — extension de P9c aux 4 points `wall*`
+  (`wallTL`/`wallTR`/`wallBL`/`wallBR`), avec agrégation par TYPE DE
+  POINT en plus de l'agrégation par scène. Fichier permanent :
+  `test/core/perspective/p9d_edge_detect_wallpoints_gate_test.dart`,
+  log `docs/logs/p9d_edge_detect_wallpoints_gate.txt`. Aucun `expect`
+  qui échoue, aucun changement sous `lib/` (`git diff --stat lib/`
+  vide, revérifié après ce commit) — instrument de mesure, même
+  philosophie que P9a/P9c.
+
+  **Prédiction écrite AVANT exécution** (règle du protocole) : deux
+  prédictions falsifiables, distinguées explicitement dans le fichier
+  et dans le code — (1) trivialité côté DÉTECTÉ
+  (`wallTL.yPct==wallTR.yPct`, `wallBL.yPct==wallBR.yPct`, mécanique
+  car `wallTopYPct`/`wallBotYPct`, `edge_detect.dart:589-590`, ne
+  consomment aucune donnée d'image) — attendue triviale ; (2) l'erreur
+  `wall*` serait PLUS GRANDE que l'erreur `ceil`/`floor`
+  correspondante, pas simplement corrélée à l'identique, parce que la
+  formule tire le point à 50% vers le bord de l'image (0%/100%) au
+  lieu de suivre la vérité terrain (qui place les murs à 5-10 points
+  de % du plafond/sol).
+
+  **Résultat mesuré, verbatim** (`flutter test
+  test/core/perspective/p9d_edge_detect_wallpoints_gate_test.dart
+  --reporter expanded`, `+1: All tests passed!`, 1 seule tentative de
+  compilation) :
+  ```
+  [p9d] preset=haussmann yErr_wallTL=0.0100 yErr_wallTR=0.0150 yErr_wallBL=0.0027 yErr_wallBR=0.0127 wallMean=0.0101 wallMax=0.0150 ceilFloorMean=0.0961 ratio_wall/ceilFloor=0.11 detTopEqual=true detBotEqual=true
+  [p9d] preset=moderne yErr_wallTL=0.0050 yErr_wallTR=0.0050 yErr_wallBL=0.2350 yErr_wallBR=0.2350 wallMean=0.1200 wallMax=0.2350 ceilFloorMean=0.1775 ratio_wall/ceilFloor=0.68 detTopEqual=true detBotEqual=true
+  [p9d] preset=provencal yErr_wallTL=0.0400 yErr_wallTR=0.0400 yErr_wallBL=0.0813 yErr_wallBR=0.0813 wallMean=0.0606 wallMax=0.0813 ceilFloorMean=0.0563 ratio_wall/ceilFloor=1.08 detTopEqual=true detBotEqual=true
+  [p9d] preset=scandinave yErr_wallTL=0.0250 yErr_wallTR=0.0250 yErr_wallBL=0.0744 yErr_wallBR=0.0744 wallMean=0.0497 wallMax=0.0744 ceilFloorMean=0.0813 ratio_wall/ceilFloor=0.61 detTopEqual=true detBotEqual=true
+  [p9d] point=wallTL mean_yPct_error=0.0200 max_yPct_error=0.0400 n=4
+  [p9d] point=wallTR mean_yPct_error=0.0212 max_yPct_error=0.0400 n=4
+  [p9d] point=wallBL mean_yPct_error=0.0983 max_yPct_error=0.2350 n=4
+  [p9d] point=wallBR mean_yPct_error=0.1008 max_yPct_error=0.2350 n=4
+  [p9d] GLOBAL wall* mean_yPct_error=0.0601 (seuil<0.02, DEPASSE) max_yPct_error=0.2350 (seuil<0.04, DEPASSE)
+  [p9d] PREDICTION 1 (trivialite detectee wallTL==wallTR et wallBL==wallBR cote DETECTE, sur 4 scenes) : detTopEqual=4/4 detBotEqual=4/4 -> CONFIRMEE
+  [p9d] PREDICTION 2 (erreur wall* > erreur ceil/floor correspondante, pas simple reproduction a l'identique) : ratio moyen wall/ceilFloor=0.62 ratio minimum observe=0.11 -> INFIRMEE ou PARTIELLE (au moins une scene avec ratio<=1)
+  [p9d] VERDICT wall* = SEUIL wall* NON ATTEINT - detecteur absent sur ce volet, pas seulement imprecis (confirme la lecture P9b : wallTL=wallTR et wallBL=wallBR par construction, aucune donnee d'image consommee)
+  ```
+
+  **Prédiction 1 (trivialité) : CONFIRMÉE**, 4/4 scènes sur les deux
+  couples — comme attendu, la formule symétrique produit une égalité
+  côté détecté qui n'existe pas dans la vérité terrain (ex. haussmann
+  `wallTL=0,100` vs `wallTR=0,095`, distincts).
+
+  **Prédiction 2 (erreur wall* > erreur ceil/floor) : INFIRMÉE en
+  moyenne**, contrairement à l'attendu — ratio `wall/ceilFloor` de
+  `0,11` (haussmann) à `1,08` (provencal), moyenne `0,62`, donc
+  généralement PLUS PETIT que 1, pas plus grand. Explication
+  mécanique, pas contradiction avec le diagnostic d'absence : en
+  tirant le point à 50% vers le bord fixe de l'image (`wallTopYPct =
+  ceilYPct * 0,5`), la formule DILUE une partie de l'erreur de
+  `ceilY`/`floorY` au lieu de l'amplifier — un ceilY détecté avec 10
+  points d'erreur produit un wallTop avec 5 points d'erreur mécanique,
+  pas 10. Seule la scène `provencal` dépasse `1,0` (`1,08`), et
+  `moderne` reste sous `1,0` (`0,68`) malgré l'anomalie de sol de cette
+  scène (voir Tour 2 ci-dessous) — donc PAS de corrélation simple
+  «erreur wall proportionnelle à l'erreur ceil/floor», la prédiction
+  qualitative de départ (une simple reproduction à l'échelle) était
+  trop simple. Ce que la mesure confirme malgré cette infirmation :
+  l'erreur `wall*`, quelle que soit sa taille relative, ne varie
+  JAMAIS indépendamment de `ceilY`/`floorY` — c'est une conséquence
+  algébrique directe de la formule, pas une mesure de la géométrie
+  réelle des murs latéraux. Le diagnostic d'absence de détecteur
+  wall* propre tient donc, la formulation initiale de sa signature
+  numérique (erreur plus grande) ne tenait pas.
+
+  **Seuils dépassés sur wall\*** : moyenne globale `0,0601` contre
+  `<0,02`, max global `0,2350` (points `wallBL`/`wallBR`, scène
+  moderne) contre `<0,04` — les deux `wall*` bas (`wallBL`/`wallBR`,
+  moyenne `0,0983`/`0,1008`) sont nettement plus loin de la vérité que
+  les deux `wall*` hauts (`wallTL`/`wallTR`, moyenne `0,0200`/`0,0212`,
+  qui eux atteignent presque le seuil moyen `<0,02`) — asymétrie
+  cohérente avec l'anomalie de sol qui contamine spécifiquement
+  `wallBot` via `floorYPct` (Tour 2 ci-dessous).
+
+  **Conclusion actée** : le volet « murs » n'est PAS une régression à
+  réparer — c'est une fonctionnalité absente à créer. Aucune ligne
+  Hough dédiée aux murs latéraux n'existe dans `edge_detect.dart` ;
+  les 4 points `wall*` sont une pure dérivation algébrique de
+  `ceilY`/`floorY`, sans variance propre issue de l'image. Confirme et
+  chiffre la lecture qualitative de P9b (`edge_detect.dart:597-600`).
+
+  **Tour 2 — anomalie `moderne`, diagnostic falsifiable, LECTURE
+  SEULE** (aucun changement sous `lib/`) : `floorL.yPct` détecté =
+  `0,9367`, `floorR.yPct` détecté = `0,9633`, contre vérité terrain
+  `0,72` (les deux côtés) — écart de `0,22`/`0,24`, confirmé par sonde
+  ponctuelle (`dart:ui`, décodage direct de
+  `assets/demo_scenes/moderne.jpg`, 1960×1470px, non committée,
+  fichier temporaire supprimé après lecture). Image annotée (lignes
+  jaune=vérité à 72%, rouge=détecté à 93,7-96,3%, bleue=repli plafond
+  à 22% non pertinent ici) analysée visuellement : **la ligne rouge
+  (sol détecté) tombe presque entièrement sur le tapis, dans une zone
+  de texture continue, à quelques % du bord inférieur du cadre — elle
+  ne correspond à AUCUNE arête structurelle** (elle passe juste
+  au-dessus du bord du canapé à gauche, coupe le pied d'une table
+  d'appoint à droite). La ligne jaune (vérité, `72%`) coïncide, elle,
+  avec le plateau d'une table basse en bois clair au centre et coupe
+  l'assise de meubles sur les côtés — la vraie jonction mur/sol
+  (plinthe sous les fenêtres) se situe en réalité plus haut encore,
+  vers `61-62%`, sous les fauteuils verts en arrière-plan (donc la
+  convention retenue par le preset lui-même, `72%`, n'est pas non plus
+  la jonction mur/sol au sens strict, mais un proxy admis pour cette
+  scène — cohérent avec la docstring de `persp_calib.dart` documentant
+  ce type d'arbitrage par scène).
+
+  **Réponse à la question falsifiable posée** : la détection est-elle
+  au-dessus ou en-dessous de la vérité, et sur une arête réelle ou
+  non ? Réponse mesurée : **en-dessous** de la vérité (plus proche du
+  bord bas de l'image) et **sans arête réelle** dessous (texture de
+  tapis, pas de bord de tapis/seuil/ombre à cette hauteur précise).
+  D'après la question posée elle-même, ce cas de figure (« en-dessous
+  ou sans arête ») indique un problème de CADRAGE/repli du détecteur
+  Hough actuel, pas une simple confusion de candidat entre deux arêtes
+  concurrentes — et un tel problème casserait de la même façon une
+  future méthode LSD+RANSAC si la classification amont (quelle ligne
+  candidate retenir comme « sol ») n'est pas revue en premier. Ceci
+  reste un diagnostic sur CETTE scène (`n=1` cas d'anomalie extrême
+  isolé, les 3 autres scènes ont une erreur de sol sous `0,02`, cf.
+  P9c) — pas encore généralisé, aucune modification de code engagée
+  ici.
+
+  **Conséquence chiffrage, vérifiée par lecture de code, LECTURE
+  SEULE** : `computeMetres`/`getQteNetteForFamille`/`calcChiffrage`
+  (`lib/core/chiffrage.dart:194-217/228-246/159-174`) ne référencent
+  AUCUN champ de `PerspCalib` ni aucun point `wall*`/`ceil*`/`floor*` —
+  confirmé par grep exhaustif sur le fichier entier (aucune occurrence
+  de `wallT`/`wallB`/`surface`/`perspCalib`/`calib.` en dehors des noms
+  de variables `MetresResult.surface`/`Chiffrage`). Les entrées de
+  `computeMetres` (`metresMurA`, `metresMurB`, `metresHauteur`) sont
+  des CHAMPS TEXTE saisis à la main par l'utilisateur
+  (`lib/widgets/studio/metres_panel.dart:31-33`, `TextEditingController`
+  lié à `AppState.metresMurA`/`metresMurB`/`metresHauteur`,
+  `app_state.dart:79-81`), entièrement indépendants de toute
+  calibration de perspective détectée ou manuelle. Le badge `isCalibrated
+  ? 'Calibré ±3%' : 'Estimatif ±15%'` (`chiffrage.dart:172`) ne
+  qualifie donc QUE l'alignement visuel du rendu produit sur la photo
+  (le fait que les 4 poignées aient été déplacées manuellement,
+  `AppState.updateCalibPoint`) — il ne certifie EN RIEN l'exactitude du
+  métré/de la surface, qui dépend uniquement de ce que l'utilisateur
+  tape au mètre dans le panneau Métrés, sans lien avec `PerspCalib`.
+  **Le « ±3% » mérite donc d'être requalifié** : ce n'est pas une
+  précision de métré, c'est une précision de calage visuel du rendu.
+  Aucune correction de libellé appliquée ici (lecture seule demandée),
+  la décision de reformuler revient à l'utilisateur.
+
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger

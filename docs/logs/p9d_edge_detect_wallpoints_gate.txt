@@ -1,0 +1,65 @@
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  exif_reader 4.1.0 (4.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  http 1.5.0 (1.6.0 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+22 available)
+  image_picker_ios 0.8.13+3 (0.8.13+7 available)
+  intl 0.19.0 (0.20.3 available)
+  iso_base_media 6.3.2 (6.3.3 available)
+  lints 5.1.1 (6.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.16.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  random_access_source 4.2.1 (4.3.1 available)
+  share_plus 12.0.2 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  shared_preferences 2.5.3 (2.5.5 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.6 (0.7.14 available)
+  url_launcher 6.3.1 (6.3.2 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.3.6 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_web 2.4.1 (2.4.3 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_math 2.2.0 (2.4.2 available)
+  vm_service 15.2.0 (15.3.0 available)
+  win32 5.15.0 (6.4.0 available)
+Got dependencies!
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/flutter_app/test/core/perspective/p9d_edge_detect_wallpoints_gate_test.dart
+00:00 +0: P9d : écart absolu en yPct sur les points wall*, agrégation par type de point ET par scène, vérification de la prédiction d'absence de détection propre
+[p9d] preset=haussmann yErr_wallTL=0.0100 yErr_wallTR=0.0150 yErr_wallBL=0.0027 yErr_wallBR=0.0127 wallMean=0.0101 wallMax=0.0150 ceilFloorMean=0.0961 ratio_wall/ceilFloor=0.11 detTopEqual=true detBotEqual=true
+[p9d] preset=moderne yErr_wallTL=0.0050 yErr_wallTR=0.0050 yErr_wallBL=0.2350 yErr_wallBR=0.2350 wallMean=0.1200 wallMax=0.2350 ceilFloorMean=0.1775 ratio_wall/ceilFloor=0.68 detTopEqual=true detBotEqual=true
+[p9d] preset=provencal yErr_wallTL=0.0400 yErr_wallTR=0.0400 yErr_wallBL=0.0813 yErr_wallBR=0.0813 wallMean=0.0606 wallMax=0.0813 ceilFloorMean=0.0563 ratio_wall/ceilFloor=1.08 detTopEqual=true detBotEqual=true
+[p9d] preset=scandinave yErr_wallTL=0.0250 yErr_wallTR=0.0250 yErr_wallBL=0.0744 yErr_wallBR=0.0744 wallMean=0.0497 wallMax=0.0744 ceilFloorMean=0.0813 ratio_wall/ceilFloor=0.61 detTopEqual=true detBotEqual=true
+[p9d] --- Agrégation par type de point (toutes scènes) ---
+[p9d] point=wallTL mean_yPct_error=0.0200 max_yPct_error=0.0400 n=4
+[p9d] point=wallTR mean_yPct_error=0.0212 max_yPct_error=0.0400 n=4
+[p9d] point=wallBL mean_yPct_error=0.0983 max_yPct_error=0.2350 n=4
+[p9d] point=wallBR mean_yPct_error=0.1008 max_yPct_error=0.2350 n=4
+[p9d] GLOBAL wall* mean_yPct_error=0.0601 (seuil<0.02, DEPASSE) max_yPct_error=0.2350 (seuil<0.04, DEPASSE)
+[p9d] PREDICTION 1 (trivialite detectee wallTL==wallTR et wallBL==wallBR cote DETECTE, sur 4 scenes) : detTopEqual=4/4 detBotEqual=4/4 -> CONFIRMEE
+[p9d] PREDICTION 2 (erreur wall* > erreur ceil/floor correspondante, pas simple reproduction a l'identique) : ratio moyen wall/ceilFloor=0.62 ratio minimum observe=0.11 -> INFIRMEE ou PARTIELLE (au moins une scene avec ratio<=1)
+[p9d] VERDICT wall* = SEUIL wall* NON ATTEINT - detecteur absent sur ce volet, pas seulement imprecis (confirme la lecture P9b : wallTL=wallTR et wallBL=wallBR par construction, aucune donnee d'image consommee)
+00:01 +1: All tests passed!
