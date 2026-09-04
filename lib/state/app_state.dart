@@ -349,6 +349,7 @@ class AppState extends ChangeNotifier {
         perspCalib = c.copyWith(wallBR: p);
         break;
     }
+    isCalibrated = true;
     notifyListeners();
   }
 
