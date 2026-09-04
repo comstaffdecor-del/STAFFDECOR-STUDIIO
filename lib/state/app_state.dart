@@ -177,9 +177,7 @@ class AppState extends ChangeNotifier {
       // TODO: repasser `_autoApplyDetection` à true une fois le bug du
       // rendu en "X" définitivement corrigé et vérifié sur les 4 scènes
       // démo + import utilisateur.
-      // ignore: dead_code
-      const autoApplyDetection = false;
-      // ignore: dead_code
+      const autoApplyDetection = true;
       if (geo != null && autoApplyDetection) {
         perspCalib = geo.calib;
         calibAutoDetected = true;
