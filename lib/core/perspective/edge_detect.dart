@@ -384,24 +384,41 @@ class _Classified {
 /// la normale à la droite).
 double _lineAngle(_HLine l) => (90 - l.angle + 360) % 180;
 
-/// Bande angulaire grossière : 0 = horizontal (plafond/sol), 1 = fuyante
-/// gauche, 2 = fuyante droite. Utilisée pour (a) empêcher le clustering
-/// de fusionner une horizontale faible avec une diagonale forte proche
-/// en rho, et (b) capper le nombre de candidats PAR bande plutôt que
-/// globalement (une bande dominée par des doublons diagonaux non fusionnés
-/// ne doit plus évincer les rares candidats horizontaux).
+/// Bande angulaire : 0 = horizontal (plafond/sol), 1 = fuyante gauche,
+/// 2 = quasi-verticale (75°-105°), 3 = fuyante droite, 4 = ambiguë
+/// (]55°,75°] et [105°,125°[ — ni assez plate pour une fuyante, ni assez
+/// verticale pour la bande 2).
+///
+/// P10-correctif (5 bandes au lieu de 3) : la sonde P10bis a mesuré que
+/// 31 à 34 lignes quasi-verticales distinctes (75°-105°) survivent au
+/// clustering sur les 4 scènes démo, mais meurent presque totalement au
+/// cap par bande — l'ancien découpage à 3 bandes regroupait ces
+/// verticales avec les VRAIES fuyantes droites dans une bande unique
+/// `]55°,165°[` large de 110°, où elles perdaient systématiquement la
+/// compétition de score pour les 20 places du `take(20)`. Isoler les
+/// verticales dans leur propre bande (et introduire une bande "ambiguë"
+/// pour les 2×20° de transition ]55,75]/[105,125[, qui n'étaient déjà
+/// exploitées nulle part par `_classifyLines` — ni horizontal ]15,165[,
+/// ni left-diag ]15,55], ni right-diag ]125,165[) libère la bande fuyante
+/// droite (désormais `]125°,165°[`, 40° comme la bande gauche) de cette
+/// concurrence, sans changer ni les seuils de `_classifyLines` (inchangés,
+/// non touchés) ni le cap de 20/bande (juste appliqué à 5 bandes au lieu
+/// de 3, chacune indépendamment).
 int _bandeAngulaire(_HLine l) {
   final a = _lineAngle(l);
   if (a <= 15 || a >= 165) return 0; // horizontal
-  if (a <= 55) return 1; // fuyante gauche
-  return 2; // fuyante droite
+  if (a > 15 && a <= 55) return 1; // fuyante gauche
+  if (a > 75 && a < 105) return 2; // quasi-verticale
+  if (a > 125 && a < 165) return 3; // fuyante droite
+  return 4; // ambigue : ]55,75] et [105,125[
 }
 
 /// Cap le nombre de lignes gardées, séparément par bande angulaire, pour
 /// que les diagonales (souvent majoritaires) ne masquent plus les rares
-/// candidats horizontaux plafond/sol.
+/// candidats horizontaux plafond/sol, ni les fuyantes droites ne soient
+/// noyées par les quasi-verticales (voir docstring de [_bandeAngulaire]).
 List<_HLine> _capParBande(List<_HLine> lines, int nParBande) {
-  final bandes = <List<_HLine>>[[], [], []];
+  final bandes = <List<_HLine>>[[], [], [], [], []];
   for (final l in lines) {
     bandes[_bandeAngulaire(l)].add(l);
   }
@@ -412,6 +429,8 @@ List<_HLine> _capParBande(List<_HLine> lines, int nParBande) {
     ...bandes[0].take(nParBande),
     ...bandes[1].take(nParBande),
     ...bandes[2].take(nParBande),
+    ...bandes[3].take(nParBande),
+    ...bandes[4].take(nParBande),
   ]..sort((x, y) => y.score.compareTo(x.score));
 }
 
