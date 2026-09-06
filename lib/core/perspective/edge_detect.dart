@@ -443,16 +443,38 @@ _Classified? _classifyLines(List<_HLine> lines, int w, int h) {
   }
 
   final hmid = h * 0.5;
-  final ceilLines =
-      horizontals.where((l) => (l.y1 + l.y2) / 2 < h * 0.35).toList()
-        ..sort((a, b) => (a.y1 + a.y2).compareTo(b.y1 + b.y2));
-  final floorLines =
-      horizontals.where((l) => (l.y1 + l.y2) / 2 >= hmid * 0.65).toList()
-        ..sort((a, b) => (a.y1 + a.y2).compareTo(b.y1 + b.y2));
+  final borderMargin = h * 0.03;
 
+  double midY(_HLine l) => (l.y1 + l.y2) / 2;
+
+  // P9o : tri par score Hough décroissant au lieu de la position
+  // verticale, et exclusion d'une marge de 3% aux deux bords (ceinture
+  // en plus du nettoyage post-Sobel de P9o-A). La sélection positionnelle
+  // précédente (ceilLines.first = ligne la plus haute, floorLines.last =
+  // ligne la plus basse, triées par position) choisissait mécaniquement
+  // la ligne la plus proche du bord de l'image, quel que soit son score
+  // Hough réel. Les bornes de plage (h*0.35 / hmid*0.65) sont conservées
+  // à l'identique — seul le critère de sélection change.
+  final ceilLines =
+      horizontals.where((l) {
+        final y = midY(l);
+        return y > borderMargin && y < h * 0.35;
+      }).toList()
+        ..sort((a, b) => b.score.compareTo(a.score));
+  final floorLines =
+      horizontals.where((l) {
+        final y = midY(l);
+        return y >= hmid * 0.65 && y < h - borderMargin;
+      }).toList()
+        ..sort((a, b) => b.score.compareTo(a.score));
+
+  // Point critique : floorLines.last devient floorLines.first, car le
+  // sens de tri change (position croissante -> score décroissant).
+  // Inverser le tri sans inverser le sélecteur donnerait la pire ligne
+  // au lieu de la meilleure.
   return _Classified(
     ceiling: ceilLines.isNotEmpty ? ceilLines.first : null,
-    floor: floorLines.isNotEmpty ? floorLines.last : null,
+    floor: floorLines.isNotEmpty ? floorLines.first : null,
     leftDiags: leftDiags,
     rightDiags: rightDiags,
   );
