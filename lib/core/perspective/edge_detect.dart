@@ -281,10 +281,18 @@ List<double>? _rhoThetaToSegment(double rho, double theta, int w, int h) {
     }
   }
 
-  if (sinT.abs() > 1e-6) tryPt(rho / cosT, 0);
-  if (sinT.abs() > 1e-6) tryPt((rho - h * sinT) / cosT, h.toDouble());
-  if (cosT.abs() > 1e-6) tryPt(0, rho / sinT);
-  if (cosT.abs() > 1e-6) tryPt(w.toDouble(), (rho - w * cosT) / sinT);
+  // P9n : gardes corrigées — on divise par cosT pour les intersections
+  // avec y=0/y=h, donc c'est cosT qu'il faut garder non-nul (pas sinT) ;
+  // symétriquement pour x=0/x=w, qui divisent par sinT. L'ancien code
+  // inversait les deux, ce qui supprimait silencieusement toute ligne
+  // proche de l'horizontale pure (theta=90°, cosT≈0) : les deux points
+  // valides (x=0/x=w) étaient sautés à tort tandis que les deux points
+  // invalides (division par cosT≈0) étaient tentés puis rejetés par le
+  // bounds-check — pts.length<2, segment nul.
+  if (cosT.abs() > 1e-6) tryPt(rho / cosT, 0);
+  if (cosT.abs() > 1e-6) tryPt((rho - h * sinT) / cosT, h.toDouble());
+  if (sinT.abs() > 1e-6) tryPt(0, rho / sinT);
+  if (sinT.abs() > 1e-6) tryPt(w.toDouble(), (rho - w * cosT) / sinT);
 
   if (pts.length < 2) return null;
   var best = [pts[0], pts[1]];
