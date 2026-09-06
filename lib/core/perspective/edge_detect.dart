@@ -1006,3 +1006,79 @@ Future<EdgeDetectDiagnostics?> detectRoomEdgesDiagnostic(ui.Image image) async {
     return null;
   }
 }
+
+// ============================================================================
+// Sonde complémentaire (additive, lecture seule) : expose les 3 états
+// successifs de la liste de lignes que `detectRoomEdges`/
+// `detectRoomEdgesDiagnostic` traversent en interne, SANS ajouter ni
+// retirer aucune étape : (a) `rawLines` = sortie brute de `_houghLines`
+// (avant tout filtrage), (b) `clustered` = sortie de `_clusterLines`
+// (fusion des doublons proches en angle+rho), (c) `capped` = sortie de
+// `_capParBande` (troncature à N par bande angulaire — c'est exactement
+// la liste `capped` que `detectRoomEdges` transmet ensuite à
+// `_classifyLines`, aucune différence). Les trois appels ci-dessous sont
+// rigoureusement identiques à ceux de `detectRoomEdgesDiagnostic`
+// (mêmes constantes `_houghThFrac`/`_clusterAngleDeg`/`_clusterRho`/20),
+// aucune nouvelle logique de filtrage n'est introduite.
+class EdgeDetectStages {
+  final List<LineDiagnostic> rawLines;
+  final List<LineDiagnostic> clustered;
+  final List<LineDiagnostic> capped;
+  const EdgeDetectStages({
+    required this.rawLines,
+    required this.clustered,
+    required this.capped,
+  });
+}
+
+Future<EdgeDetectStages?> detectRoomEdgesStages(ui.Image image) async {
+  try {
+    final srcW = image.width;
+    final srcH = image.height;
+    if (srcW == 0 || srcH == 0) return null;
+
+    final scale = _workW / srcW;
+    final wW = _workW;
+    final wH = (srcH * scale).round().clamp(40, 2000);
+
+    final small = await _downscale(image, wW, wH);
+    final byteData = await small.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    );
+    small.dispose();
+    if (byteData == null) return null;
+    final px = byteData.buffer.asUint8List();
+
+    final gray = _toGray(px, wW, wH);
+    final blurred = _blur3x3(gray, wW, wH);
+    final edges = _sobel(blurred, wW, wH, _sobelTh);
+
+    const borderPx = 3;
+    for (var y = 0; y < wH; y++) {
+      for (var x = 0; x < wW; x++) {
+        if (y < borderPx ||
+            y >= wH - borderPx ||
+            x < borderPx ||
+            x >= wW - borderPx) {
+          edges[y * wW + x] = 0;
+        }
+      }
+    }
+
+    final rawLines = _houghLines(edges, wW, wH, _houghThFrac);
+    final clustered = rawLines.isEmpty
+        ? <_HLine>[]
+        : _clusterLines(rawLines, _clusterAngleDeg, _clusterRho);
+    final capped = clustered.isEmpty
+        ? <_HLine>[]
+        : _capParBande(clustered, 20);
+
+    return EdgeDetectStages(
+      rawLines: rawLines.map((l) => _toLineDiagnostic(l, wW, wH)).toList(),
+      clustered: clustered.map((l) => _toLineDiagnostic(l, wW, wH)).toList(),
+      capped: capped.map((l) => _toLineDiagnostic(l, wW, wH)).toList(),
+    );
+  } catch (_) {
+    return null;
+  }
+}
