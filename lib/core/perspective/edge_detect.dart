@@ -446,13 +446,20 @@ _Classified? _classifyLines(List<_HLine> lines, int w, int h) {
   final ceilLines =
       horizontals.where((l) => (l.y1 + l.y2) / 2 < h * 0.35).toList()
         ..sort((a, b) => (a.y1 + a.y2).compareTo(b.y1 + b.y2));
+  // P9o-D : le sol reprend le tri par score Hough decroissant de B (gain
+  // mesure sur floor : 0.1131 -> 0.0671), le plafond reste positionnel
+  // comme en A (0.0615, non degrade par B). La marge de bord 3% de B a
+  // ete testee separement (D2) : resultat rigoureusement identique a D1
+  // (sans marge) sur les 16 valeurs p9c ET p9d — elle est redondante avec
+  // la neutralisation 3px du cadre deja faite en amont (voir P9o-A,
+  // au-dessus dans detectRoomEdges), donc non reprise ici.
   final floorLines =
       horizontals.where((l) => (l.y1 + l.y2) / 2 >= hmid * 0.65).toList()
-        ..sort((a, b) => (a.y1 + a.y2).compareTo(b.y1 + b.y2));
+        ..sort((a, b) => b.score.compareTo(a.score));
 
   return _Classified(
     ceiling: ceilLines.isNotEmpty ? ceilLines.first : null,
-    floor: floorLines.isNotEmpty ? floorLines.last : null,
+    floor: floorLines.isNotEmpty ? floorLines.first : null,
     leftDiags: leftDiags,
     rightDiags: rightDiags,
   );
