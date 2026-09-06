@@ -2707,6 +2707,190 @@ et P8a) ci-dessous.
   amélioration algorithmique réelle de la session. Nouvelle archive
   complète à faire après ce commit de documentation.
 
+- **P9m** — les 4 scènes de démo chargent désormais leur preset
+  `PerspCalib.demoPresets` directement au lieu de passer par
+  `autoDetectEdges()`. Commit `669f4f8`, un seul fichier
+  (`lib/state/app_state.dart`, +25/-4). Nouvelle fonction
+  `_presetForScene(String key) => PerspCalib.demoPresets[key]`
+  (`app_state.dart:270`, lit directement la map plutôt que de dupliquer
+  les clés dans un switch). Site d'appel modifié dans `loadDemoScene`
+  (`app_state.dart:326` et suivantes) : si `_presetForScene(key)` renvoie
+  un preset non-null, `perspCalib = preset`, `calibAutoDetected = true`,
+  `isCalibrated = true`, `edgeDetectConfidence = 1.0` — sinon (photo
+  utilisateur inconnue), comportement inchangé, `unawaited(autoDetectEdges())`.
+  Motivation chiffrée dans le commit : l'erreur du détecteur à ce
+  stade était de `0,058`-`0,079` au plafond et `0,2433` au sol moderne
+  (barrière P9c non franchie) — inacceptable pour l'affichage direct
+  des 4 scènes vitrine. **Conséquence structurelle pour tout ce qui
+  suit (P9n à P9o)** : `edge_detect.dart` ne pèse plus JAMAIS sur le
+  rendu des 4 scènes de démo, seulement sur le chemin photo inconnue et
+  sur les tests de gate P9c/P9d — red line reconduite explicitement
+  dans tous les tours suivants.
+
+- **P9n** — correctif de gardes inversées dans `_rhoThetaToSegment`
+  (`edge_detect.dart`), diagnostic + correction dans le même commit
+  `585411c` (+12/-4, un seul fichier). Avant correction, le code
+  divisait par `cosT` pour les intersections avec `y=0`/`y=h` en
+  gardant `sinT.abs() > 1e-6` (au lieu de `cosT`), et symétriquement
+  pour `x=0`/`x=w` en gardant `cosT.abs() > 1e-6` (au lieu de `sinT`) —
+  les deux gardes étaient échangées. Effet mesuré : toute ligne proche
+  de l'horizontale pure (`theta=90°`, `cosT≈0`) perdait silencieusement
+  ses deux points valides (`x=0`/`x=w`, qui divisent par `sinT`, non
+  nul ici) tout en tentant ses deux points invalides (division par
+  `cosT≈0`, rejetés par le bounds-check) → `pts.length<2` → segment
+  `null`. Correction : `cosT.abs() > 1e-6` gardé pour `tryPt(rho/cosT,
+  0)` et `tryPt((rho-h*sinT)/cosT, h)` ; `sinT.abs() > 1e-6` gardé pour
+  `tryPt(0, rho/sinT)` et `tryPt(w, (rho-w*cosT)/sinT)`. Message de
+  commit : « asymétrie provençale confirmée résolue » — réfère à
+  l'asymétrie `ceilL≠ceilR` observée sur provençal dans P9k
+  (`0,0795` contre `0,0163`, deux côtés sélectionnant des candidats
+  différents), un des symptômes plausibles de lignes horizontales
+  perdues par ce bug. Seuils P9c/P9d toujours non franchis après ce
+  commit seul (non re-mesurés isolément dans le message, absorbés dans
+  la mesure P9o-A qui suit). Non touchés : `autoApplyDetection`,
+  `PerspCalib.demoPresets`, `lib/state/app_state.dart`.
+
+- **P9o** — chantier en 4 étapes sur `_classifyLines`/le bloc de
+  neutralisation de bord de `detectRoomEdges`
+  (`lib/core/perspective/edge_detect.dart`), toutes lecture/mesure
+  d'abord, patch ensuite, porte de commit à 3 critères numériques
+  (plafond isolé, sol isolé, max global) fixée avant tout patch.
+  Chemin concerné exclusivement : photos utilisateur inconnues + tests
+  de gate P9c/P9d — aucun impact sur les 4 scènes de démo (P9m). Red
+  lines reconduites intactes sur tout le chantier : `_rhoThetaToSegment`
+  (P9n, validé), `autoApplyDetection`, `isCalibrated`,
+  `PerspCalib.demoPresets`, `_presetForScene`/`loadDemoScene`.
+
+  **P9o-A — neutralisation du cadre artificiel post-Sobel, commit
+  `d3355ad`** (un seul fichier, `edge_detect.dart`). Diagnostic :
+  `_blur3x3` n'écrit que l'intérieur du buffer (`y=1..h-2`,
+  `x=1..w-2`), initialisé à zéro — Sobel rencontre donc une
+  discontinuité parfaite exactement en `y=1` et `y=h-2`. Depuis P9n,
+  ces horizontales exactes (`theta=90°`, `cosT=0`) redeviennent des
+  segments Hough valides, votées au maximum, et `_classifyLines`
+  (sélection positionnelle `first`/`last` à l'époque) les choisissait
+  systématiquement comme plafond/sol, quelle que soit la vraie
+  géométrie. Correctif : boucle de zérotage explicite sur `edges[]`
+  pour une bande de `borderPx=3` sur les 4 côtés, entre `_sobel` et
+  `_houghLines` (`edge_detect.dart:79-95` dans l'état committé de ce
+  tour). **Mesuré (A seul, isolé)** : P9c mean `0,1371 → 0,0873`, max
+  `0,2689 → 0,2411` (moderne) ; P9d wall mean `0,1322 → 0,0767`, max
+  `0,2600 → 0,2411`. Plafond isolé après A : `0,0615`. Sol isolé après
+  A : `0,1131`. Asymétrie provençale réapparue au passage :
+  `ceilL=0,0613 ≠ ceilR=0,0125` (contre `ceilL=ceilR=0,1338`
+  auparavant, signature d'un bord plat partagé par les deux côtés) —
+  confirme que le cadre était bien voté par Hough puis sélectionné.
+  Seuils P9c/P9d toujours non franchis. `flutter analyze` 0 erreur,
+  `flutter test` 237/237.
+
+  **P9o-B — tri par score Hough + marge de bord 3%, commit `d1f48d9`,
+  puis REVERT ce tour (`471128a`)**. `_classifyLines` triait
+  `ceilLines`/`floorLines` par position verticale et sélectionnait
+  `ceilLines.first`/`floorLines.last` (ligne la plus proche du bord,
+  quel que soit son score). Remplacé par un tri sur `_HLine.score`
+  décroissant des deux côtés, `.first` dans les deux cas (le sens de
+  tri change), plus une marge d'exclusion `borderMargin = h*0.03` aux
+  deux extrémités de chaque plage de recherche. **Mesuré (B sur A)** :
+  P9c mean `0,0873 → 0,0935`, max `0,2411(moderne) → 0,3461(haussmann)` ;
+  P9d wall mean `0,0767 → 0,0894`, max `0,2411 → 0,2473`. Les deux
+  gates restaient NON ATTEINTES et B dégradait légèrement le global
+  par rapport à A seul (mean et max en hausse) — asymétrie provençale
+  toujours forte (`ceilL=0,0262` vs `ceilR=0,1838`). **Un tour
+  intermédiaire non documenté ailleurs dans ce fichier** a ensuite
+  tenté un patch P9o-C (filtre d'angle à 3° avant le tri par score de
+  B) : mesure a montré une amélioration du mean global mais une
+  DÉGRADATION du plafond isolé (`0,1199 → 0,1387`), contredisant le
+  diagnostic que l'angle seul expliquait les dégâts de B au plafond —
+  **non commité**, fichier restauré à `d1f48d9` (`git checkout`), aucun
+  changement resté sous `lib/`.
+
+  **Étape 1 de ce tour — revert de B, reproduction de la référence
+  A** : `git revert --no-edit d1f48d9` → commit `471128a` (un seul
+  fichier touché, `+6/-28`). `flutter analyze` → 0 erreur. Reproduction
+  EXACTE des 4 valeurs de contrôle : P9c mean `0,0873`, max `0,2411`
+  (moderne), plafond isolé `0,0615`, sol isolé `0,1131` ; P9d wall mean
+  `0,0767` — confirmé une seconde fois ce tour par relecture directe
+  dans un `git worktree` détaché sur `471128a` (`p9c` relancé,
+  `+1: All tests passed!`, mêmes 16 valeurs à l'identique, worktree
+  supprimé après vérification). Aucune anomalie de revert détectée.
+
+  **Étape 2 — P9o-D par ablation, deux variantes mesurées séparément,
+  commit final `9ae0098`** (un seul fichier, `edge_detect.dart`,
+  `+9/-2`). Grep de re-lecture avant édition confirmés :
+  `_classifyLines` (`edge_detect.dart:421-466` dans l'état final) et
+  `class _HLine` (`edge_detect.dart:184-190`, champs `rho`, `theta`,
+  `angle`, `score`, `x1,y1,x2,y2`, `cls`, inchangés depuis P9k).
+  Principe : plafond reprend la sélection positionnelle de A (`.first`
+  après tri par position croissante, non dégradée par B), sol reprend
+  le tri par score Hough décroissant de B (`.first` après tri par
+  score décroissant, gain mesuré `0,1131 → 0,0671`).
+
+  **D1 — tri par score sur le sol SEUL, bandes identiques à A, aucune
+  marge de bord.** Mesuré, p9c :
+  ```
+  [p9c] preset=haussmann yErr_ceilL=0.0481 yErr_ceilR=0.0431 yErr_floorL=0.0197 yErr_floorR=0.0995 mean=0.0526 max=0.0995
+  [p9c] preset=moderne yErr_ceilL=0.0506 yErr_ceilR=0.0506 yErr_floorL=0.0800 yErr_floorR=0.0800 mean=0.0653 max=0.0800
+  [p9c] preset=provencal yErr_ceilL=0.0613 yErr_ceilR=0.0125 yErr_floorL=0.0325 yErr_floorR=0.1900 mean=0.0741 max=0.1900
+  [p9c] preset=scandinave yErr_ceilL=0.0750 yErr_ceilR=0.1511 yErr_floorL=0.0188 yErr_floorR=0.0165 mean=0.0653 max=0.1511
+  [p9c] GLOBAL mean_yPct_error=0.0643 max_yPct_error=0.1900 sur scene=provencal
+  ```
+  Plafond isolé D1 : `0,0615` (identique à A — non dégradé, confirme
+  que le plafond n'a pas été touché par inadvertance). Sol isolé D1 :
+  `0,0671` (identique au gain isolé de B). p9d global wall mean :
+  `0,0541`, max `0,1112` (détail par scène : haussmann `wallMean
+  0,0576`, moderne `0,0653`, provencal `0,0741`, scandinave `0,0196`).
+
+  **D2 — D1 + `borderMargin = h*0.03` sur les deux bandes
+  (`midY(l) > borderMargin` plafond, `midY(l) < h - borderMargin`
+  sol).** Mesuré : **rigoureusement identique à D1 sur les 16 valeurs
+  p9c ET sur toutes les valeurs p9d** — comparaison directe confirmée,
+  aucun écart d'un seul chiffre. La marge de bord de B ne filtre donc
+  ZÉRO candidat supplémentaire sur ces 4 scènes, entièrement redondante
+  avec la neutralisation `borderPx=3` post-Sobel déjà faite en amont
+  (P9o-A). Règle de lecture du brief appliquée : `D1 ≈ D2` → gardé D1
+  (plus simple), code de marge écrit puis retiré, finding documenté en
+  commentaire inline dans `_classifyLines`
+  (`edge_detect.dart:449-455`). Effet de bord positif : ce résultat
+  écarte, pour ces 4 photos, l'hypothèse que le cadre artificiel
+  persisterait en amont de `_blur3x3` — pas une preuve générale, un
+  indice pour ce jeu de données seulement (Section 5 du brief reste
+  fermée : `_blur3x3` non ouvert, D2 n'a pas battu D1).
+
+  **Porte de commit, 3 critères, TOUS réunis** : plafond isolé `0,0615
+  ≤ 0,0615` (égal) ; sol isolé `0,0671 ≤ 0,0671` (égal) ; max global
+  `0,1900` (provençal, D1/D2) `≤ 0,2411` (max de A) — vérifié.
+  `flutter analyze` → 0 erreur. `flutter test --reporter compact` →
+  237/237, `All tests passed!`. Commit `9ae0098` : "P9o-D : selection
+  hybride plafond positionnel / sol par score Hough, mesure 0.0615
+  plafond et 0.0671 sol".
+
+  **Aucun chiffre contredisant le diagnostic ce tour** (contrairement
+  au P9o-C non commité ci-dessus, où le plafond isolé s'était dégradé
+  de façon inattendue) — signal explicitement recherché par le
+  protocole, absent cette fois.
+
+  **Résidu non bloquant, hors porte de commit, noté pour suite** :
+  `scandinave ceilR=0,1511` reste loin de la cible informelle « sous
+  0,04 » du brief — c'est une CIBLE (aspiration), pas un des 3 critères
+  de la porte de commit, donc non bloquant ; ouvert pour un futur tour,
+  hors périmètre de celui-ci (Section 5 du brief).
+
+  **P9c GLOBAL après D1/D2 (committé)** : mean `0,0643`, max `0,1900`
+  sur provençal (`floorR`). **P9d GLOBAL wall\* après D1/D2** : mean
+  `0,0541`, max `0,1112`. Les deux seuils de gate (`mean<0,02`,
+  `max<0,04`) restent NON ATTEINTS malgré le gain — `autoApplyDetection`
+  reste `false`, aucun impact production, cohérent avec P9m (les 4
+  scènes de démo ne passent jamais par ce chemin).
+
+  **Historique complet du fichier sur ce chantier, aucune réécriture** :
+  `585411c` (P9n) → `d3355ad` (P9o-A) → `d1f48d9` (P9o-B, préservé) →
+  `471128a` (revert de B, ce tour) → `9ae0098` (P9o-D, ce tour).
+
+  **Sauvegarde** : `fCtg1fMY` couvre l'état antérieur à ce tour
+  (jusqu'à `d1f48d9` inclus) — désormais deux commits en retard
+  (`471128a`, `9ae0098`). Nouvelle archive complète prévue en fin de
+  session (Section 6.5 du brief), après les livrables réunion.
+
 - **P9** — jointure `index.json`×`catalogue_data.dart`, cas 20-54, ratio
   de couverture 4 familles.
 - **P10** — dédup D887, relancer `vp_current_state_probe.dart`, purger
