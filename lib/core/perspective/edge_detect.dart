@@ -73,6 +73,27 @@ Future<EdgeDetectResult?> detectRoomEdges(ui.Image image) async {
     final gray = _toGray(px, wW, wH);
     final blurred = _blur3x3(gray, wW, wH);
     final edges = _sobel(blurred, wW, wH, _sobelTh);
+
+    // P9o : neutralise le cadre artificiel créé par le prétraitement.
+    // _blur3x3 n'écrit que l'intérieur (y=1..h-2, x=1..w-2) d'un buffer
+    // initialisé à zéro : Sobel rencontre donc une discontinuité parfaite
+    // en y=1 et y=h-2. Depuis P9n, ces horizontales exactes (theta=90°,
+    // cosT=0) sont de nouveau des segments valides, Hough les vote au
+    // maximum, et _classifyLines les choisit par position (first/last).
+    // Mesuré sur les 4 scènes : plafond détecté à y≈0.006 (ligne 1), sol à
+    // y≈0.987 (ligne h-2), quelle que soit la vraie géométrie.
+    const borderPx = 3;
+    for (var y = 0; y < wH; y++) {
+      for (var x = 0; x < wW; x++) {
+        if (y < borderPx ||
+            y >= wH - borderPx ||
+            x < borderPx ||
+            x >= wW - borderPx) {
+          edges[y * wW + x] = 0;
+        }
+      }
+    }
+
     final lines = _houghLines(edges, wW, wH, _houghThFrac);
     if (lines.isEmpty) return null;
 
