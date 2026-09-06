@@ -264,6 +264,15 @@ class AppState extends ChangeNotifier {
     _lastPhotoZoneSize = size;
   }
 
+  /// P9m : retourne le preset de calibration mesuré à la main pour la
+  /// scène démo [key] (voir [PerspCalib.demoPresets]), ou `null` si [key]
+  /// ne correspond à aucune des 4 scènes démo connues (cas d'une photo
+  /// utilisateur importée, qui doit continuer à passer par
+  /// [autoDetectEdges]). Lit directement [PerspCalib.demoPresets] plutôt
+  /// que de dupliquer les clés dans un switch, pour éviter tout risque de
+  /// désynchronisation entre les deux listes de clés.
+  PerspCalib? _presetForScene(String key) => PerspCalib.demoPresets[key];
+
   /// Charge une vraie photo de scène démo depuis les assets
   /// (`assets/demo_scenes/<key>.jpg`) et l'affiche comme [roomImage],
   /// exactement comme une photo importée par l'utilisateur — corrige le
@@ -317,10 +326,22 @@ class AppState extends ChangeNotifier {
       demoSceneLoading = false;
       notifyListeners();
       if (roomImage != null) {
-        // Détection auto des arêtes sur la vraie photo de scène démo —
-        // remplace la calibration par défaut par la perspective réelle
-        // dès que l'analyse Sobel/Hough est terminée.
-        unawaited(autoDetectEdges());
+        // P9m : les 4 scènes de démo ont une calibration mesurée à la main
+        // dans persp_calib.dart. On la charge directement plutôt que de
+        // passer par le détecteur, dont l'erreur est de 0,058-0,079 au
+        // plafond et 0,2433 au sol moderne (barrière P9c non franchie).
+        // Les photos utilisateur inconnues (preset introuvable) continuent
+        // d'aller vers autoDetectEdges().
+        final preset = _presetForScene(key);
+        if (preset != null) {
+          perspCalib = preset;
+          calibAutoDetected = true;
+          isCalibrated = true;
+          edgeDetectConfidence = 1.0;
+          notifyListeners();
+        } else {
+          unawaited(autoDetectEdges());
+        }
       }
     }
   }
