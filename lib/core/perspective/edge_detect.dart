@@ -671,3 +671,338 @@ EdgeDetectResult? _buildGeometry(_Classified cls, _Pt vp, int wW, int wH) {
 
   return EdgeDetectResult(calib: calib, confidence: confidence);
 }
+
+// ============================================================================
+// P10 — sonde diagnostique ADDITIVE (aucune ligne existante ci-dessus n'est
+// modifiée). Objectif unique : exposer, pour `test/core/perspective/
+// p10_image_reading_probe_test.dart`, les données intermédiaires de
+// `detectRoomEdges` (lignes Hough, classification enrichie, intersections
+// diagonales, point de fuite, inliers, plafond/sol choisis) qui sont
+// aujourd'hui invisibles depuis l'extérieur car portées par des types/
+// fonctions privés (`_HLine`, `_Classified`, `_houghLines`, etc. — la
+// visibilité `_` de Dart est PAR FICHIER, donc un fichier de test externe
+// ne peut pas y accéder). La seule façon d'exposer ces données sans toucher
+// au pipeline de production est d'ajouter ici, dans le même fichier, une
+// fonction supplémentaire qui rejoue EXACTEMENT les mêmes étapes/constantes
+// que `detectRoomEdges` (même downscale, même Sobel, même Hough, même
+// clustering, même cap par bande, même `_classifyLines`, même
+// `_computeVanishingPoint`, même `_buildGeometry` appelé sans modification)
+// et capture au passage les informations demandées. `detectRoomEdges` et
+// `_buildGeometry` ne sont ni modifiés ni dupliqués dans leur logique
+// géométrique : ils sont appelés tels quels.
+// ============================================================================
+
+/// Une droite Hough exposée pour diagnostic (theta/rho/score/longueur/
+/// endpoints en xPct/yPct + classification enrichie).
+///
+/// Classification enrichie (distincte de la classification interne de
+/// `_classifyLines`, qui ne connaît que horizontal/left-diag/right-diag et
+/// ignore silencieusement le reste) :
+///   - `horizontal`      : angle ligne <=15° ou >=165° (candidat plafond/sol)
+///   - `diagonal_left`   : angle ligne dans ]15°,55°]  (fuyante gauche)
+///   - `diagonal_right`  : angle ligne dans ]125°,165°[ (fuyante droite)
+///   - `vertical`        : angle ligne dans ]75°,105°[ (quasi-verticale,
+///                         jamais utilisée par le pipeline de production)
+///   - `ignored`         : reste (]55°,75°] ou [105°,125°]) — zone
+///                         ambiguë, ni assez plate pour une fuyante latérale,
+///                         ni assez verticale pour `vertical` ; c'est
+///                         exactement la zone que `_classifyLines` élimine
+///                         déjà silencieusement en production.
+class LineDiagnostic {
+  final double theta;
+  final double rho;
+  final double score;
+  final double length;
+  final double x1Pct, y1Pct, x2Pct, y2Pct;
+  final String classification;
+
+  const LineDiagnostic({
+    required this.theta,
+    required this.rho,
+    required this.score,
+    required this.length,
+    required this.x1Pct,
+    required this.y1Pct,
+    required this.x2Pct,
+    required this.y2Pct,
+    required this.classification,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'theta': theta,
+    'rho': rho,
+    'houghScore': score,
+    'length': length,
+    'x1Pct': x1Pct,
+    'y1Pct': y1Pct,
+    'x2Pct': x2Pct,
+    'y2Pct': y2Pct,
+    'classification': classification,
+  };
+}
+
+/// Une intersection entre une fuyante gauche et une fuyante droite,
+/// exposée pour diagnostic (mêmes bornes de validité que
+/// `_computeVanishingPoint`, reproduites sans modification de cette
+/// fonction).
+class IntersectionDiagnostic {
+  final double xPct;
+  final double yPct;
+
+  const IntersectionDiagnostic({required this.xPct, required this.yPct});
+
+  Map<String, dynamic> toJson() => {'xPct': xPct, 'yPct': yPct};
+}
+
+/// Résultat complet de la sonde diagnostique P10 pour une image donnée.
+class EdgeDetectDiagnostics {
+  /// Toutes les droites Hough survivant au clustering + cap par bande
+  /// (== l'ensemble réellement soumis à `_classifyLines` en production),
+  /// avec classification enrichie.
+  final List<LineDiagnostic> lines;
+
+  /// Intersections gauche×droite retenues comme valides par
+  /// `_computeVanishingPoint` (mêmes bornes, même troncature à 4
+  /// lignes/côté).
+  final List<IntersectionDiagnostic> diagonalIntersections;
+
+  /// Estimation du point de fuite (fraction de l'image de travail),
+  /// `null` seulement si la classification a échoué avant ce calcul
+  /// (`_classifyLines` a renvoyé `null`, aucune horizontale trouvée).
+  final double? vpXPct;
+  final double? vpYPct;
+
+  /// Nombre de droites diagonales DISTINCTES (gauche + droite confondues)
+  /// ayant participé à au moins une intersection valide retenue ci-dessus
+  /// — c'est la mesure directe du critère de décision du brief P10
+  /// (">= 3 lignes diagonales inliers").
+  final int inlierDiagonalCount;
+
+  final LineDiagnostic? chosenCeiling;
+  final LineDiagnostic? chosenFloor;
+
+  /// Calibration 8 points générée par `_buildGeometry` — `null` si
+  /// `_buildGeometry` a rejeté la détection (écart plafond/sol
+  /// insuffisant, ou confiance < seuil minimum).
+  final PerspCalib? calib;
+
+  /// Confiance — reproduit ICI la formule de `_buildGeometry`
+  /// (`(hasCeil?0.30:0.05)+(hasFloor?0.30:0.05)+(hasLeft?0.20:0.05)+
+  /// (hasRight?0.20:0.05)`), calculée indépendamment pour rester
+  /// disponible même quand `_buildGeometry` rejette la détection AVANT
+  /// d'atteindre son propre calcul de confiance (le test `yGapOk` est
+  /// évalué avant, voir `_buildGeometry` ci-dessus) — sans cette
+  /// duplication, aucune confiance ne serait mesurable dans ce cas précis.
+  /// Formule dupliquée volontairement à l'identique, jamais modifiée
+  /// séparément de l'original (voir commentaire au site d'appel).
+  final double confidence;
+
+  /// `true` si et seulement si `detectRoomEdges` (production, appelé sans
+  /// modification) aurait renvoyé un résultat non-null pour cette image —
+  /// c'est-à-dire `_buildGeometry` a validé à la fois `yGapOk` ET
+  /// `confidence >= _minConfidence`. Reflet exact du comportement réel de
+  /// l'app, pas un seuil recalculé séparément.
+  final bool usable;
+
+  const EdgeDetectDiagnostics({
+    required this.lines,
+    required this.diagonalIntersections,
+    required this.vpXPct,
+    required this.vpYPct,
+    required this.inlierDiagonalCount,
+    required this.chosenCeiling,
+    required this.chosenFloor,
+    required this.calib,
+    required this.confidence,
+    required this.usable,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'lines': lines.map((l) => l.toJson()).toList(),
+    'diagonalIntersections': diagonalIntersections
+        .map((i) => i.toJson())
+        .toList(),
+    'vanishingPoint': (vpXPct == null || vpYPct == null)
+        ? null
+        : {'xPct': vpXPct, 'yPct': vpYPct},
+    'inlierDiagonalCount': inlierDiagonalCount,
+    'chosenCeiling': chosenCeiling?.toJson(),
+    'chosenFloor': chosenFloor?.toJson(),
+    'perspCalib': calib?.toJson(),
+    'confidence': confidence,
+    'verdict': usable ? 'usable' : 'not usable',
+  };
+}
+
+/// Angle de ligne (0-180°) enrichi en 5 catégories pour diagnostic
+/// uniquement — voir docstring de [LineDiagnostic]. N'affecte en rien
+/// `_classifyLines` (non modifiée, appelée séparément ci-dessous).
+String _diagClassify(_HLine l) {
+  final a = _lineAngle(l);
+  if (a <= 15 || a >= 165) return 'horizontal';
+  if (a > 15 && a <= 55) return 'diagonal_left';
+  if (a > 125 && a < 165) return 'diagonal_right';
+  if (a > 75 && a < 105) return 'vertical';
+  return 'ignored';
+}
+
+LineDiagnostic _toLineDiagnostic(_HLine l, int wW, int wH) {
+  final length = math.sqrt(
+    (l.x2 - l.x1) * (l.x2 - l.x1) + (l.y2 - l.y1) * (l.y2 - l.y1),
+  );
+  return LineDiagnostic(
+    theta: l.theta,
+    rho: l.rho,
+    score: l.score,
+    length: length,
+    x1Pct: l.x1 / wW,
+    y1Pct: l.y1 / wH,
+    x2Pct: l.x2 / wW,
+    y2Pct: l.y2 / wH,
+    classification: _diagClassify(l),
+  );
+}
+
+/// Sonde diagnostique P10 — voir docstring de section ci-dessus. Rejoue
+/// EXACTEMENT le même pipeline que `detectRoomEdges` (mêmes constantes,
+/// même ordre d'appels, `_buildGeometry` non modifié et appelé tel quel)
+/// et capture les données intermédiaires demandées par le brief P10.
+/// Ne lève jamais d'exception (`resolve(null)` en cas d'erreur, comme
+/// `detectRoomEdges`).
+Future<EdgeDetectDiagnostics?> detectRoomEdgesDiagnostic(ui.Image image) async {
+  try {
+    final srcW = image.width;
+    final srcH = image.height;
+    if (srcW == 0 || srcH == 0) return null;
+
+    final scale = _workW / srcW;
+    final wW = _workW;
+    final wH = (srcH * scale).round().clamp(40, 2000);
+
+    final small = await _downscale(image, wW, wH);
+    final byteData = await small.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    );
+    small.dispose();
+    if (byteData == null) return null;
+    final px = byteData.buffer.asUint8List();
+
+    final gray = _toGray(px, wW, wH);
+    final blurred = _blur3x3(gray, wW, wH);
+    final edges = _sobel(blurred, wW, wH, _sobelTh);
+
+    const borderPx = 3;
+    for (var y = 0; y < wH; y++) {
+      for (var x = 0; x < wW; x++) {
+        if (y < borderPx ||
+            y >= wH - borderPx ||
+            x < borderPx ||
+            x >= wW - borderPx) {
+          edges[y * wW + x] = 0;
+        }
+      }
+    }
+
+    final rawLines = _houghLines(edges, wW, wH, _houghThFrac);
+    if (rawLines.isEmpty) {
+      return const EdgeDetectDiagnostics(
+        lines: [],
+        diagonalIntersections: [],
+        vpXPct: null,
+        vpYPct: null,
+        inlierDiagonalCount: 0,
+        chosenCeiling: null,
+        chosenFloor: null,
+        calib: null,
+        confidence: 0.0,
+        usable: false,
+      );
+    }
+
+    final clustered = _clusterLines(rawLines, _clusterAngleDeg, _clusterRho);
+    final capped = _capParBande(clustered, 20);
+    final lineDiags = capped.map((l) => _toLineDiagnostic(l, wW, wH)).toList();
+
+    final cls = _classifyLines(capped, wW, wH);
+    if (cls == null) {
+      return EdgeDetectDiagnostics(
+        lines: lineDiags,
+        diagonalIntersections: const [],
+        vpXPct: null,
+        vpYPct: null,
+        inlierDiagonalCount: 0,
+        chosenCeiling: null,
+        chosenFloor: null,
+        calib: null,
+        confidence: 0.0,
+        usable: false,
+      );
+    }
+
+    // Intersections diagonales + inliers — reproduit à l'identique la
+    // boucle de `_computeVanishingPoint` (même troncature à 4 lignes/
+    // côté, mêmes bornes de validité) pour capturer chaque intersection
+    // retenue et les droites qui l'ont produite, SANS modifier
+    // `_computeVanishingPoint` : elle est appelée normalement juste après
+    // pour obtenir le VP final réellement utilisé par le pipeline.
+    final lds = cls.leftDiags.length > 4
+        ? cls.leftDiags.sublist(0, 4)
+        : cls.leftDiags;
+    final rds = cls.rightDiags.length > 4
+        ? cls.rightDiags.sublist(0, 4)
+        : cls.rightDiags;
+    final diagInter = <IntersectionDiagnostic>[];
+    final inlierLines = <_HLine>{};
+    for (final ld in lds) {
+      for (final rd in rds) {
+        final pt = _lineIntersection(ld, rd);
+        if (pt != null &&
+            pt.x > -wW * 0.5 &&
+            pt.x < wW * 1.5 &&
+            pt.y > -wH &&
+            pt.y < wH * 2) {
+          diagInter.add(
+            IntersectionDiagnostic(xPct: pt.x / wW, yPct: pt.y / wH),
+          );
+          inlierLines.add(ld);
+          inlierLines.add(rd);
+        }
+      }
+    }
+
+    final vp = _computeVanishingPoint(cls, wW, wH);
+    final result = _buildGeometry(cls, vp, wW, wH);
+
+    // Confiance dupliquée à l'identique de `_buildGeometry` (voir
+    // docstring de [EdgeDetectDiagnostics.confidence]) pour rester
+    // mesurable même quand `_buildGeometry` rejette avant d'y arriver.
+    final hasCeil = cls.ceiling != null;
+    final hasFloor = cls.floor != null;
+    final hasLeft = cls.leftDiags.isNotEmpty;
+    final hasRight = cls.rightDiags.isNotEmpty;
+    final confidence =
+        (hasCeil ? 0.30 : 0.05) +
+        (hasFloor ? 0.30 : 0.05) +
+        (hasLeft ? 0.20 : 0.05) +
+        (hasRight ? 0.20 : 0.05);
+
+    return EdgeDetectDiagnostics(
+      lines: lineDiags,
+      diagonalIntersections: diagInter,
+      vpXPct: vp.x / wW,
+      vpYPct: vp.y / wH,
+      inlierDiagonalCount: inlierLines.length,
+      chosenCeiling: cls.ceiling == null
+          ? null
+          : _toLineDiagnostic(cls.ceiling!, wW, wH),
+      chosenFloor: cls.floor == null
+          ? null
+          : _toLineDiagnostic(cls.floor!, wW, wH),
+      calib: result?.calib,
+      confidence: confidence,
+      usable: result != null,
+    );
+  } catch (_) {
+    return null;
+  }
+}
