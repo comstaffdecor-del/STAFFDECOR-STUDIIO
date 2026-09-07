@@ -100,6 +100,27 @@ class SceneProbeResult {
   final double ceilingWallResidualDispersion;
   final double wallFloorResidualDispersion;
 
+  // P12-quater §Patch C : evalAt(xVerite) pour chacun des 4 points de
+  // verite terrain (ceilL/ceilR/floorL/floorR) -- DISTINCT des flags
+  // edgeL/cornerL/cornerR/edgeR de analyseLabelMap (voir brief : "les
+  // deux jeux ne coincident pas et ne doivent pas etre presentes comme
+  // equivalents"). La valeur brute reste toujours presente meme si le
+  // point est signale extrapole/hors bornes.
+  final BoundaryEval? ceilLEval;
+  final BoundaryEval? ceilREval;
+  final BoundaryEval? floorLEval;
+  final BoundaryEval? floorREval;
+
+  // P12-quater : domaines d'echantillons observes + evals de
+  // plausibilite (edgeL/cornerL/cornerR/edgeR) + balayage de marges,
+  // copies depuis debugJson de analyseLabelMap pour le rapport de la
+  // sonde.
+  final List<double>? ceilingWallSampleDomain;
+  final List<double>? wallFloorSampleDomain;
+  final Map<String, dynamic>? ceilingWallEvals;
+  final Map<String, dynamic>? wallFloorEvals;
+  final Map<String, dynamic> extrapolationSweep;
+
   const SceneProbeResult({
     required this.scene,
     required this.ceilL,
@@ -117,6 +138,15 @@ class SceneProbeResult {
     required this.wallFloorValidColumnProportion,
     required this.ceilingWallResidualDispersion,
     required this.wallFloorResidualDispersion,
+    required this.ceilLEval,
+    required this.ceilREval,
+    required this.floorLEval,
+    required this.floorREval,
+    required this.ceilingWallSampleDomain,
+    required this.wallFloorSampleDomain,
+    required this.ceilingWallEvals,
+    required this.wallFloorEvals,
+    required this.extrapolationSweep,
   });
 
   Map<String, dynamic> toJson() => {
@@ -141,6 +171,23 @@ class SceneProbeResult {
       'ceilingWall': ceilingWallResidualDispersion,
       'wallFloor': wallFloorResidualDispersion,
     },
+    // P12-quater : evals aux 4 abscisses de VERITE (distinct des evals
+    // aux 4 abscisses edgeL/cornerL/cornerR/edgeR ci-dessous).
+    'evalAtTruth': {
+      'ceilL': ceilLEval?.toJson(),
+      'ceilR': ceilREval?.toJson(),
+      'floorL': floorLEval?.toJson(),
+      'floorR': floorREval?.toJson(),
+    },
+    'sampleDomain': {
+      'ceilingWall': ceilingWallSampleDomain,
+      'wallFloor': wallFloorSampleDomain,
+    },
+    // Evals aux abscisses edgeL/cornerL/cornerR/edgeR (celles
+    // controlees par analyseLabelMap, marge=0.0).
+    'ceilingWallEvals': ceilingWallEvals,
+    'wallFloorEvals': wallFloorEvals,
+    'extrapolationSweep': extrapolationSweep,
   };
 }
 
@@ -194,6 +241,17 @@ Future<SceneProbeResult> _runProbe(String scene) async {
 
   final ceilingWall = analysis.ceilingWallBoundary;
   final wallFloor = analysis.wallFloorBoundary;
+
+  // P12-quater §Patch C : evalAt(xVerite) pour chacun des 4 points de
+  // verite terrain -- distinct des evals edgeL/cornerL/cornerR/edgeR de
+  // analyseLabelMap (voir brief). La valeur brute (yPct/erreur signee)
+  // est TOUJOURS calculee et conservee, meme si le point est marque
+  // extrapole ou hors bornes -- "l'appelant decide, le calcul ne
+  // ment pas".
+  final ceilLEval = ceilingWall?.evalAt(truth.ceilL.xPct);
+  final ceilREval = ceilingWall?.evalAt(truth.ceilR.xPct);
+  final floorLEval = wallFloor?.evalAt(truth.floorL.xPct);
+  final floorREval = wallFloor?.evalAt(truth.floorR.xPct);
 
   final ceilL = ceilingWall != null
       ? ceilingWall.yAt(truth.ceilL.xPct) - truth.ceilL.yPct
@@ -250,6 +308,22 @@ Future<SceneProbeResult> _runProbe(String scene) async {
     wallFloorValidColumnProportion: wallFloorValidProp,
     ceilingWallResidualDispersion: ceilingWallDispersion,
     wallFloorResidualDispersion: wallFloorDispersion,
+    ceilLEval: ceilLEval,
+    ceilREval: ceilREval,
+    floorLEval: floorLEval,
+    floorREval: floorREval,
+    ceilingWallSampleDomain:
+        (analysis.debugJson['ceilingWallSampleDomain'] as List?)
+            ?.cast<double>(),
+    wallFloorSampleDomain:
+        (analysis.debugJson['wallFloorSampleDomain'] as List?)
+            ?.cast<double>(),
+    ceilingWallEvals:
+        analysis.debugJson['ceilingWallEvals'] as Map<String, dynamic>?,
+    wallFloorEvals:
+        analysis.debugJson['wallFloorEvals'] as Map<String, dynamic>?,
+    extrapolationSweep:
+        analysis.debugJson['extrapolationSweep'] as Map<String, dynamic>,
   );
 }
 
@@ -319,11 +393,15 @@ void main() {
           'xL=${_fmtErr(result.xL)} xR=${_fmtErr(result.xR)} '
           'qualityScore=${result.qualityScore.toStringAsFixed(4)} '
           'manualRequired=${result.manualRequired} '
+          'reasons=${result.manualRequiredReasons} '
           'inferenceMs=${result.inferenceMs} '
           'validCol(ceil/floor)=${result.ceilingWallValidColumnProportion.toStringAsFixed(3)}/'
           '${result.wallFloorValidColumnProportion.toStringAsFixed(3)} '
           'dispersion(ceil/floor)=${result.ceilingWallResidualDispersion.toStringAsFixed(4)}/'
-          '${result.wallFloorResidualDispersion.toStringAsFixed(4)}',
+          '${result.wallFloorResidualDispersion.toStringAsFixed(4)} '
+          'yOOB@truth(ceilL/ceilR/floorL/floorR)='
+          '${result.ceilLEval?.yOutOfBounds}/${result.ceilREval?.yOutOfBounds}/'
+          '${result.floorLEval?.yOutOfBounds}/${result.floorREval?.yOutOfBounds}',
         );
 
         // Seule assertion : le test doit produire un resultat mesurable
@@ -377,6 +455,46 @@ void main() {
           '  residualDispersion: ceilingWall=${r.ceilingWallResidualDispersion.toStringAsFixed(4)} '
           'wallFloor=${r.wallFloorResidualDispersion.toStringAsFixed(4)} '
           '(P12-ter \u00a74, pas une porte -- candidat "discriminant moderne")',
+        );
+        // P12-quater : evalAt(xVerite) -- valeur brute TOUJOURS visible,
+        // meme si yOutOfBounds/extrapole. Distinct des evals
+        // edgeL/cornerL/cornerR/edgeR ci-dessous (points controles par
+        // analyseLabelMap).
+        buffer.writeln('  evalAtTruth (P12-quater, valeur brute + drapeaux) :');
+        for (final entry in {
+          'ceilL': r.ceilLEval,
+          'ceilR': r.ceilREval,
+          'floorL': r.floorLEval,
+          'floorR': r.floorREval,
+        }.entries) {
+          final e = entry.value;
+          if (e == null) {
+            buffer.writeln('    ${entry.key}: N/A (frontiere absente)');
+          } else {
+            buffer.writeln(
+              '    ${entry.key}: xPct=${e.xPct.toStringAsFixed(4)} '
+              'yPctPredit=${e.yPct.toStringAsFixed(4)} '
+              'yOutOfBounds=${e.yOutOfBounds} '
+              'extrapolatedLeft=${e.extrapolatedLeft} '
+              'extrapolatedRight=${e.extrapolatedRight}',
+            );
+          }
+        }
+        buffer.writeln(
+          '  sampleDomain: ceilingWall=${r.ceilingWallSampleDomain} '
+          'wallFloor=${r.wallFloorSampleDomain}',
+        );
+        buffer.writeln(
+          '  ceilingWallEvals (edgeL/cornerL/cornerR/edgeR, margin=0.0) = '
+          '${r.ceilingWallEvals}',
+        );
+        buffer.writeln(
+          '  wallFloorEvals (edgeL/cornerL/cornerR/edgeR, margin=0.0) = '
+          '${r.wallFloorEvals}',
+        );
+        buffer.writeln(
+          '  extrapolationSweep (marges $kExtrapolationMarginSweep, '
+          'DIAGNOSTIC seul, aucun rejet cable) = ${r.extrapolationSweep}',
         );
         buffer.writeln('');
       }

@@ -127,6 +127,15 @@ RoomPlaneAnalysisResult analyseLabelMap(
   RoomPlaneMaskResult mask, {
   double cornerSearchMargin = kDefaultCornerSearchMargin,
   int minSeg = kDefaultMinSeg,
+
+  /// P12-quater — marge (xPct) au-delà de laquelle un coin détecté
+  /// évalué hors du domaine observé déclenche un rejet
+  /// (`*_extrapolated_left`/`*_extrapolated_right`). `null` (défaut) =
+  /// domaine purement DIAGNOSTIQUE : aucun rejet sur ce critère, seul
+  /// `extrapolationSweep` (dans [debugJson]) est peuplé. Voir brief :
+  /// "on lira la table avant de câbler le moindre rejet sur
+  /// extrapolation".
+  double? extrapolationMarginXPct,
 }) {
   final reasons = <String>[];
 
@@ -185,6 +194,82 @@ RoomPlaneAnalysisResult analyseLabelMap(
     reasons.add('wall_floor_fallback_no_corners');
   }
 
+  // --- P12-quater : plausibilité (bloquant, sans seuil réglable) ---
+  Map<String, BoundaryEval> evalsOf(PlaneBoundaryResult b, double margin) {
+    final out = <String, BoundaryEval>{'edgeL': b.evalAt(0.0, margin: margin)};
+    final c = b.corners;
+    if (c != null) {
+      out['cornerL'] = b.evalAt(c[0], margin: margin);
+      out['cornerR'] = b.evalAt(c[1], margin: margin);
+    }
+    out['edgeR'] = b.evalAt(1.0, margin: margin);
+    return out;
+  }
+
+  final cwEvals = ceilingWall == null ? null : evalsOf(ceilingWall, 0.0);
+  final wfEvals = wallFloor == null ? null : evalsOf(wallFloor, 0.0);
+
+  if (cwEvals != null && cwEvals.values.any((e) => e.yOutOfBounds)) {
+    reasons.add('ceiling_wall_y_out_of_bounds');
+  }
+  if (wfEvals != null && wfEvals.values.any((e) => e.yOutOfBounds)) {
+    reasons.add('wall_floor_y_out_of_bounds');
+  }
+
+  // Croisement / inversion : le sol doit rester STRICTEMENT sous le
+  // plafond sur tout le domaine commun observé.
+  if (ceilingWall != null && wallFloor != null) {
+    final lo = [ceilingWall.minSampleXPct, wallFloor.minSampleXPct]
+        .reduce((a, b) => a > b ? a : b);
+    final hi = [ceilingWall.maxSampleXPct, wallFloor.maxSampleXPct]
+        .reduce((a, b) => a < b ? a : b);
+    if (lo.isNaN || hi.isNaN || hi <= lo) {
+      reasons.add('boundaries_no_common_domain');
+    } else {
+      var crossed = false;
+      for (var k = 0; k <= 20; k++) {
+        final x = lo + (hi - lo) * k / 20.0;
+        if (wallFloor.yAt(x) <= ceilingWall.yAt(x)) crossed = true;
+      }
+      if (crossed) reasons.add('boundaries_crossed');
+    }
+  }
+
+  // --- P12-quater : domaine / extrapolation (DIAGNOSTIC seul si
+  // extrapolationMarginXPct == null) ---
+  final sweep = <String, dynamic>{};
+  for (final m in kExtrapolationMarginSweep) {
+    final flagged = <String>[];
+    for (final entry in [
+      if (ceilingWall != null) ('ceiling_wall', evalsOf(ceilingWall, m)),
+      if (wallFloor != null) ('wall_floor', evalsOf(wallFloor, m)),
+    ]) {
+      entry.$2.forEach((name, e) {
+        if (e.extrapolatedLeft) flagged.add('${entry.$1}.$name.left');
+        if (e.extrapolatedRight) flagged.add('${entry.$1}.$name.right');
+      });
+    }
+    sweep[m.toStringAsFixed(2)] = flagged;
+  }
+
+  final margin = extrapolationMarginXPct;
+  if (margin != null) {
+    for (final entry in [
+      if (ceilingWall != null) ('ceiling_wall', evalsOf(ceilingWall, margin)),
+      if (wallFloor != null) ('wall_floor', evalsOf(wallFloor, margin)),
+    ]) {
+      for (final name in const ['cornerL', 'cornerR']) {
+        final e = entry.$2[name];
+        if (e == null) continue;
+        if (e.extrapolatedLeft) reasons.add('${entry.$1}_extrapolated_left');
+        if (e.extrapolatedRight) reasons.add('${entry.$1}_extrapolated_right');
+      }
+    }
+  }
+
+  // Déduplication : plusieurs points peuvent déclencher la même raison.
+  final uniqueReasons = reasons.toSet().toList();
+
   final subScores = <String, double>{};
   if (ceilingWall != null) {
     subScores['ceilingWallFit'] = _fitScore(
@@ -206,7 +291,7 @@ RoomPlaneAnalysisResult analyseLabelMap(
       ? 0.0
       : subScores.values.reduce((a, b) => a + b) / subScores.length;
 
-  final manualRequired = reasons.isNotEmpty;
+  final manualRequired = uniqueReasons.isNotEmpty;
 
   final debugJson = <String, dynamic>{
     'hasCeiling': hasCeiling,
@@ -215,9 +300,19 @@ RoomPlaneAnalysisResult analyseLabelMap(
     'qualityScore': qualityScore,
     'qualitySubScores': subScores,
     'manualRequired': manualRequired,
-    'manualRequiredReasons': reasons,
+    'manualRequiredReasons': uniqueReasons,
     'ceilingWallCorners': ceilingWall?.corners,
     'wallFloorCorners': wallFloor?.corners,
+    'ceilingWallSampleDomain': ceilingWall == null
+        ? null
+        : [ceilingWall.minSampleXPct, ceilingWall.maxSampleXPct],
+    'wallFloorSampleDomain': wallFloor == null
+        ? null
+        : [wallFloor.minSampleXPct, wallFloor.maxSampleXPct],
+    'ceilingWallEvals': cwEvals?.map((k, v) => MapEntry(k, v.toJson())),
+    'wallFloorEvals': wfEvals?.map((k, v) => MapEntry(k, v.toJson())),
+    'extrapolationSweep': sweep,
+    'extrapolationMarginXPct': extrapolationMarginXPct,
   };
 
   return RoomPlaneAnalysisResult(
@@ -226,7 +321,7 @@ RoomPlaneAnalysisResult analyseLabelMap(
     qualityScore: qualityScore,
     qualitySubScores: subScores,
     manualRequired: manualRequired,
-    manualRequiredReasons: reasons,
+    manualRequiredReasons: uniqueReasons,
     debugJson: debugJson,
   );
 }

@@ -87,6 +87,44 @@ class BoundarySegment {
   });
 }
 
+/// P12-quater — évaluation de la frontière à une abscisse donnée,
+/// accompagnée des drapeaux de garde-fou. Sépare volontairement la
+/// VALEUR (toujours calculée, pour le diagnostic) de sa RECEVABILITÉ
+/// (drapeaux) : l'appelant décide, le calcul ne ment pas.
+class BoundaryEval {
+  final double xPct;
+  final double yPct;
+  final bool extrapolatedLeft;
+  final bool extrapolatedRight;
+
+  /// `true` si [yPct] sort de `[0, 1]` ou n'est pas fini — une
+  /// frontière ne peut pas se situer hors de l'image. Contrôle sans
+  /// seuil réglable, donc bloquant dès P12-quater.
+  final bool yOutOfBounds;
+
+  const BoundaryEval({
+    required this.xPct,
+    required this.yPct,
+    required this.extrapolatedLeft,
+    required this.extrapolatedRight,
+    required this.yOutOfBounds,
+  });
+
+  bool get extrapolated => extrapolatedLeft || extrapolatedRight;
+
+  Map<String, dynamic> toJson() => {
+        'xPct': xPct,
+        'yPct': yPct,
+        'extrapolatedLeft': extrapolatedLeft,
+        'extrapolatedRight': extrapolatedRight,
+        'yOutOfBounds': yOutOfBounds,
+      };
+}
+
+/// Marges balayées par la sonde P12-quater. Aucune n'est retenue comme
+/// seuil produit à ce stade : on rapporte, on décide après lecture.
+const List<double> kExtrapolationMarginSweep = [0.0, 0.02, 0.05, 0.10];
+
 /// Résultat complet de l'extraction pour UNE frontière (ceiling/wall OU
 /// wall/floor) d'UNE scène.
 class PlaneBoundaryResult {
@@ -125,13 +163,23 @@ class PlaneBoundaryResult {
     required this.right,
   });
 
-  /// Hauteur (yPct) de la frontière à l'abscisse [xPct], en utilisant
-  /// le segment approprié si les coins ont été détectés, sinon
-  /// [globalLine]. Ne extrapole jamais au-delà des bornes couvertes par
-  /// [samples] au-delà d'une tolérance raisonnable (clamp doux) — la
-  /// même logique de prudence que `_lineYAtX` dans `edge_detect.dart`,
-  /// réimplémentée ici indépendamment (aucune dépendance croisée entre
-  /// ce fichier et `edge_detect.dart`).
+  /// Borne gauche/droite du domaine réellement OBSERVÉ (xPct du
+  /// premier/dernier échantillon ; [samples] est trié croissant par
+  /// construction, les colonnes étant parcourues dans l'ordre dans
+  /// `_sampleBoundary`). `NaN` si le nuage est vide.
+  double get minSampleXPct => samples.isEmpty ? double.nan : samples.first.xPct;
+  double get maxSampleXPct => samples.isEmpty ? double.nan : samples.last.xPct;
+
+  /// Hauteur (yPct) de la frontière à l'abscisse [xPct], via le segment
+  /// approprié si les coins ont été détectés, sinon [globalLine].
+  ///
+  /// ATTENTION (rectification P12-quater) : cette fonction EXTRAPOLE
+  /// librement hors du domaine observé — elle n'a jamais fait le
+  /// "clamp doux" que sa docstring P11 annonçait. C'est la cause
+  /// racine de haussmann floorR = +0.807 (segment droit ajusté
+  /// jusqu'à xPct 0.747, évalué au-delà, yPct ≈ 1.67). Tout appelant
+  /// qui évalue à une abscisse non garantie interne doit passer par
+  /// [evalAt] et respecter les drapeaux.
   double yAt(double xPct) {
     if (corners == null || left == null || middle == null || right == null) {
       return globalLine.yAt(xPct);
@@ -139,6 +187,23 @@ class PlaneBoundaryResult {
     if (xPct <= corners![0]) return left!.line.yAt(xPct);
     if (xPct >= corners![1]) return right!.line.yAt(xPct);
     return middle!.line.yAt(xPct);
+  }
+
+  /// [yAt] + drapeaux de garde-fou. [margin] est la tolérance (en xPct)
+  /// accordée au-delà du domaine observé avant de déclarer une
+  /// extrapolation ; volontairement NON figée (voir
+  /// [kExtrapolationMarginSweep]).
+  BoundaryEval evalAt(double xPct, {double margin = 0.0}) {
+    final y = yAt(xPct);
+    final lo = minSampleXPct;
+    final hi = maxSampleXPct;
+    return BoundaryEval(
+      xPct: xPct,
+      yPct: y,
+      extrapolatedLeft: lo.isNaN || xPct < lo - margin,
+      extrapolatedRight: hi.isNaN || xPct > hi + margin,
+      yOutOfBounds: !(y.isFinite && y >= 0.0 && y <= 1.0),
+    );
   }
 }
 
