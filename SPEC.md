@@ -860,3 +860,10 @@ points consécutifs dépasse un seuil donné — pour que TOUT appelant
 (pas seulement les tests qui pensent à le faire eux-mêmes) bénéficie
 d'une granularité de trajet suffisante pour des requêtes localisées par
 `uvAt(i).x`. Ne pas laisser cette responsabilité à chaque appelant.
+
+## Renvoi — statuts de rendabilité et preuve visuelle (P13)
+
+Voir `docs/ETAT_MOTEUR_RENDU.md` §8 : trois statuts dérivés côté client
+(`draft`/`pending_render_validation`/`renderable`, aucun champ ajouté
+aux JSON profils), inventaire catalogue (79 profils, 0/79 avec
+`assets.height`), et capture visuelle Panneau A/B commentée.

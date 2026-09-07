@@ -662,3 +662,95 @@ production dans cette mise à jour** : `dxf2profile.py`,
 identiques à leur état du commit `354201e`. Total `statut_gate=OK`
 inchangé à 31/62. Pas de nouveau hash au-delà de `354201e` pour ce
 volet.
+
+---
+
+## 8. Mise à jour P13 — statuts de rendabilité dérivés (client) + inventaire catalogue
+
+**Contexte** : P13 (« preuve visuelle : profil catalogue réel posé sur
+photo réelle ») répondait à une question distincte des sections 1-7
+ci-dessus (qui portaient sur la question d'échelle/branchement des deux
+lignées géométriques) : « un rendu produit par le catalogue réel,
+posé sur une photo réelle avec calibration manuelle, est-il visuellement
+crédible ? ». Capture produite et inspectée à l'œil :
+`/tmp/p13_studio_visual_check.png` (SKU D720, photo
+`assets/demo_scenes/haussmann.jpg`, calibration `PerspCalib.
+forDemoScene('haussmann')`, non modifiée).
+
+### 8.1 Trois statuts de rendabilité — DÉRIVÉS, aucun champ ajouté aux JSON profils
+
+Statuts calculés côté client à partir de champs déjà présents dans les
+JSON (`statut`, `assets.height`) + d'un fait externe (existence d'une
+capture validée à l'œil par un humain). **Aucune écriture dans
+`assets/profiles/*.json` n'a eu lieu ni n'est prévue.**
+
+| Statut dérivé | Condition | Visible Studio ? |
+|---|---|---|
+| `draft` | Géométrie non exploitable (`statut != "OK"`, ou bbox invalide) | Non |
+| `pending_render_validation` | `statut: "OK"` dans le JSON, mais aucune capture n'a été validée à l'œil pour ce SKU | Non — caché client |
+| `renderable` | `statut: "OK"` **et** une capture a été produite et validée visuellement | Oui |
+
+`statut: "OK"` est **nécessaire mais non suffisant** pour `renderable`.
+Sur les 73 profils `OK` du catalogue (§8.2), un seul (D720) a une
+capture produite/inspectée dans le cadre de P13 — les 72 autres restent
+en `pending_render_validation` par construction.
+
+### 8.2 Inventaire catalogue (`/tmp/p13_catalog_renderability.json`)
+
+Fichiers `assets/profiles/*.json` : 80 (dont 1 index, exclu). Profils
+réels : 79. Répartition `statut` : `OK`=73, `ERREUR_SELECTION`=4
+(`0900`, `1005`, `1145c`, `20-54`), `ERREUR_UNITES`=2 (`1102BH`, `1202`).
+
+### 8.3 `assets.height` — absent sur 79/79 → palier enrichi vide
+
+**0 profil sur 79** possède `assets.height` renseigné, y compris les
+8 profils à `motif` non-null (`D515`, `D569`, `D617`, `D628`, `D814`,
+`D815`, `D840`, `D898`). Le palier « rendu enrichi » (height-map pour
+relief fidèle des motifs ornés) est **vide aujourd'hui** — 0 SKU
+éligible. Ces 8 profils ne sont pas rendables avec relief fidèle sans
+height-map, faute de données présentes dans leur JSON.
+
+### 8.4 Constat visuel de la capture (Étape 3, résumé)
+
+- **Panneau A** (`RoomPainter`→`paintCorniceSet`, production) : bande
+  2D plate, épaisseur apparente constante — ne suit pas le rétrécissement
+  en profondeur de la vraie corniche photographiée (bande "flottante",
+  pas de dérive de cadrage aux extrémités).
+- **Panneau B** (`sweepMoulure`+`paintMeshOnCanvas`, non câblé) :
+  silhouette de moulure reconnaissable, convergence de profondeur
+  suivie correctement ; défauts : matière de repli (aplat gris/damier),
+  coupes diagonales abruptes aux deux extrémités ne se raccordant pas
+  aux angles réels de la pièce.
+
+### 8.5 Étape 4 P13 — câblage import photo (lecture seule)
+
+- **`image_picker` : OK**, branché et utilisé réellement par
+  `_importPhoto()` dans `lib/screens/studio/studio_screen.dart`.
+- **`exif_reader` : présent mais orphelin** — `readFocalFromExif()`/
+  `resolveFocal()` (`lib/core/geometry/camera.dart`) n'ont aucun
+  appelant dans `lib/screens/studio/` ni ailleurs dans `lib/` hors
+  `camera.dart` lui-même (cohérent avec le constat déjà consigné en
+  section 3 de ce document, rétractation « EXIF »). Verdict global
+  Étape 4 : **partiel**.
+
+### 8.6 Deux pistes chiffrées en effort — pour décision P14 (aucune recommandation)
+
+- **Piste 1 — réparer le chargement texture Panneau A (HTTP 400 sur
+  l'URL produit D720 chez `staffdecor.fr`)** : diagnostic endpoint/URL +
+  correctif mapping SKU→image ou repli visuel amélioré. N'améliore pas
+  le défaut structurel du Panneau A (bande plate). **Effort estimé :
+  0,5 à 1 jour.**
+- **Piste 2 — brancher le mesh réel (Panneau B) dans `RoomPainter`** :
+  remplacement de `paintCorniceSet` par le chemin mesh pour la famille
+  Corniches, texturing réel du mesh, correction des raccords
+  d'extrémité, correction du défaut connu « sweep.dart 2 anneaux »
+  (section 7 de ce même document), validation visuelle multi-SKU avant
+  tout passage en `renderable` généralisé. **Effort estimé : 4 à 7
+  jours.**
+
+**Rien câblé dans ce tour** : `sweepMoulure` reste non appelé par
+`RoomPainter` ni par aucun écran de production. P12/IA gelé à
+`b38d3e5`. Aucun champ ajouté aux JSON profils.
+
+---
+
