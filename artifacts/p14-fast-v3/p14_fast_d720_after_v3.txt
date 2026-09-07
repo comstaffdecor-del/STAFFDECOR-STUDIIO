@@ -1,0 +1,7 @@
+P14 fast v3 — D720 / calib manuelle mur-miroir (0.16-0.56)
+focalPx = 2488.8889 px [REPLI 35mm-EQUIV — v1 très excentré (mur quasi frontal), v2 vertical dégénéré, PAS retouché]
+backWallDepthM = 5.865124 m (derive de roomHeightM=2.5)
+hSceneM = 2.500 m (par construction, roomHeightM impose)
+hauteur mesh mesuree = 99.47 px (bboxHMm=202.87)
+bornes x mesh = [0.1480, 0.5621] (attendu ~[0.16,0.56])
+Defauts restants : focale = repli 35mm-equiv (mur quasi frontal, VP horizontal a x≈-79.17 hors-cadre) -- plausible mais NON mesuree geometriquement ; pas de verification automatique de galbe/materiau, jugement visuel requis sur le PNG.
