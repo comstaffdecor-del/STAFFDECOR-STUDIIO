@@ -1,0 +1,27 @@
+# P12 - dependances du service de segmentation reelle.
+# Versions figees a celles installees et validees dans ce sandbox
+# (Python 3.13.13), et testees avec succes au curl sur les 4 photos
+# reelles de assets/demo_scenes/ (200 OK, RLE et labels corrects,
+# ~0.65-0.95s d'inference CPU par image a 512x384).
+#
+# torch/torchvision : installer separement via l'index CPU officiel
+# (absents de ce fichier pour ne pas declencher un telechargement CUDA
+# par defaut sur un hebergeur qui n'aurait pas l'index CPU configure) :
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# Versions validees ici : torch==2.14.0+cpu, torchvision==0.29.0+cpu
+#
+# SegformerImageProcessor requiert torchvision (sinon ImportError au
+# chargement du modele) - piege non documente dans le brief initial.
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+transformers==5.16.1
+cachetools==7.1.8
+numpy==2.3.5
+# numpy>=2.1 requis par cette version de scipy (dependance transitive de
+# transformers) ; numpy 1.26.4 (present par defaut dans ce sandbox)
+# provoque un crash au chargement ("ValueError: All ufuncs must have
+# type numpy.ufunc") dans scipy.special._multiufuncs. 2.3.5 est aussi
+# le plafond tolere par numba dans ce meme sandbox (numba<2.4) - a
+# ignorer si numba n'est pas installe sur l'hote de production.
