@@ -142,24 +142,34 @@ RoomPlaneAnalysisResult analyseLabelMap(
   PlaneBoundaryResult? wallFloor;
 
   if (hasCeiling && hasWall) {
+    // P12-ter : plafond jamais occulté -> dernier pixel de la classe
+    // supérieure (ceiling) est fiable. Mode explicite (voir brief :
+    // "la configuration doit exposer ce choix explicitement").
     ceilingWall = extractPlaneBoundary(
       mask,
       above: RoomPlaneClass.ceiling,
       below: RoomPlaneClass.wall,
       cornerSearchMargin: cornerSearchMargin,
       minSeg: minSeg,
+      sampleMode: BoundarySampleMode.lastOfUpper,
     );
   } else {
     reasons.add('boundary_ceiling_wall_unavailable');
   }
 
   if (hasWall && hasFloor) {
+    // P12-ter : plinthe quasi-systématiquement occultée par du
+    // mobilier (classé unknown) -> le dernier pixel wall mesure le
+    // sommet du meuble, pas la plinthe. On prend le premier pixel de
+    // la classe inférieure (floor) en remontant depuis le bas de la
+    // colonne.
     wallFloor = extractPlaneBoundary(
       mask,
       above: RoomPlaneClass.wall,
       below: RoomPlaneClass.floor,
       cornerSearchMargin: cornerSearchMargin,
       minSeg: minSeg,
+      sampleMode: BoundarySampleMode.firstOfLower,
     );
   } else {
     reasons.add('boundary_wall_floor_unavailable');

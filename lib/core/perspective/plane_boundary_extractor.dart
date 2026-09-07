@@ -18,6 +18,18 @@
 ///      positions xL/xR des coins réels des presets (`demoPresets`,
 ///      coins à xPct=0.100/0.900 selon la scène).
 ///
+/// P12-ter — correctif asymétrique de l'échantillonnage par colonne
+/// (`BoundarySampleMode`, voir plus bas) : le diagnostic P12-bis a
+/// établi que le plafond est bien détecté (résidus 0,008 à 0,036,
+/// transition franche) mais que la frontière mur/sol souffrait d'un
+/// biais mécanique, pas géométrique — le mobilier (canapés, tables,
+/// fauteuils, plantes) est classé `unknown`, donc chercher "le dernier
+/// pixel wall" avant le sol revient à mesurer le sommet du canapé, pas
+/// la plinthe. Le correctif repose sur une asymétrie physique : rien
+/// n'occulte un plafond (mode `lastOfUpper`, inchangé), tout occulte
+/// une plinthe (mode `firstOfLower`, nouveau, décrit en détail sur
+/// [BoundarySampleMode] et dans `_sampleBoundary`).
+///
 /// Les 3 points de correction du brief P11 sont appliqués dès cette
 /// première version (fichier neuf, aucune version antérieure buguée
 /// dans ce dépôt à "corriger" — la spécification finale est appliquée
@@ -147,18 +159,70 @@ const int kDefaultMinSeg = 6;
 /// courante pour un rejet robuste, ni trop permissif ni trop agressif).
 const double kMadRejectMultiplier = 3.0;
 
-/// Échantillonne la frontière [above] -> [below] sur [mask] : pour
-/// chaque colonne, scanne verticalement de haut en bas et retient la
-/// première ligne où un pixel de classe [above] est immédiatement
-/// suivi (verticalement) d'un pixel de classe [below] — colonne
-/// ignorée (pas de sample) si cette transition n'existe pas exactement
-/// une fois dans la colonne (transition absente, ou plusieurs
-/// candidats ambigus — le masque contient alors du bruit sur cette
-/// colonne, mieux vaut l'exclure que produire un sample erroné).
+/// P12-ter — mode d'échantillonnage par colonne pour
+/// [extractPlaneBoundary] / [_sampleBoundary]. Voir docstring de
+/// fichier (section P12-ter) pour le raisonnement complet : l'asymétrie
+/// physique entre un plafond (jamais occulté) et une plinthe
+/// (quasi-systématiquement occultée par du mobilier) impose deux
+/// stratégies de recherche distinctes plutôt qu'une seule.
+enum BoundarySampleMode {
+  /// Conserve le DERNIER pixel de la classe [above] immédiatement
+  /// suivi d'un pixel [below] (scan haut -> bas, transition unique
+  /// exigée) — comportement historique P11, inchangé. Utilisé pour la
+  /// frontière plafond/mur : rien n'occulte un plafond, donc le dernier
+  /// pixel `ceiling` avant `wall` est fiable (résidus 0,008 à 0,036
+  /// mesurés en P12-bis).
+  lastOfUpper,
+
+  /// Cherche le PREMIER pixel de la classe [below] en REMONTANT depuis
+  /// le bas de la colonne (`y = h-1` vers `y = 0`), et retient le
+  /// sommet du bloc CONTIGU de pixels [below] ancré au bord bas de
+  /// l'image. Utilisé pour la frontière mur/sol : le mobilier (canapés,
+  /// tables, plantes, classés `unknown`) occulte presque toujours la
+  /// plinthe réelle, donc chercher "le dernier pixel wall" revient à
+  /// mesurer le sommet du meuble, pas la plinthe (diagnostic P12-bis).
+  /// Voir caveats #1 et #2 du brief P12-ter dans [_sampleBoundary].
+  firstOfLower,
+}
+
+/// Échantillonne la frontière [above] -> [below] sur [mask] selon
+/// [mode] — une valeur `(xPct, yPct)` par colonne valide, colonne
+/// exclue (jamais de valeur par défaut) si aucun échantillon fiable
+/// n'y est trouvé.
+///
+/// Mode [BoundarySampleMode.lastOfUpper] (plafond/mur, inchangé depuis
+/// P11) : scanne chaque colonne de haut en bas et retient la ligne où
+/// un pixel [above] est immédiatement suivi d'un pixel [below] —
+/// colonne ignorée si cette transition n'existe pas exactement une
+/// fois (transition absente, ou plusieurs candidats ambigus : le
+/// masque contient alors du bruit sur cette colonne, mieux vaut
+/// l'exclure que produire un sample erroné).
+///
+/// Mode [BoundarySampleMode.firstOfLower] (mur/sol, nouveau P12-ter) :
+/// remonte depuis le bas de la colonne (`y = h-1`) et retient le
+/// sommet du bloc CONTIGU de pixels [below] ancré à ce bord bas.
+///   - Caveat #1 (brief P12-ter) : on part IMPÉRATIVEMENT du bas, pas
+///     du haut. Descendre depuis le haut et prendre le premier pixel
+///     [below] rencontré attraperait un faux positif haut dans l'image
+///     — un reflet de sol dans un miroir, ou un patch de parquet
+///     visible sous un meuble suspendu et donc déconnecté du bord bas
+///     réel. Remonter depuis le bas et exiger la contiguïté avec ce
+///     bord ignore mécaniquement ces patchs isolés et donne la vraie
+///     plinthe (le bloc de sol qui touche effectivement le bas de la
+///     photo).
+///   - Caveat #2 (brief P12-ter) : si le pixel du bord bas (`y = h-1`)
+///     n'est pas déjà de classe [below], la colonne est EXCLUE — que
+///     ce soit parce qu'elle ne contient aucun pixel [below] du tout,
+///     ou parce que le seul pixel [below] présent est un patch isolé
+///     non contigu au bord bas (donc suspect, voir caveat #1) — jamais
+///     de valeur par défaut. Cette proportion de colonnes exclues est
+///     elle-même une donnée de diagnostic (futur "discriminant
+///     moderne", voir brief P12-ter §2/§5 — pas encore exploitée ici).
 List<BoundarySample> _sampleBoundary(
   RoomPlaneMaskResult mask,
   RoomPlaneClass above,
   RoomPlaneClass below,
+  BoundarySampleMode mode,
 ) {
   final flat = mask.decode();
   final w = mask.width;
@@ -167,22 +231,42 @@ List<BoundarySample> _sampleBoundary(
   final belowIdx = below.index;
 
   final samples = <BoundarySample>[];
-  for (var x = 0; x < w; x++) {
-    var transitionY = -1;
-    var transitionCount = 0;
-    for (var y = 0; y < h - 1; y++) {
-      final cur = flat[y * w + x];
-      final next = flat[(y + 1) * w + x];
-      if (cur == aboveIdx && next == belowIdx) {
-        transitionY = y;
-        transitionCount++;
+
+  if (mode == BoundarySampleMode.lastOfUpper) {
+    for (var x = 0; x < w; x++) {
+      var transitionY = -1;
+      var transitionCount = 0;
+      for (var y = 0; y < h - 1; y++) {
+        final cur = flat[y * w + x];
+        final next = flat[(y + 1) * w + x];
+        if (cur == aboveIdx && next == belowIdx) {
+          transitionY = y;
+          transitionCount++;
+        }
+      }
+      if (transitionCount == 1) {
+        samples.add(
+          BoundarySample((x + 0.5) / w, (transitionY + 0.5) / h),
+        );
       }
     }
-    if (transitionCount == 1) {
-      samples.add(
-        BoundarySample((x + 0.5) / w, (transitionY + 0.5) / h),
-      );
+    return samples;
+  }
+
+  // BoundarySampleMode.firstOfLower — voir caveats #1/#2 ci-dessus.
+  for (var x = 0; x < w; x++) {
+    if (flat[(h - 1) * w + x] != belowIdx) {
+      // Bord bas non-[below] : colonne exclue (caveat #2), jamais de
+      // défaut.
+      continue;
     }
+    var y = h - 1;
+    while (y > 0 && flat[(y - 1) * w + x] == belowIdx) {
+      y--;
+    }
+    // y est maintenant le sommet du bloc contigu de [below] ancré au
+    // bord bas — c'est la plinthe (caveat #1).
+    samples.add(BoundarySample((x + 0.5) / w, (y + 0.5) / h));
   }
   return samples;
 }
@@ -350,16 +434,30 @@ List<int>? _findTwoBreakpointIndices(
 /// Point d'entrée principal : extrait la frontière [above] -> [below]
 /// de [mask] et produit le [PlaneBoundaryResult] complet (échantillons,
 /// droite globale robuste, coins + segments si détectés).
+///
+/// [sampleMode] contrôle la stratégie d'échantillonnage par colonne
+/// (voir [BoundarySampleMode] et docstring de fichier, section
+/// P12-ter). Défaut = [BoundarySampleMode.lastOfUpper], qui préserve
+/// EXACTEMENT le comportement historique P11 pour tout appelant ne
+/// spécifiant pas ce paramètre (compatibilité requise, notamment pour
+/// `p11_room_plane_segmentation_contract_test.dart` qui appelle cette
+/// fonction directement sans argument de mode). Les appelants
+/// P12-ter-aware (`room_plane_analysis.dart`) doivent passer ce
+/// paramètre EXPLICITEMENT : `lastOfUpper` pour plafond/mur,
+/// `firstOfLower` pour mur/sol — le brief exige que ce choix soit
+/// exposé en configuration plutôt que codé en dur, précisément pour
+/// que la sonde puisse mesurer les deux variantes sur une même passe.
 PlaneBoundaryResult extractPlaneBoundary(
   RoomPlaneMaskResult mask, {
   required RoomPlaneClass above,
   required RoomPlaneClass below,
   double cornerSearchMargin = kDefaultCornerSearchMargin,
   int minSeg = kDefaultMinSeg,
+  BoundarySampleMode sampleMode = BoundarySampleMode.lastOfUpper,
 }) {
   // (a) breakpoints calculés sur les samples filtrés COMPLETS, sans
   // sous-échantillonnage — voir docstring de section.
-  final breakpointBase = _sampleBoundary(mask, above, below);
+  final breakpointBase = _sampleBoundary(mask, above, below, sampleMode);
   final breakpointSingleFit = _lsq(breakpointBase);
   final indices = _findTwoBreakpointIndices(
     breakpointBase,

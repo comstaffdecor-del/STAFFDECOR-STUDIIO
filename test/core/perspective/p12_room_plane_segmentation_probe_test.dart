@@ -41,9 +41,11 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:staff_decor_studio/core/perspective/http_room_plane_segmenter.dart';
+import 'package:staff_decor_studio/core/perspective/plane_boundary_extractor.dart';
 import 'package:staff_decor_studio/core/perspective/room_plane_analysis.dart';
 import 'package:staff_decor_studio/core/perspective/room_plane_segmenter.dart';
 import 'package:staff_decor_studio/models/persp_calib.dart';
@@ -81,6 +83,23 @@ class SceneProbeResult {
   final List<String> manualRequiredReasons;
   final int inferenceMs;
 
+  // P12-ter §4 : collectees maintenant SANS en faire une porte -- ce
+  // sont les 2 grandeurs qui serviront a concevoir le "discriminant
+  // moderne" au tour suivant (brief P12-ter §2/§5).
+  /// Proportion de colonnes valides (samples.length / mask.width) pour
+  /// chaque frontiere -- pour wallFloor en mode firstOfLower, une
+  /// colonne exclue signifie qu'aucun pixel floor n'atteint le bord bas
+  /// de l'image sur cette colonne (occlusion totale, voir caveat #2).
+  final double ceilingWallValidColumnProportion;
+  final double wallFloorValidColumnProportion;
+
+  /// Dispersion (ecart-type) des residus `yPct - yAt(xPct)` sur les
+  /// samples de chaque frontiere -- mesure la coherence interne du
+  /// nuage de points, independamment de la comparaison a la verite
+  /// terrain (ceilL/ceilR/floorL/floorR).
+  final double ceilingWallResidualDispersion;
+  final double wallFloorResidualDispersion;
+
   const SceneProbeResult({
     required this.scene,
     required this.ceilL,
@@ -94,6 +113,10 @@ class SceneProbeResult {
     required this.manualRequired,
     required this.manualRequiredReasons,
     required this.inferenceMs,
+    required this.ceilingWallValidColumnProportion,
+    required this.wallFloorValidColumnProportion,
+    required this.ceilingWallResidualDispersion,
+    required this.wallFloorResidualDispersion,
   });
 
   Map<String, dynamic> toJson() => {
@@ -110,6 +133,14 @@ class SceneProbeResult {
     'manualRequired': manualRequired,
     'manualRequiredReasons': manualRequiredReasons,
     'inferenceMs': inferenceMs,
+    'validColumnProportion': {
+      'ceilingWall': ceilingWallValidColumnProportion,
+      'wallFloor': wallFloorValidColumnProportion,
+    },
+    'residualDispersion': {
+      'ceilingWall': ceilingWallResidualDispersion,
+      'wallFloor': wallFloorResidualDispersion,
+    },
   };
 }
 
@@ -186,6 +217,22 @@ Future<SceneProbeResult> _runProbe(String scene) async {
     reasons.add('corner_position_undetected');
   }
 
+  // P12-ter §4 : proportion de colonnes valides + dispersion des
+  // residus, collectees sans en faire une porte (voir docstring de
+  // SceneProbeResult).
+  final ceilingWallValidProp = mask.width == 0
+      ? 0.0
+      : (ceilingWall?.samples.length ?? 0) / mask.width;
+  final wallFloorValidProp = mask.width == 0
+      ? 0.0
+      : (wallFloor?.samples.length ?? 0) / mask.width;
+  final ceilingWallDispersion = ceilingWall == null
+      ? 0.0
+      : _residualStdDev(ceilingWall.samples, ceilingWall.yAt);
+  final wallFloorDispersion = wallFloor == null
+      ? 0.0
+      : _residualStdDev(wallFloor.samples, wallFloor.yAt);
+
   return SceneProbeResult(
     scene: scene,
     ceilL: ceilL,
@@ -199,7 +246,29 @@ Future<SceneProbeResult> _runProbe(String scene) async {
     manualRequired: analysis.manualRequired || detectedCorners == null,
     manualRequiredReasons: reasons,
     inferenceMs: stopwatch.elapsedMilliseconds,
+    ceilingWallValidColumnProportion: ceilingWallValidProp,
+    wallFloorValidColumnProportion: wallFloorValidProp,
+    ceilingWallResidualDispersion: ceilingWallDispersion,
+    wallFloorResidualDispersion: wallFloorDispersion,
   );
+}
+
+/// Ecart-type des residus `yPct - yAt(xPct)` sur [samples] -- mesure de
+/// dispersion PURE (pas de comparaison a une verite terrain), utilisee
+/// par le brief P12-ter §4 comme candidate pour le futur "discriminant
+/// moderne" (§2/§5), collectee ici sans etre transformee en porte.
+double _residualStdDev(
+  List<BoundarySample> samples,
+  double Function(double xPct) yAt,
+) {
+  if (samples.length < 2) return 0.0;
+  final residuals = samples.map((s) => s.yPct - yAt(s.xPct)).toList();
+  final mean = residuals.reduce((a, b) => a + b) / residuals.length;
+  var sumSq = 0.0;
+  for (final r in residuals) {
+    sumSq += (r - mean) * (r - mean);
+  }
+  return math.sqrt(sumSq / residuals.length);
 }
 
 String _fmtErr(double? v) => v == null ? 'N/A (manualRequired)' : v.toStringAsFixed(4);
@@ -250,7 +319,11 @@ void main() {
           'xL=${_fmtErr(result.xL)} xR=${_fmtErr(result.xR)} '
           'qualityScore=${result.qualityScore.toStringAsFixed(4)} '
           'manualRequired=${result.manualRequired} '
-          'inferenceMs=${result.inferenceMs}',
+          'inferenceMs=${result.inferenceMs} '
+          'validCol(ceil/floor)=${result.ceilingWallValidColumnProportion.toStringAsFixed(3)}/'
+          '${result.wallFloorValidColumnProportion.toStringAsFixed(3)} '
+          'dispersion(ceil/floor)=${result.ceilingWallResidualDispersion.toStringAsFixed(4)}/'
+          '${result.wallFloorResidualDispersion.toStringAsFixed(4)}',
         );
 
         // Seule assertion : le test doit produire un resultat mesurable
@@ -295,6 +368,16 @@ void main() {
         buffer.writeln('  manualRequired = ${r.manualRequired}');
         buffer.writeln('  manualRequiredReasons = ${r.manualRequiredReasons}');
         buffer.writeln('  inferenceMs = ${r.inferenceMs}');
+        buffer.writeln(
+          '  validColumnProportion: ceilingWall=${r.ceilingWallValidColumnProportion.toStringAsFixed(3)} '
+          'wallFloor=${r.wallFloorValidColumnProportion.toStringAsFixed(3)} '
+          '(P12-ter \u00a74, pas une porte -- candidat "discriminant moderne")',
+        );
+        buffer.writeln(
+          '  residualDispersion: ceilingWall=${r.ceilingWallResidualDispersion.toStringAsFixed(4)} '
+          'wallFloor=${r.wallFloorResidualDispersion.toStringAsFixed(4)} '
+          '(P12-ter \u00a74, pas une porte -- candidat "discriminant moderne")',
+        );
         buffer.writeln('');
       }
       if (inferenceTimes.isNotEmpty) {
