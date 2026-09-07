@@ -119,7 +119,22 @@ async def segment(
     width: int = Form(...),
     height: int = Form(...),
     image: UploadFile = File(...),
+    do_resize: bool = True,
 ) -> dict:
+    """`do_resize` est un parametre de QUERY STRING (pas Form) ajoute
+    pour le diagnostic P12-bis (hypothese A : deformation du rapport
+    d'aspect a l'entree du processeur). Defaut True = comportement de
+    production inchange (identique a P12). Passe a False uniquement
+    par ?do_resize=false dans l'URL, pour comparer sans toucher au
+    contrat multipart ni au client Dart (HttpRoomPlaneSegmenter envoie
+    l'URI `endpoint` telle quelle a MultipartRequest, donc une query
+    string sur l'URI passee au constructeur suffit, zero modif Dart).
+    Diagnostic uniquement : ne pas laisser un client de production
+    dependre de ce parametre sans repasser par une decision explicite
+    (cf. reserve du brief : do_resize=False est plus lent / plus
+    gourmand en memoire, acceptable pour une image, pas pour un
+    service).
+    """
     if not (16 <= width <= 2048 and 16 <= height <= 2048):
         raise HTTPException(400, "width/height hors bornes [16, 2048]")
 
@@ -129,7 +144,7 @@ async def segment(
 
     cache_key = None
     if _cache is not None:
-        cache_key = (hashlib.sha256(raw).hexdigest(), width, height)
+        cache_key = (hashlib.sha256(raw).hexdigest(), width, height, do_resize)
         cached = _cache.get(cache_key)
         if cached is not None:
             return cached
@@ -140,7 +155,7 @@ async def segment(
         raise HTTPException(400, f"image illisible: {exc}") from exc
 
     with torch.no_grad():
-        inputs = _processor(images=img, return_tensors="pt")
+        inputs = _processor(images=img, return_tensors="pt", do_resize=do_resize)
         logits = _model(**inputs).logits  # (1, 150, h_model, w_model)
 
     # Upsampling BILINEAIRE des LOGITS (valeurs continues) vers la
