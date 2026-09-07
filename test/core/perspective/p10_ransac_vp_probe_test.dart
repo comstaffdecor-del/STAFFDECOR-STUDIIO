@@ -30,6 +30,40 @@ import 'dart:ui' as ui;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:staff_decor_studio/core/perspective/edge_detect.dart';
 
+// P10 TEMPS3 — PRIORITE 2 : témoin aléatoire de validation/invalidation
+// du RANSAC. Ajout ADDITIF pur (aucune ligne ci-dessus modifiée) :
+// pour chaque scène, on tire 500 points uniformément dans [-0.5,1.5]²
+// (espace xPct/yPct, mêmes bornes que `kVpBoundLow`/`kVpBoundHigh` du
+// verdict `usable`) et on compte, au MÊME seuil `kInlierDistThreshold`
+// (0.05) et sur les MÊMES `rawLines` (allDiags), combien de droites
+// chaque point aléatoire "explique" par hasard. Objectif : établir si
+// le `bestInlierCount` du RANSAC est significativement meilleur qu'un
+// témoin aléatoire, ou si 60-70 inliers est simplement ce qu'on obtient
+// n'importe où dans l'image avec ~250-300 diagonales disponibles et un
+// seuil de 5% de largeur (auquel cas le RANSAC ne "trouve" rien de
+// spécifique). Seed fixe (reproductibilité du probe, pas un aléa réel
+// d'un tirage à l'autre — même philosophie déterministe que le reste
+// de la suite p9/p10).
+//
+// ⚠️ NOTE MÉTHODOLOGIQUE OBLIGATOIRE (documentée ici ET dans les
+// fichiers de sortie) : `radialMAD` et `maxResidual` du RANSAC sont
+// CIRCULAIRES — ils sont calculés UNIQUEMENT sur les distances des
+// inliers déjà sélectionnés par le seuil `kInlierDistThreshold`, donc
+// ils sont mathématiquement bornés par ce seuil (maxResidual <= 0.05
+// par construction) et ne peuvent JAMAIS être mauvais, quelle que soit
+// la qualité réelle du point trouvé. Ils NE DOIVENT PAS servir de
+// critère de qualité ou de décision — seul `inlierCount`/`inlierRatio`
+// comparé au témoin aléatoire ci-dessous a un pouvoir discriminant.
+const int kRandomWitnessTrials = 500;
+const int kRandomWitnessSeed = 42;
+
+double _percentile(List<double> xs, double p) {
+  if (xs.isEmpty) return double.nan;
+  final s = [...xs]..sort();
+  final idx = (p * (s.length - 1)).round().clamp(0, s.length - 1);
+  return s[idx];
+}
+
 const List<String> kPresetKeys = [
   'haussmann',
   'moderne',
@@ -250,6 +284,54 @@ void main() {
           }
         }
 
+        // --- Témoin aléatoire (PRIORITE 2) : 500 VP tirés uniformément --
+        // dans [-0.5,1.5]², même seuil, mêmes rawLines (allDiags). Calculé
+        // AVANT le `if (bestVp == null)` pour rester disponible même si
+        // le RANSAC lui-même n'a trouvé aucune hypothèse valide (cas
+        // dégénéré : le témoin reste une mesure indépendante).
+        final rng = math.Random(kRandomWitnessSeed);
+        final randomInlierCounts = <int>[];
+        for (var t = 0; t < kRandomWitnessTrials; t++) {
+          final rx = kVpBoundLow + rng.nextDouble() * (kVpBoundHigh - kVpBoundLow);
+          final ry = kVpBoundLow + rng.nextDouble() * (kVpBoundHigh - kVpBoundLow);
+          final randPt = _WPt(rx, ry * hw);
+          var cnt = 0;
+          for (final cand in allDiags) {
+            if (_pointToLineDist(randPt, cand) <= kInlierDistThreshold) {
+              cnt++;
+            }
+          }
+          randomInlierCounts.add(cnt);
+        }
+        final randomMedian = _median(
+          randomInlierCounts.map((e) => e.toDouble()).toList(),
+        );
+        final randomP95 = _percentile(
+          randomInlierCounts.map((e) => e.toDouble()).toList(),
+          0.95,
+        );
+        logLine(
+          '[p10ransac][witness] scene=$key trials=$kRandomWitnessTrials '
+          'seed=$kRandomWitnessSeed medianInliers='
+          '${randomMedian.toStringAsFixed(2)} p95Inliers='
+          '${randomP95.toStringAsFixed(2)} '
+          '(comparer a bestInlierCount du RANSAC ci-dessous)',
+        );
+        final randomWitnessJson = {
+          'trials': kRandomWitnessTrials,
+          'seed': kRandomWitnessSeed,
+          'sampleBounds': {'low': kVpBoundLow, 'high': kVpBoundHigh},
+          'inlierDistThreshold': kInlierDistThreshold,
+          'medianInlierCount': randomMedian,
+          'p95InlierCount': randomP95,
+          'note':
+              'temoin aleatoire : compare bestInlierCount (RANSAC) a ces '
+              'valeurs. radialMAD/maxResidual sont CIRCULAIRES (calcules '
+              'uniquement sur les inliers du seuil retenu, bornes par '
+              'kInlierDistThreshold) et ne doivent PAS servir de critere '
+              'de qualite ou de decision.',
+        };
+
         if (bestVp == null) {
           logLine(
             '[p10ransac] scene=$key AUCUNE hypothèse valide '
@@ -282,6 +364,7 @@ void main() {
               'medianXPctLeft': vLeftMedianX.isNaN ? null : vLeftMedianX,
               'medianXPctRight': vRightMedianX.isNaN ? null : vRightMedianX,
             },
+            'randomWitness': randomWitnessJson,
           };
           File('/tmp/p10_ransac_vp_$key.json').writeAsStringSync(
             const JsonEncoder.withIndent('  ').convert(jsonMap),
@@ -340,9 +423,18 @@ void main() {
           '${bestVpYPct.toStringAsFixed(4)}) '
           'inlierCount=$bestInlierCount inlierRatio='
           '${inlierRatio.toStringAsFixed(4)} '
-          'radialMAD=${radialMad.toStringAsFixed(4)} '
-          'maxResidual=${maxResidual.toStringAsFixed(4)} '
+          'radialMAD=${radialMad.toStringAsFixed(4)} (CIRCULAIRE, ne pas '
+          'utiliser comme critere) '
+          'maxResidual=${maxResidual.toStringAsFixed(4)} (CIRCULAIRE, ne '
+          'pas utiliser comme critere) '
           'verdict=$verdict',
+        );
+        logLine(
+          '[p10ransac][witness-vs-ransac] scene=$key '
+          'bestInlierCount(RANSAC)=$bestInlierCount vs '
+          'medianInliers(temoin)=${randomMedian.toStringAsFixed(2)} vs '
+          'p95Inliers(temoin)=${randomP95.toStringAsFixed(2)} -> '
+          '${bestInlierCount > randomP95 ? "RANSAC bat le p95 aleatoire" : bestInlierCount > randomMedian ? "RANSAC bat la mediane mais pas le p95 aleatoire" : "RANSAC NE BAT PAS le temoin aleatoire"}',
         );
         logLine(
           '[p10ransac] scene=$key verticalsAfterFix='
@@ -372,8 +464,18 @@ void main() {
           'totalDiagonalCount': totalDiagCount,
           'inlierRatio': inlierRatio,
           'radialMAD': radialMad,
+          'radialMAD_WARNING':
+              'CIRCULAIRE : calcule uniquement sur les inliers deja '
+              'selectionnes par inlierDistThreshold, borne par construction '
+              '<= inlierDistThreshold. Ne pas utiliser comme critere de '
+              'qualite/decision.',
           'maxResidual': maxResidual,
+          'maxResidual_WARNING':
+              'CIRCULAIRE : borne par construction <= inlierDistThreshold '
+              '(meme raison que radialMAD_WARNING). Ne pas utiliser comme '
+              'critere de qualite/decision.',
           'vpInBounds': vpInBounds,
+          'randomWitness': randomWitnessJson,
           'selectedLines': [
             for (var i = 0; i < bestInlierLines.length; i++)
               _lineToReportJson(bestInlierLines[i], bestDistances[i]),
