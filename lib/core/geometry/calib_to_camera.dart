@@ -138,7 +138,24 @@ Vector2 calibPointToPixels(
 /// plinthe + moulure) sont dessinées dans la même scène — toutes doivent
 /// utiliser la même valeur pour ne pas se retrouver à des échelles
 /// visuelles incohérentes entre elles. Défaut 3.0 m, raisonnable pour une
-/// pièce standard.
+/// pièce standard. **Ignoré si [roomHeightM] est fourni** (voir ci-dessous).
+///
+/// [roomHeightM] (optionnel, `null` par défaut) : si fourni, **remplace**
+/// [backWallDepthM] par une profondeur dérivée qui rend la scène 3D
+/// métriquement cohérente avec la hauteur sous plafond réelle donnée —
+/// càd que `hSceneM = pH * backWallDepthEffectif / focalPx` (voir
+/// `strip_px_from_dims.dart::pxParMm`, même pH, même convention) égale
+/// exactement [roomHeightM] :
+/// `backWallDepthEffectif = roomHeightM * focalPx / pH`, avec `pH` calculé
+/// ici exactement comme `VanishingPoint.pH` en production
+/// (`floorL.yPct - ceilL.yPct`, en pixels). Cause corrigée : P14-C a établi
+/// que la valeur fixe `backWallDepthM=3.0` encodait implicitement une
+/// hauteur de scène (`hSceneM≈1.676m`) différente de `metresHauteur`
+/// (2.5m, défaut `AppState`), un facteur multiplicatif A≈1.4913 sur toute
+/// mesure de profondeur dans la scène (voir P14-D). Laisser `null` (défaut)
+/// reproduit EXACTEMENT le comportement précédent (aucune régression) —
+/// seul un appelant qui fournit explicitement [roomHeightM] obtient la
+/// scène corrigée.
 ///
 /// Lance [ArgumentError] si le mur du fond et le plafond dérivés sont
 /// (quasi) parallèles (configuration dégénérée — calibration invalide,
@@ -149,6 +166,7 @@ CalibratedScene buildCalibratedScene({
   required double imageWidthPx,
   required double imageHeightPx,
   double backWallDepthM = 3.0,
+  double? roomHeightM,
 }) {
   final ceilLPx = calibPointToPixels(
     calib.ceilL,
@@ -187,10 +205,21 @@ CalibratedScene buildCalibratedScene({
     principalPoint: focal.principalPoint,
   );
 
-  final ceilL3D = camera.unproject(ceilLPx, backWallDepthM);
-  final ceilR3D = camera.unproject(ceilRPx, backWallDepthM);
-  final floorL3D = camera.unproject(floorLPx, backWallDepthM);
-  final floorR3D = camera.unproject(floorRPx, backWallDepthM);
+  // Profondeur effective du mur du fond : si [roomHeightM] est fourni, on
+  // la dérive pour que la scène soit métriquement cohérente avec la
+  // hauteur sous plafond réelle (cause A du gap P14-C, corrigée en P14-D) ;
+  // sinon on garde [backWallDepthM] tel quel (comportement historique,
+  // zéro régression). `pH` recalculé ici EXACTEMENT comme
+  // `VanishingPoint.pH` en production (`floorL.yPct - ceilL.yPct`, pixels)
+  // — même convention, pas une approximation séparée.
+  final effectiveBackWallDepthM = roomHeightM == null
+      ? backWallDepthM
+      : roomHeightM * focal.focalPx / (floorLPx.y - ceilLPx.y);
+
+  final ceilL3D = camera.unproject(ceilLPx, effectiveBackWallDepthM);
+  final ceilR3D = camera.unproject(ceilRPx, effectiveBackWallDepthM);
+  final floorL3D = camera.unproject(floorLPx, effectiveBackWallDepthM);
+  final floorR3D = camera.unproject(floorRPx, effectiveBackWallDepthM);
 
   final ceilingY = (ceilL3D.y + ceilR3D.y) / 2.0;
   final ceilingPlane = Plane3.fromPointAndNormal(
@@ -230,6 +259,6 @@ CalibratedScene buildCalibratedScene({
     ceilR3D: ceilR3D,
     floorL3D: floorL3D,
     floorR3D: floorR3D,
-    backWallDepthM: backWallDepthM,
+    backWallDepthM: effectiveBackWallDepthM,
   );
 }
