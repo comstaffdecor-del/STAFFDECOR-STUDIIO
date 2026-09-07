@@ -1,0 +1,79 @@
+P14-C — DIAGNOSTIC d'echelle (grille 6 echelles D720 sur haussmann.jpg) — rapport
+CE RAPPORT N'EST NI UNE PREUVE PRODUIT NI UNE VALIDATION DE RENDABILITE.
+=========================================================
+
+CHEMIN DE RENDU UTILISE (pour les 6 panneaux) :
+  lib/core/geometry/sweep.dart::sweepMoulure (extrusion du contour COMPLET profil_mm)
+  + lib/core/perspective/mesh_painter.dart::paintMeshOnCanvas (projection Camera3D + tri peintre + eclairage)
+  -> VRAIE silhouette (PAS paintCorniceSet, le chemin bande-plate de production).
+
+MEME ANCRAGE POUR LES 6 PANNEAUX :
+  PerspCalib.forDemoScene('haussmann') (preset non modifie)
+  buildCalibratedScene(calib, imageWidthPx=2560, imageHeightPx=1783, backWallDepthM=3.0 [defaut])
+  Meme pathMeters (subdivision 50mm de l'arete ceilLOnEdge->ceilROnEdge) et meme wallPlanes/ceilingPlane pour tous les panneaux.
+
+MATIERE : blanc casse uni (0xFFF2EEE4), ambient=1.0 dans paintMeshOnCanvas.
+  mesh_painter.dart lignes 100-102 : brightness = ambient + (1-ambient)*((dot(normal,light)+1)/2).
+  Avec ambient=1.0, brightness = 1.0 QUEL QUE SOIT le sommet/la facette -> aucune variation de luminosite,
+  donc aucun degrade Lambertien source d'un artefact "damier" possible dans ce rendu.
+
+0) ETAPE 0 (brief P14-C) + BRANCHES C.1/C.2 — RESUME (detail complet : /tmp/p14_scale_factor_analysis_d720.txt) :
+   Etape 0 (convention de mesure) : verticale-image=195.3374px vs perpendiculaire-ancrage=195.3320px
+     delta=0.0028% (<1%) -> convention ECARTEE comme cause.
+     Ratio (convention verticale-image, ancienne mesure) = 1.730859 (persiste)
+     Ratio (convention perpendiculaire-ancrage, meme convention que production)  = 1.730811 (quasi-identique, confirme que le choix de convention ne change pas le constat).
+   Branche C.1 (pH scene 3D vs pH production) : reprojection stricte des coins scene -> ecart=2.274e-13px (bruit flottant) -> IDENTIQUES, cause ECARTEE.
+   Branche C.2 (ETABLIE) : gap = facteur A x facteur B :
+     A = metresHauteur/hSceneM = 1.491346 (backWallDepthM=3.0m code implicitement hSceneM=1.676338m, != metresHauteur=2.5 m)
+     B = 1.160603 (profondeur reelle du profil D720 : bord libre plus proche de la camera que le mur du fond -> perspective reelle)
+     A x B = 1.730861 vs ratio total mesure 1.730859 (ecart=0.000002) -> explique ENTIEREMENT le gap, sans reste inexplique.
+
+1) FACTEUR mm->px ACTUELLEMENT APPLIQUE EN PRODUCTION, ET PROVENANCE EXACTE :
+   Champ/fonction : pxParMm({required double pH, required double metresHauteur})
+   Fichier/ligne  : lib/core/perspective/strip_px_from_dims.dart, lignes 38-41
+   Formule        : return pH / (metresHauteur * 1000.0);
+   pH vient de    : VanishingPoint.pH (lib/core/perspective/vanishing_point.dart, ligne 335) => "fBL.dy - fTL.dy" (pixels canvas)
+   metresHauteur vient de : AppState.metresHauteur (lib/state/app_state.dart, ligne 81), defaut = 2.5 (m)
+   Appele depuis  : lib/core/perspective/room_painter.dart (case 'Corniches', ~lignes 223-232) via stripPxFromDims(pH:, metresHauteur:, retombeeMm: dims.retombeeMm, projectionMm: dims.projectionMm)
+   Pour CETTE scene (haussmann, canvas = photo pleine taille 2560x1783px) :
+     pH = (calib.floorL.yPct - calib.ceilL.yPct) * photoH = (0.87 - 0.09) * 1783 = 1390.740 px
+     facteur actuel (metresHauteur=2.5 m, defaut AppState) = pH / (metresHauteur*1000) = 0.556296 px/mm
+
+2) FACTEUR DU PANNEAU F ("corrige", cible = hauteur PIXEL de la formule de PRODUCTION ACTUELLE, PAS une hypothese) :
+   Cible retenue (corrigee suite P14-C — la version precedente utilisait a tort metresHauteur=2.70m,
+   une hypothese, au lieu du defaut REEL AppState 2.5m) : cible px = bbox_mm.h x facteur PRODUCTION ACTUEL
+   (etape0ProductionPx, deja calcule Etape 0 ci-dessus) = 112.856 px.
+   On cherche le SCALE a appliquer au profil physique (mm) du chemin mesh pour que sa hauteur projetee en
+   pixels (convention verticale-image, Etape 0) egale cette cible.
+     hauteur mesuree a scale=1.0 (rendu mesh physique 1:1, independant de metresHauteur par construction de profileToWorld /1000) = 195.337 px
+     scale resolu (3 iterations de correction lineaire, mesure reelle a chaque pas) = 0.579748
+     hauteur obtenue avec ce scale (mesuree reellement sur le rendu final) = 112.856 px (cible 112.856 px, ecart 0.000 px)
+   RAPPEL (prohibition F du brief) : ce scale (0.579748) est un RESULTAT DE MESURE pour verification
+   visuelle UNIQUEMENT — il n'est PAS et ne doit PAS etre reinjecte comme multiplicateur fige dans le code de production.
+
+3) HAUTEUR DU PROFIL EN PIXELS POUR CHACUN DES 6 PANNEAUX :
+   Methode de mesure : distance verticale en pixels ECRAN entre le point du contour colle au plafond
+   (indice 3, y=0) et le point le plus bas de la retombee (indice 0, y le plus negatif — c'est
+   exactement le point qui definit bbox_mm.h / retombeeMm recalcule), sur l'anneau du MILIEU du trajet,
+   projetes par la meme Camera3D pour tous les panneaux.
+     scale x 1.0 : scale=1.000000 -> hauteur = 195.337 px
+     scale x 0.5 : scale=0.500000 -> hauteur = 97.269 px
+     scale x 0.25 : scale=0.250000 -> hauteur = 48.536 px
+     scale x 0.15 : scale=0.150000 -> hauteur = 29.099 px
+     scale x 0.10 : scale=0.100000 -> hauteur = 19.391 px
+     Panneau F (corrigee, cible=prod. actuelle) : scale=0.579748 -> hauteur = 112.856 px
+
+4) QUESTION BINAIRE — bbox_mm.h (202.87) ou hauteur_mur_mm (77.613) pour la retombee ?
+   REPONSE : NI L'UN NI L'AUTRE directement. lib/core/perspective/profile_dims.dart::loadProfileDims
+   (lignes 216-226) RECALCULE retombeeMm = max(|y - y_plafond|) sur TOUS les points de profil_mm, puis
+   VALIDE ce resultat recalcule contre bbox_mm.h avec une tolerance de 0.5mm (lignes 228-250, rejet
+   silencieux -> null si l'ecart depasse la tolerance). hauteur_mur_mm N'EST JAMAIS LU par ce fichier
+   (grep confirme : seule occurrence dans lib/ = le commentaire docstring ligne 139, qui precise que
+   hauteur_mur_mm decrit la face de collage, une sous-etendue DIFFERENTE, PAS utilisee pour retombeeMm).
+   Verification numerique (ce test) : retombeeMm recalcule depuis profil_mm = 202.8700mm (colle a bbox_mm.h,
+   ecart bien sous la tolerance de 0.5mm) — hauteur_mur_mm=77.613mm est SANS RAPPORT avec ce calcul.
+   Le ratio 2.6139 (~2.6) entre bbox_mm.h et hauteur_mur_mm est donc REEL, mais
+   hauteur_mur_mm n'etant lu nulle part pour la retombee, ce ratio N'EST PAS le mecanisme d'un bug d'echelle
+   dans le calcul ACTUEL de retombeeMm/stripPxFromDims — le suspect est ecarte POUR CE CHEMIN DE CODE precis.
+
+Fichier PNG : /tmp/p14_diagnostic_profile_sweep_scale_grid_d720.png

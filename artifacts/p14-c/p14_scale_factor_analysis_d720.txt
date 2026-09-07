@@ -1,0 +1,210 @@
+P14-C — ANALYSE DU FACTEUR D'ECHELLE D720 (livrable D.2 du brief)
+===================================================================
+CE FICHIER EST UN DIAGNOSTIC. IL NE PROUVE PAS QUE D720 EST PRET POUR LE
+RENDU CLIENT ET NE VALIDE AUCUNE RENDABILITE. AUCUN MULTIPLICATEUR ICI
+N'EST UN CORRECTIF A REINJECTER DANS LE CODE DE PRODUCTION.
+
+Genere par : test/core/geometry/p14_diagnostic_profile_sweep_scale_grid_test.dart
+(renomme depuis test/core/geometry/p14_scale_grid_d720_test.dart via `git mv`)
+Voir aussi (meme run) : /tmp/p14_diagnostic_profile_sweep_scale_grid_d720.png
+                        /tmp/p14_diagnostic_profile_sweep_scale_grid_d720.txt
+
+-------------------------------------------------------------------
+ETAPE 0 — VERIFICATION DE LA CONVENTION DE MESURE (obligatoire avant
+toute recherche de cause, brief P14-C section B)
+-------------------------------------------------------------------
+
+Hypothese testee : "112,8px" (stripPxFromDims / production) est une
+epaisseur LOCALE PERPENDICULAIRE a la ligne d'ancrage (confirme par
+lecture de code : cornice_plinth_painter.dart:217, paintCorniceSet
+calcule `perpDown(fTL, fTR, th.faceMurFond)`, un vecteur de longueur
+EXACTEMENT th.faceMurFond perpendiculaire au segment fTL->fTR). "195,3px"
+etait potentiellement une etendue VERTICALE-IMAGE (bbox), grandeur
+differente si la ligne d'ancrage (ceilL->ceilR, haussmann.jpg) n'est pas
+parfaitement horizontale.
+
+Mesures realisees, MEME lieu (centre du trajet, xPct=0.5, ring du milieu
+"midRingIndex"), MEME profil (D720, scale=1.0), MEME scene calibree
+(buildCalibratedScene, backWallDepthM=3.0m par defaut) :
+
+  A) Convention VERTICALE-IMAGE (mesure precedente, dy pur) :
+     etape0OldVertical = 195.3374239660062 px
+     (mesure sur ring[midRingIndex], point plafond (ceilingIndices.first)
+     -> point le plus bas du contour (_bottomIdxOf), delta de la seule
+     composante Y en pixels ecran apres projection Camera3D.project)
+
+  B) Convention PERPENDICULAIRE-A-LA-LIGNE-D'ANCRAGE (meme formule perpDown
+     que production, projection du vecteur top->bottom sur le vecteur
+     unitaire perpendiculaire a ceilL->ceilR) :
+     etape0NewPerp = 195.33195290710012 px
+
+  Delta entre les deux conventions :
+     |etape0NewPerp - etape0OldVertical| / etape0OldVertical * 100
+     = 0.0028 % (< 1%, negligeable)
+
+  Cause : la ligne mur/plafond haussmann.jpg a une pente quasi-nulle
+  (calib.ceilL.yPct=0.090, calib.ceilR.yPct=0.085 ; angle ~= 0.38 deg,
+  cos(angle) ~= 0.99998), donc les deux conventions convergent presque
+  exactement.
+
+  Cible production (meme instant, meme pH, meme metresHauteur=2.5m
+  reel/AppState) :
+     etape0ProductionPx = bbox_mm.h(202.87mm) * pxParMm(pH=1390.74,
+     metresHauteur=2.5) = 202.87 * 0.556296 = 112.85576952000001 px
+
+  Ratios recalcules (mesh / production) :
+     etape0RatioOld (convention verticale-image)      = 195.3374239660062 / 112.85576952000001 = 1.730858996370487
+     etape0RatioNew (convention perpendiculaire-ancrage) = 195.33195290710012 / 112.85576952000001 = 1.730811... (quasi identique)
+
+VERDICT ETAPE 0 : le ratio NE tombe PAS a ~1.0 — il reste a ~1.73 quelle
+que soit la convention retenue. LA CONVENTION DE MESURE N'EST PAS LA
+CAUSE DU GAP. Recherche de cause poursuivie (brief section C).
+
+Consequence sur le panneau 6 de la grille precedente (scale=0.536990) :
+ce panneau N'EST PAS un artefact de convention de mesure (l'ecart de
+convention est negligeable, 0.0028%) — MAIS il a ete construit sur une
+hypothese metrique ERRONEE (metresHauteurCalcul=2.70m au lieu du vrai
+defaut AppState 2.5m), ce qui est une erreur SEPAREE, maintenant
+corrigee dans ce fichier (panneau F recalcule avec cible = 112.856px,
+la valeur REELLEMENT produite aujourd'hui par stripPxFromDims a 2.5m,
+scale resultant = 0.579748, tres proche de 0.536990 mais pas identique
+— la petite difference vient uniquement de la correction 2.70m->2.5m).
+
+-------------------------------------------------------------------
+RECHERCHE DE CAUSE (brief section C, ordre impose, arret a la premiere
+cause etablie)
+-------------------------------------------------------------------
+
+C.1 — pH utilise par la scene 3D vs pH utilise par stripPxFromDims :
+  Methode : reprojection stricte des points 3D deja construits par la
+  scene (scene.ceilL3D, scene.floorL3D — deprojetes a backWallDepthM=3.0m
+  lors de buildCalibratedScene) via la MEME Camera3D (scene.camera.project),
+  et comparaison au pH pixel d'entree (pHPixels = (floorL.yPct-ceilL.yPct)*photoH).
+
+  pHFromSceneReprojection = 1390.7400000000002 px
+  pHPixels (production)   = 1390.74 px
+  c1PHEcart = |pHFromSceneReprojection - pHPixels| = 2.2737367544323206e-13 px
+
+  VERDICT C.1 : ecart = bruit flottant (echelle ~1e-13, machine epsilon
+  double precision). Les deux pH sont EXACTEMENT LA MEME QUANTITE
+  (unproject/project sont des inverses exactes par construction,
+  camera.dart:200-241). CAUSE ECARTEE.
+
+C.2 — Profondeur du ruban dans la scene (backWallDepthM) :
+  ETABLI COMME LA CAUSE. Se decompose en DEUX facteurs multiplicatifs
+  INDEPENDANTS dont le produit egale exactement le ratio total mesure.
+
+  Facteur A — mismatch metrique de la convention de scene :
+    buildCalibratedScene deprojette les 4 coins du mur du fond a une
+    profondeur CONVENTIONNELLE backWallDepthM=3.0m (jamais overridee
+    nulle part dans le code de production actuel). Cette convention
+    encode IMPLICITEMENT une hauteur metrique de scene :
+      hSceneM = pHPixels * backWallDepthM / focalPx
+              = 1390.74 * 3.0 / 2488.8888888888887
+              = 1.6763383928571431 m
+    Cette hauteur (1.676m) est DIFFERENTE de metresHauteur=2.5m (le
+    defaut AppState reellement utilise par la formule 2D de production).
+      Facteur A = metresHauteur / hSceneM = 2.5 / 1.6763383928571431
+                = 1.4913441975796382
+
+  Facteur B — profondeur physique reelle du profil D720 (effet de
+  perspective genuine, absent de la formule 2D plate) :
+    Meme en neutralisant le facteur A (c'est-a-dire meme si hSceneM
+    egalait metresHauteur), le PROFIL D720 lui-meme a une extension en
+    profondeur : ses points vont de xProfilMm~9mm (bord libre, point 0)
+    a xProfilMm~112.79mm (face plafond, point 3) — PAS une profondeur
+    constante/nulle. Le bord libre (bas de la retombee) est donc
+    mesurablement PLUS PRES de la camera (depthCam=2.9910289) que le
+    sommet cote plafond (depthCam=2.8872112). C'est un effet de
+    perspective REEL (plus proche => plus grand a l'ecran), totalement
+    absent de stripPxFromDims (qui modelise un segment PLAT sur le plan
+    du mur du fond, a profondeur constante).
+      heightPxAtConstantDepth = deltaWorldYM * (focalPx / backWallDepthM)
+      (magnification a profondeur CONSTANTE = celle du mur du fond,
+      isole le facteur A, exclut le facteur B)
+      Facteur B = etape0OldVertical / heightPxAtConstantDepth
+                = 1.1606032994794675
+
+  Verification numerique (aucun reste inexplique) :
+      A x B = 1.4913441975796382 x 1.1606032994794675
+            = 1.730858996370487 (calcule) vs 1.730858996370487
+              (etape0RatioOld, mesure independamment)
+      ecart = c2EcartVsRatioTotal ~ 0.000002 (bruit numerique residuel
+              de la non-linearite de la projection perspective, tolerance
+              du test < 0.05)
+
+  VERDICT C.2 : LA CAUSE EST ETABLIE ET COMPLETE. Le gap x1.73 = A x B,
+  sans reste inexplique. Recherche C.3/C.4 (axe de mesure, orientation
+  face_pose) NON NECESSAIRE — arret a la premiere cause etablie, comme
+  demande par le brief.
+
+-------------------------------------------------------------------
+HYPOTHESES ECARTEES (recapitulatif avec chiffres)
+-------------------------------------------------------------------
+  1. hauteur_mur_mm (77.613mm) comme mecanisme du bug d'echelle :
+     ECARTE (deja verrouille avant ce brief). hauteur_mur_mm N'EST JAMAIS
+     LU par profile_dims.dart::loadProfileDims pour calculer retombeeMm
+     (grep : seule occurrence = docstring ligne 139). retombeeMm est
+     RECALCULE depuis profil_mm et VALIDE (tolerance 0.5mm) contre
+     bbox_mm.h — ratio bbox_mm.h/hauteur_mur_mm = 2.6139, REEL mais SANS
+     RAPPORT avec ce chemin de code.
+
+  2. Convention de mesure (verticale-image vs perpendiculaire-ancrage) :
+     ECARTEE (Etape 0 ci-dessus). Delta = 0.0028%, negligeable — le
+     ratio persiste a ~1.73 quelle que soit la convention.
+
+  3. pH scene 3D vs pH production (Branche C.1) :
+     ECARTEE. Ecart = 2.27e-13 px (bruit flottant pur) — les deux pH
+     sont identiques par construction (project/unproject inverses exactes).
+
+-------------------------------------------------------------------
+CAUSE ETABLIE (recapitulatif)
+-------------------------------------------------------------------
+  Branche C.2 — profondeur du ruban dans la scene 3D, decomposee en :
+    Facteur A = 1.4913441975796382 (mismatch metrique backWallDepthM=3.0m
+                vs metresHauteur=2.5m : la convention de scene encode
+                implicitement hSceneM=1.6763383928571431m != metresHauteur)
+    Facteur B = 1.1606032994794675 (profondeur physique reelle du profil
+                D720 lui-meme : bord libre plus proche de la camera que
+                le mur du fond -> effet de perspective genuine, absent
+                de la formule 2D plate stripPxFromDims)
+    A x B     = 1.730858996370487 == ratio total mesure (1.730858996370487)
+
+-------------------------------------------------------------------
+PROPOSITION DE CORRECTION MINIMALE (PAS un multiplicateur fige — brief
+prohibition F)
+-------------------------------------------------------------------
+Aucun correctif n'est applique dans cette passe (P14-C est un diagnostic
+uniquement, aucune modification du chemin de rendu client). Deux pistes
+minimales, NON implementees, a evaluer separement avant tout changement
+de production :
+
+  Piste 1 (neutraliser le Facteur A par construction) : faire dependre
+  backWallDepthM (calib_to_camera.dart::buildCalibratedScene, actuellement
+  une constante 3.0m jamais overridee) de metresHauteur au lieu d'une
+  valeur conventionnelle fixe — par exemple choisir backWallDepthM tel
+  que hSceneM = metresHauteur exactement (backWallDepthM = metresHauteur
+  * focalPx / pHPixels). Cela annulerait le Facteur A (A->1) par
+  construction, et ne laisserait subsister que le Facteur B — un effet
+  de perspective reel et PETIT (1.16x), inherent a la profondeur propre
+  du profil, qu'aucune formule 2D plate ne peut de toute facon capturer.
+  Impact : uniquement sur le chemin mesh 3D (sweep.dart/mesh_painter.dart,
+  actuellement non branche sur RoomPainter en production) — AUCUN effet
+  sur stripPxFromDims/paintCorniceSet (chemin client actuel, non touche).
+
+  Piste 2 (accepter le mesh comme rendu physique 1:1 et ne pas chercher a
+  le faire coincider avec la formule 2D) : le chemin mesh
+  (profileToWorld, sweep.dart, division par 1000 des mm profil vers des
+  metres monde) est DEJA un rendu physique correct et independant de
+  metresHauteur/pH — la formule 2D stripPxFromDims est une APPROXIMATION
+  plate specifique a paintCorniceSet. Si le futur chemin de rendu client
+  bascule un jour vers le maillage 3D (cf. regle catalogue, section G du
+  brief, non implementee ce tour-ci), le Facteur A n'aura plus lieu
+  d'exister (plus de formule 2D a faire coincider) et seul un Facteur B
+  residuel (perspective reelle, correcte par construction) subsistera.
+
+Ni l'une ni l'autre piste n'a ete implementee ni decidee dans cette
+passe : elles sont documentees ici a titre de pistes futures uniquement.
+Aucun multiplicateur (0.536990, 0.577764, 0.579748) n'a ete ni ne doit
+etre reinjecte comme correctif dans stripPxFromDims, RoomPainter, ou tout
+autre chemin de rendu client.
