@@ -1,0 +1,8 @@
+P14-FAST v4 — cible rectifiée + comparateur override 1.0 vs 1.134 (D720, calib manuelle v3 figée)
+pH mesure = 1060.885 px (calib manuelle : ceilL.yPct=0.090, floorL.yPct=0.685, roomHeightM=2.5)
+pxParMm recalcule = 0.424354 (cible perimee 0.556296 abandonnee, venait du preset large invalide)
+cible corrigee = 99.91 px (bboxHMm=202.87 x pxParMm x B=1.1606)
+hauteur mesuree (override=1.0)   = 99.47 px (ecart cible 0.45px -> aucune correction geometriquement justifiee)
+hauteur mesuree (override=1.134) = 112.86 px (retombee equivalente implicite = 230.1mm -> NON conforme au D720 reel, 202.87mm)
+bornes x = [0.1480, 0.5621] (identiques a override=1.134, extremites sur droite d'ancrage, jamais deplacees)
+Defauts restants : extremites nettes au jambage (coupe droite, pas de retour ni de coupe sur tableaux de porte) ; override=1.134 est une EXAGERATION VISUELLE de comparaison, PAS un facteur retenu -- reference = 1.0. NE PAS declarer D720 renderable.
