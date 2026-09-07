@@ -95,7 +95,11 @@ class HttpRoomPlaneSegmenter implements RoomPlaneSegmenter {
       throw RoomPlaneContractViolationException('reponse non-JSON: $e');
     }
 
-    return decodeRoomPlaneMaskJson(body);
+    return decodeRoomPlaneMaskJson(
+      body,
+      expectedWidth: width,
+      expectedHeight: height,
+    );
   }
 }
 
@@ -104,18 +108,34 @@ class HttpRoomPlaneSegmenter implements RoomPlaneSegmenter {
 /// de [HttpRoomPlaneSegmenter.segment] pour être testable sans réseau
 /// (un simple `Map<String, dynamic>` déjà décodé).
 ///
+/// [expectedWidth]/[expectedHeight] : dimensions demandées par
+/// l'appelant (voir [RoomPlaneSegmenter.segment]) — P12-1. Paramètres
+/// nommés optionnels : la fonction reste testable sans réseau (aucune
+/// vérification si `null`), et les usages existants (avant P12)
+/// compilent sans retouche. [HttpRoomPlaneSegmenter.segment] les
+/// fournit systématiquement.
+///
 /// Échec franc ([RoomPlaneContractViolationException]) si :
 ///   - `labels` absent, de longueur différente de
 ///     `RoomPlaneClass.values.length`, ou dans un ordre différent de
 ///     [kRoomPlaneLabelOrder] (ex : modèle Pascal VOC sans
 ///     ceiling/floor — voir docstring de tête de fichier) ;
 ///   - `width`/`height`/`rle` absents ou de type incorrect ;
+///   - `width`/`height` retournés différents de [expectedWidth]/
+///     [expectedHeight] (P12-1) — sans ce contrôle, un backend
+///     renvoyant p.ex. 128x96 pour une demande 512x384 passerait sans
+///     bruit, l'erreur ne se manifestant que plus loin sous forme de
+///     `yPct` faussés (repli silencieux que ce fichier interdit) ;
 ///   - le RLE décodé ne respecte pas les contraintes de
 ///     [RoomPlaneMaskResult] (somme des runLength, bornes de
 ///     classIndex — délégué au constructeur de [RoomPlaneMaskResult],
 ///     qui lève déjà [ArgumentError] dans ce cas, laissé remonter tel
 ///     quel).
-RoomPlaneMaskResult decodeRoomPlaneMaskJson(Map<String, dynamic> body) {
+RoomPlaneMaskResult decodeRoomPlaneMaskJson(
+  Map<String, dynamic> body, {
+  int? expectedWidth,
+  int? expectedHeight,
+}) {
   final labelsRaw = body['labels'];
   if (labelsRaw is! List) {
     throw const RoomPlaneContractViolationException(
@@ -159,6 +179,18 @@ RoomPlaneMaskResult decodeRoomPlaneMaskJson(Map<String, dynamic> body) {
     );
   }
 
+  // P12-1 : le backend n'a pas le droit d'imposer sa propre resolution.
+  // Sans ce controle, un masque 128x96 rendu pour une demande 512x384
+  // passerait et ne se manifesterait qu'en yPct faussés plus loin.
+  if ((expectedWidth != null && widthRaw != expectedWidth) ||
+      (expectedHeight != null && heightRaw != expectedHeight)) {
+    throw RoomPlaneContractViolationException(
+      'dimensions renvoyees ${widthRaw}x$heightRaw != demandees '
+      '${expectedWidth}x$expectedHeight (le backend doit produire le '
+      'masque a la resolution demandee, cf. RoomPlaneSegmenter.segment).',
+    );
+  }
+
   final rleRaw = body['rle'];
   if (rleRaw is! List) {
     throw const RoomPlaneContractViolationException(
@@ -170,6 +202,14 @@ RoomPlaneMaskResult decodeRoomPlaneMaskJson(Map<String, dynamic> body) {
     if (pair is! List || pair.length != 2) {
       throw const RoomPlaneContractViolationException(
         'element "rle" invalide (attendu paire [classIndex, runLength])',
+      );
+    }
+    // P12-1 (point mineur) : eviter un TypeError brut si le backend
+    // place une chaine dans le RLE - echec franc coherent avec le
+    // reste du fichier, plutot qu'une exception non geree.
+    if (pair[0] is! num || pair[1] is! num) {
+      throw const RoomPlaneContractViolationException(
+        'element "rle" non numerique (attendu [int, int])',
       );
     }
     rle.add([(pair[0] as num).toInt(), (pair[1] as num).toInt()]);
