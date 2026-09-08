@@ -1,0 +1,406 @@
+P17-VISUEL — Apercu IA d'ambiance (Mano/Nano Banana, Gemini image)
+====================================================================
+Rapport de cloture de passe -- genere avant build/commit/push.
+
+1. BASE REELLE
+----------------------------------------------------------------
+Base annoncee dans le brief : ccf321c.
+Base REELLE constatee en debut de passe : d0dfe4c ("genspark auto-backup"),
+un commit cree automatiquement entre deux tours, hors controle explicite
+de l'utilisateur ou de l'agent, un commit devant ccf321c.
+Un second commit auto-backup (af989f6) est apparu en cours de passe ;
+inspecte (git show --stat) : il ne contient que les fichiers P17 deja en
+cours d'ecriture par cette meme passe (ai_ambiance_mock.dart,
+ia_ambiance_preview.dart, ai_ambiance_panel.dart, studio_screen.dart,
+app_state.dart) -- aucun fichier etranger, aucun secret.
+Point de controle amont pour la PROCHAINE passe : le commit produit par
+CETTE passe (voir section "COMMIT FINAL" plus bas), ni ccf321c ni d0dfe4c.
+
+2. IMPLEMENTATION RETENUE
+----------------------------------------------------------------
+Nano Banana / Gemini reellement utilise : NON (aucun appel reseau reel
+effectue durant cette passe).
+Cle API Gemini presente dans le sandbox : NON (verifie : variables
+d'environnement GEMINI_API_KEY / GOOGLE_AI_* / GENAI_* / NANO_BANANA_*
+absentes ; aucun fichier .env pertinent trouve -- sans jamais indiquer de
+nom exact de secret ni de valeur).
+kAiPreviewEnabled : false (const bool, lib/data/ia_ambiance_preview.dart).
+Bouton "Generer un apercu IA" : visible mais GRISE, message "Fonction
+bientot disponible" affiche -- aucun crash, aucune fonctionnalite
+masquee sans explication.
+
+Strategie d'exposition de cle retenue SI une cle est un jour fournie :
+option (b) -- cle jetable/restreinte assumee pour la duree de la demo,
+puis revoquee. Justification documentee dans le code
+(lib/data/ia_ambiance_preview.dart) : aucun process serveur applicatif
+persistant dans ce sandbox au-dela du serveur de fichiers statique
+Python (python3 -m http.server) ; construire un proxy dedie aurait
+constitue un "backend lourd", explicitement interdit par le brief.
+Risque residuel documente : en Flutter Web, TOUTE cle utilisee
+cote client (meme jetable) apparait en clair dans main.dart.js ; la
+mitigation est temporelle (revocation post-demo) et non structurelle.
+Aucune cle, valeur ou fragment de cle n'a ete ecrit dans le code, les
+logs, les artefacts, les commits ou ce rapport.
+
+3. MOCK LOCAL (accepte par l'utilisateur, "oui" explicite)
+----------------------------------------------------------------
+Un second chemin, "Voir un apercu demo (local, sans IA)", a ete ajoute
+en complement du bouton grise, a la demande explicite de l'utilisateur.
+- Fichier : lib/data/ai_ambiance_mock.dart.
+- Aucun appel reseau : imports limites a dart:typed_data et dart:ui,
+  aucun package http.
+- Aucun modele, aucune IA : simple compositing local (teinte + overlay
+  semi-transparent de l'image de controle produit deja existante,
+  assets/profiles/control/<ref>.png -- jamais une geometrie inventee).
+- Filigrane "DEMO -- PAS D'IA -- ILLUSTRATIF" grave directement dans les
+  pixels de sortie (deux bandes diagonales), donc visible meme si
+  l'image est extraite du contexte de l'app.
+- Disclaimer dedie kAiMockDisclaimer, distinct du kAiPreviewDisclaimer
+  utilise pour un resultat Gemini reel -- jamais presente comme Nano
+  Banana ni comme une generation IA reelle.
+- Badge visuel "DEMO LOCALE -- PAS D'IA" affiche au-dessus de l'image
+  resultat dans ce mode.
+- Resultat conserve strictement en memoire (Uint8List / Image.memory),
+  jamais persiste sur disque, jamais dans assets/.
+
+4. PERIMETRE PRODUIT
+----------------------------------------------------------------
+Candidats proposes dans le panneau "Apercu d'ambiance IA" : exactement
+les 43 refs visibles de assets/profiles/index.json (via
+CatalogueVisibilityGate.instance.visibleRefsIfLoaded -- meme source que
+le reste du catalogue, aucune liste parallele).
+Refs hors-index exclues : OUI.
+Brouillons visibles : NON.
+Les 43 refs visibles restent inchangees apres cette passe (verifie via
+lecture directe de index.json : 43).
+
+5. GENERATION IMAGES / ASSETS
+----------------------------------------------------------------
+Images generees (mock ou, un jour, IA reelle) persistees dans
+assets/ : NON -- affichage exclusivement en memoire (Image.memory).
+Ecriture dans assets/profiles/control/ : NON, a aucun moment.
+pubspec.yaml modifie : NON (dependance http:1.5.0 deja presente,
+aucune section assets: modifiee).
+Module de similarite (lib/data/ia_suggestion.dart) : verifie inchange
+-- il continue de lire EXCLUSIVEMENT assets/profiles/control/*.png via
+rootBundle.load, aucune reference croisee vers
+ia_ambiance_preview.dart / ai_ambiance_mock.dart / ai_ambiance_panel.dart
+(confirme par grep cible sur les imports et les chemins assets/).
+Aucun produit officiel, thumbnail, JSON profil, index.json ou
+catalogue_data.dart remplace ou modifie par cette passe.
+
+6. CORRECTION DE COMPTEUR PREEXISTANT (dette heritee de P16-B)
+----------------------------------------------------------------
+3 tests en echec detectes en debut de passe, dans
+test/core/perspective/profile_dims_cache_coverage_test.dart :
+  Expected: <30>  Actual: <32>  (x3, lignes ~174/269/295)
+Cause racine confirmee (pas une regression P17) : HEAD contenait deja
+le commit auto-backup d0dfe4c, qui a embarque deux fichiers restes EN
+COURS de la passe P16-B (jamais menee a terme, jamais approuvee) :
+  - assets/profiles/D844.json
+  - assets/profiles/M048.json
+Les deux ont "statut": "OK" dans leur JSON, mais sont ABSENTS de
+assets/profiles/index.json -- donc toujours hors catalogue visible (les
+43 refs presentation ne changent pas). Leur seul effet mecanique est de
+faire passer le compteur "hors-gate-mais-fichier-existant-statut-OK" de
+30 a 32.
+Correction appliquee (autorisation explicite utilisateur, option b) :
+test/core/perspective/gate_ok_count_helper.dart,
+kExpectedHorsGateButFileExistsCount : 30 -> 32, avec commentaire
+explicite documentant la cause (commit d0dfe4c, fichiers D844.json et
+M048.json) et la dette associee.
+DETTE EXPLICITE NOTEE DANS LE CODE (a ne pas rebumper sans traiter la
+cause) : a la reprise de P16-B, soit D844/M048 sont menes au bout
+(unites, gate de sanite, decision de publication), soit ils sortent de
+assets/profiles/ ; le compteur devrait alors etre derive directement du
+CSV du gate au lieu d'etre code en dur.
+Aucun ajout a index.json, aucune modification du filtre catalogue, de
+catalogue_data.dart ou d'un autre JSON profil. Aucun des deux SKU n'a
+ete declare renderable.
+
+7. VERIFICATION SECURITE (point 4, demande restee en attente)
+----------------------------------------------------------------
+Commande : git show --stat d0dfe4c | grep -iE ".env|credential|token"
+Resultat : AUCUNE occurrence.
+Commande : git log --all --diff-filter=A -- '*.env'
+Resultat : AUCUN fichier .env n'a jamais ete ajoute dans tout
+l'historique git de ce depot.
+Conclusion : aucun secret detecte dans le commit auto-backup d0dfe4c ni
+dans l'historique git en general.
+Volume de binaires STL ajoute par d0dfe4c : 308 fichiers STL,
+308 files changed, 530 insertions(+) (git show --stat), taille sur
+disque du repertoire assets/solids/stl/ : 862 Mo (du -sh).
+Volume juge significatif -> assets/solids/stl/ ajoute au .gitignore
+racine (aucune reecriture d'historique effectuee ; les 308 fichiers
+deja commit dans d0dfe4c restent tels quels dans l'historique, seule la
+recidive future est evitee).
+Second commit auto-backup rencontre en cours de passe (af989f6) :
+egalement passe au meme controle -- aucune occurrence .env/credential/
+token, ne contient que les fichiers P17 de cette passe.
+
+8. CONTROLES
+----------------------------------------------------------------
+flutter analyze : 0 erreur (108 issues info/warning au total, toutes
+preexistantes dans des fichiers de test sans rapport avec cette passe).
+flutter test : VERT apres correction du compteur (+283 tests passes,
+~1 skip documente preexistant, 0 echec).
+Latence moyenne de generation reelle : NON APPLICABLE (aucune
+generation Gemini reelle effectuee, cle absente).
+
+9. FICHIERS MODIFIES PAR CETTE PASSE
+----------------------------------------------------------------
+Crees :
+  - lib/data/ia_ambiance_preview.dart
+  - lib/data/ai_ambiance_mock.dart
+  - lib/widgets/studio/ai_ambiance_panel.dart
+  - artifacts/p17-visuel/ (repertoire)
+Modifies :
+  - lib/state/app_state.dart (showAiAmbiancePanel + open/close)
+  - lib/screens/studio/studio_screen.dart (bouton topbar + panneau modal)
+  - test/core/perspective/gate_ok_count_helper.dart (correction
+    ponctuelle 30->32, dette documentee)
+  - .gitignore (ajout assets/solids/stl/)
+Non modifies (verifies explicitement) :
+  - assets/profiles/index.json
+  - lib/data/catalogue_data.dart
+  - lib/data/catalogue_visibility.dart
+  - lib/data/ia_suggestion.dart
+  - tout fichier JSON profil individuel (assets/profiles/*.json)
+  - pubspec.yaml
+  - GED (aucun acces, aucune ecriture)
+  - moteur mesh / Haussmann / P14 / floorR / detection de plans P12
+
+10. URL FINALE
+----------------------------------------------------------------
+[A COMPLETER apres verification des endpoints -- section suivante]
+
+11. COMMIT FINAL
+----------------------------------------------------------------
+[A COMPLETER apres git log --oneline -3 post-push]
+
+================================================================
+P17-CACHE — DESACTIVATION SERVICE WORKER WEB (FRAICHEUR DEMO)
+================================================================
+Date: 2026-09-08
+
+0. BASE REELLE CONSTATEE (verifiee, pas supposee)
+----------------------------------------------------------------
+Avant toute action :
+  git log --oneline -3 :
+    b76b60c genspark auto-backup
+    b7ce992 P17-VISUEL: apercu ambiance IA mock local sans generation externe
+    ccf321c P16-A: inventaire tableau BE / STL GED + audit D577-D620
+
+  git status --short : arbre propre (aucun fichier non commite)
+  git fetch origin : OK, rien de nouveau cote remote
+  HEAD    = b76b60c95498846a0c9586bfb17afa54d070fae0
+  origin/main = b7ce992e97964e63d7bd9de1ee98769d7e2cea77
+  -> HEAD 1 commit en avance sur origin/main (non pousse)
+
+  Le commit b76b60c ("genspark auto-backup") s'est avere contenir
+  DEJA le bloc de desenregistrement SW + purge caches dans
+  web/index.html (38 lignes ajoutees), identique au contenu prepare
+  en session precedente mais commite automatiquement au lieu
+  d'etre commite manuellement. Aucune divergence structurelle :
+  base reelle = etat attendu, a l'exception du hash (auto-backup
+  au lieu du commit manuel prevu).
+
+  Branche de securite creee : backup/pre-p17-cache-20260908-120927
+  (en plus de backup/pre-p17-cache-20260908-102402 deja existante
+  de la session precedente).
+
+1. DECISION OPTION (a) — CONFIRMEE
+----------------------------------------------------------------
+flutter build web --release --pwa-strategy=none NE supprime PAS
+flutter_service_worker.js. Fichier present, corps vide (0 octet).
+Attente = 200 avec Content-Length: 0, jamais 404. Verifie en direct
+sur build/web_fresh puis sur build/web apres permutation, et sur
+l'URL PUBLIQUE (pas localhost) — voir point 8.
+
+2. CORRECTION DU RAPPORT (affirmation anterieure erronee)
+----------------------------------------------------------------
+L'ancien commentaire dans web/index.html affirmait : "le script du
+service worker enregistre finit par renvoyer 404, et le navigateur
+desinscrit alors la registration de lui-meme". CETTE AFFIRMATION
+ETAIT FAUSSE et a ete RETIREE du commentaire (aucun 404 n'est
+jamais produit avec --pwa-strategy=none).
+
+Ce qui se passe reellement : l'ancien service worker cacheur est
+REMPLACE par un service worker no-op a corps vide, pas supprime ni
+desinscrit via 404.
+
+Limite honnete assumee et documentee dans le commentaire corrige :
+un SW a corps vide reste une registration VALIDE ; sans skipWaiting
+(absent par definition d'un corps vide), la nouvelle version reste
+en attente ("waiting") tant qu'un client controle par l'ancien SW
+est ouvert. Sur mobile, un onglet jamais reellement ferme peut donc
+maintenir l'ancien SW actif longtemps.
+Parade utilisateur fiable sur un appareil deja pollue : navigation
+privee, OU "cadenas -> Parametres du site -> Effacer et
+reinitialiser". Le reste (bloc JS de desenregistrement + SW no-op)
+est du durcissement pour les VISITEURS FUTURS, pas une garantie
+immediate sur un appareil deja touche.
+
+3. ETAT DU BUILD
+----------------------------------------------------------------
+build/web_fresh du 08/09 10:26 initialement valide (code source
+identique, diff limite a $FLUTTER_BASE_HREF -> /). MAIS le
+commentaire errone du point 2 necessitait une correction du SOURCE
+web/index.html -> REBUILD effectue :
+  flutter build web --release --pwa-strategy=none --output=build/web_fresh
+  Resultat : "Built build/web_fresh" (17.4s compilation), succes.
+Aucun rm -rf build/web a aucun moment. Aucun build direct dans
+build/web pendant que le serveur y servait.
+
+4. VERIFICATIONS SUR build/web_fresh (avant permutation)
+----------------------------------------------------------------
+  flutter_service_worker.js : 0 octet (stat -c%s) — CONFORME
+  main.dart.js (recherche brute, encodage \xe7 litteral confirme) :
+    "Aper\xe7u d'ambiance IA"           -> 2 occurrences (attendu 2) OK
+    "PAS D'IA"                          -> 2 occurrences (attendu 2) OK
+    "MO LOCALE"                         -> 1 occurrence  (attendu 1) OK
+    "Fonction bient"                    -> 1 occurrence  (attendu 1) OK
+  index.html :
+    bloc "P17-CACHE" present            -> 1 occurrence OK
+    "demo sandbox" (commentaire retrait)-> 1 occurrence OK
+    location.reload() reellement appele -> 0 (seule mention = dans
+      le commentaire expliquant l'absence volontaire) OK
+    affirmation erronee "404... desinscrit de lui-meme" -> 0
+      occurrence (retiree) OK
+    correction "NE s'applique PAS ici" / "SW no-op" -> presentes OK
+
+5. INSPECTION DE L'ETAT PERSISTE (point jamais traite avant)
+----------------------------------------------------------------
+Recherche exhaustive dans lib/ :
+  - shared_preferences : utilise (lib/state/app_state.dart,
+    lib/models/saved_project.dart)
+  - localStorage direct : 0 occurrence
+  - IndexedDB : 0 occurrence
+  - Hive : 0 occurrence (non utilise dans ce projet)
+
+Deux cles shared_preferences (-> localStorage['flutter.<cle>'] en
+web) identifiees dans lib/state/app_state.dart :
+  - 'sds_state' (persistee/restauree automatiquement a chaque
+    demarrage via app_shell.dart:30 -> AppState().restore()) :
+    contient selectedProducts, prodPositions, margeCoupePct,
+    talonMm, metres (murA/murB/hauteur/portes/fenetres),
+    devisWarnShown, catFam, contactSubmitted, lastContactInfo.
+    perspCalib/isCalibrated sont EXPLICITEMENT EXCLUS de cette
+    persistance (commentaire dedie dans le code, correction d'un
+    bug anterieur "bande cassee apres rechargement"). demoScene/
+    isDemoRoom NE SONT PAS dans cette cle de session automatique.
+  - 'sds_saved_projects' : liste des projets explicitement
+    sauvegardes par l'utilisateur (bouton corbeille dedie), contient
+    demoScene par projet mais uniquement recharge sur ACTION
+    EXPLICITE (loadProject()), jamais au demarrage automatique.
+
+CONCLUSION : aucune scene/image/photo "courante" n'est persistee et
+restauree automatiquement au demarrage de l'app. Le symptome
+rapporte par ailleurs ("anciennes vues retenues", "la 2e photo
+affiche encore la 1ere scene") NE PEUT PAS venir de shared_preferences/
+localStorage pour l'etat de session automatique -- cela confirme
+que ce symptome releve de l'imageCache cote Dart (widgets Image),
+donc de P18-CACHE, passe separee et hors perimetre ici. Aucune cle
+n'a ete purgee (rien a purger : pas de scene/etat problematique
+identifie dans ces cles).
+
+6. CONTROLES CODE
+----------------------------------------------------------------
+  flutter analyze : 0 erreur, 108 issues info/warning preexistantes
+    (identique avant/apres la correction du commentaire index.html)
+  flutter test : +283 ~1, "All tests passed!"
+  kExpectedHorsGateButFileExistsCount : verifie toujours a 32,
+    NON MODIFIE (test/core/perspective/gate_ok_count_helper.dart:83)
+
+7. PERMUTATION ET RELANCE
+----------------------------------------------------------------
+  mv build/web build/web_old_1214
+  mv build/web_fresh build/web
+  Ancien PID serveur 8080 : 111962
+  Nouveau PID serveur 8080 : 117698
+  Downtime reel mesure : ~1.5 s (kill immediat + sleep 0.5s +
+    verification sleep 1s ; indisponibilite effective ~0.5-1s entre
+    kill et re-bind du port)
+  URL inchangee : https://8080-iv0to5t5muaul2o2div2d-c81df28e.sandbox.novita.ai/
+  Ancien build conserve sur disque (build/web_old_1214) pour
+  rollback immediat si necessaire.
+
+8. VERIFICATIONS SUR L'URL PUBLIQUE (PAS localhost)
+----------------------------------------------------------------
+  GET /                                          -> 200
+  GET /main.dart.js                              -> 200
+  GET /flutter_service_worker.js                 -> 200, Content-Length: 0
+  GET /assets/assets/profiles/index.json         -> 200, 43 refs (verifie
+                                                     via parsing JSON direct
+                                                     sur la reponse publique)
+  GET /assets/assets/demo_scenes/haussmann.jpg   -> 200
+
+9. TEST DE FUITE DE VIGNETTE
+----------------------------------------------------------------
+  GET /assets/assets/profiles/control/D844.png   -> 200 (attendu 404)
+  GET /assets/assets/profiles/control/M048.png   -> 200 (attendu 404)
+
+  CONSTAT (rien supprime, verification code effectuee comme demande) :
+  lib/data/ia_suggestion.dart (ligne ~314-315) itere STRICTEMENT sur
+  CatalogueVisibilityGate.instance.ensureLoaded().values -- c'est-a-dire
+  les 43 refs de index.json -- et NON sur un glob control/*.png. Le
+  moteur de suggestion IA ne charge, ne score et ne suggere donc
+  JAMAIS D844.png ni M048.png : la logique metier de scoring est saine
+  et deja verifiee par le round-trip test (31/31 sur les refs qui
+  possedent une vignette).
+
+  Le 200 HTTP constate est un artefact de BUNDLING STATIQUE, pas un
+  probleme de logique : pubspec.yaml declare `assets/profiles/control/`
+  comme repertoire ENTIER (pas fichier par fichier), donc flutter build
+  web embarque tous les PNG physiquement presents dans ce dossier,
+  incluant D844.png/M048.png (residus P16-B, presents sur disque depuis
+  09:08 ce jour). Consequence : ces 2 PNG sont TELECHARGEABLES PAR URL
+  DIRECTE meme si l'app ne les affiche, ne les score et ne les propose
+  jamais nulle part dans son propre flux applicatif. C'est une fuite
+  d'asset statique passive, distincte d'une fuite fonctionnelle.
+  AUCUNE SUPPRESSION EFFECTUEE (interdiction explicite du brief sans
+  accord) -- rapporte tel quel pour decision.
+
+10. VERIFICATION UI (via code, Playwright interdit)
+----------------------------------------------------------------
+  Section "Aperçu d'ambiance IA" : presente (studio_screen.dart:161,
+    236 ; app_state.dart : showAiAmbiancePanel/openAiAmbiancePanel/
+    closeAiAmbiancePanel)
+  Badge "DÉMO LOCALE — PAS D'IA" : present (ai_ambiance_panel.dart:583)
+  kAiPreviewEnabled = false : confirme (ia_ambiance_preview.dart:59)
+  Catalogue limite a 43 refs : confirme (points 4/8)
+  D844/M048/1102BH/1202 absents de index.json : confirme (grep vide)
+
+11. RAPPEL PERIMETRE / INTERDICTIONS RESPECTEES
+----------------------------------------------------------------
+  Aucune suppression de flutter_service_worker.js (option a retenue)
+  Aucun rm -rf build/web pendant que le serveur y servait
+  Aucun reset --hard / filter-repo / filter-branch / lfs migrate /
+    gc --prune / --force
+  Aucun git add . (staging explicite : web/index.html uniquement)
+  Aucun ajout de produit, aucune modification de index.json, des
+    JSON profils, de catalogue_data.dart, de la GED, de P16-B, des
+    STL, du moteur mesh, de Haussmann/P14/floorR
+  kAiPreviewEnabled reste false, catalogue reste a 43
+  Bug imageCache (P18-CACHE) explicitement hors perimetre, non touche
+  Aucune cle Gemini dans le build (variable d'environnement absente,
+    mock/disabled reste actif)
+
+12. CONTROLE SECRETS
+----------------------------------------------------------------
+  git diff | grep -iE "api[_-]?key|secret|password|token|credential"
+    -> 0 match (diff limite a web/index.html, aucune mention)
+  git log --all --diff-filter=A -- '*.env' -> vide (jamais ajoute)
+
+13. FICHIER MODIFIE PAR CETTE PASSE
+----------------------------------------------------------------
+  web/index.html (commentaire du bloc P17-CACHE corrige uniquement --
+    aucun changement de comportement du script lui-meme, seule la
+    documentation en commentaire a change)
+
+14. RESULTAT FINAL
+----------------------------------------------------------------
+  URL finale (inchangee) : https://8080-iv0to5t5muaul2o2div2d-c81df28e.sandbox.novita.ai/
+  PID avant : 111962 / PID apres : 117698
+  Downtime reel : ~1.5 s
+  Commit final : [A COMPLETER apres push -- voir section commit]

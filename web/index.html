@@ -40,19 +40,33 @@
        Volontairement SANS location.reload() : aucun rechargement
        automatique n'est déclenché ici, donc aucun risque de boucle de
        rechargement -- pas besoin de garde-fou sessionStorage.
+       STRATÉGIE RETENUE (option a) : `flutter build web --release
+       --pwa-strategy=none` NE supprime PAS flutter_service_worker.js.
+       Il génère un fichier présent mais à corps vide (0 octet) --
+       200 avec Content-Length 0, jamais 404. Correction d'une
+       affirmation antérieure erronée : le mécanisme « script 404 →
+       désinscription automatique par le navigateur » NE s'applique PAS
+       ici, puisqu'aucun 404 n'est produit. Ce qui se passe réellement :
+       l'ancien service worker cacheur est remplacé par un service
+       worker no-op (corps vide) à la prochaine visite/mise à jour.
        LIMITE CONNUE (à documenter, ne pas la présenter comme une
-       solution complète) : ce bloc ne peut rien faire sur un mobile déjà
-       pollué par un ancien service worker, car c'est précisément CET
-       ancien service worker -- pas ce nouveau index.html -- qui répond
-       aux requêtes de navigation depuis son propre cache. Ce qui nettoie
-       réellement un appareil déjà pollué, c'est --pwa-strategy=none :
-       le script du service worker enregistré finit par renvoyer 404,
-       et le navigateur désinscrit alors la registration de lui-même,
-       en général après un ou deux chargements. La parade immédiate côté
-       utilisateur reste la navigation privée, ou « cadenas → Paramètres
-       du site → Effacer et réinitialiser ». Un simple paramètre
-       ?v=... n'a aucun effet : le service worker Flutter le retire de
-       la clé avant de consulter son cache. -->
+       solution complète) : un service worker à corps vide reste une
+       registration valide, et sans skipWaiting (qu'un corps vide ne
+       contient par définition pas), la nouvelle version reste en
+       attente tant qu'un client contrôlé par l'ancien SW est ouvert.
+       Sur mobile, un onglet jamais réellement fermé peut donc maintenir
+       l'ancien SW actif longtemps. Ce bloc ne peut rien faire sur un
+       appareil déjà pollué, car c'est précisément CET ancien service
+       worker -- pas ce nouveau index.html -- qui répond aux requêtes de
+       navigation depuis son propre cache. La seule parade fiable sur un
+       appareil déjà pollué reste la navigation privée, ou « cadenas →
+       Paramètres du site → Effacer et réinitialiser » ; le reste
+       (ce bloc + le SW no-op) est du durcissement pour les visiteurs
+       futurs, pas une garantie immédiate. Un simple paramètre ?v=...
+       n'a aucun effet : le service worker Flutter le retire de la clé
+       avant de consulter son cache, et même sans SW il ne rafraîchit
+       pas main.dart.js qui a sa propre URL versionnée -- ne jamais le
+       donner comme remède côté client. -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function (registrations) {
