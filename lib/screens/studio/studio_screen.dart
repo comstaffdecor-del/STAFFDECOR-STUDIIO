@@ -17,6 +17,7 @@ import '../../state/app_state.dart';
 import '../../widgets/common/common_ui.dart';
 import '../../widgets/common/motif_preview.dart';
 import '../../widgets/studio/calib_handles.dart';
+import '../../widgets/studio/ai_ambiance_panel.dart';
 import '../../widgets/studio/ia_suggestion_panel.dart';
 import '../../widgets/studio/metres_panel.dart';
 import '../../widgets/studio/product_modal.dart';
@@ -108,6 +109,7 @@ class _StudioScreenState extends State<StudioScreen> {
               onImport: _importPhoto,
               onMetres: state.openMetresPanel,
               onIaSuggestion: state.openIaSuggestionPanel,
+              onAiAmbiance: state.openAiAmbiancePanel,
             ),
             Expanded(
               child: LayoutBuilder(
@@ -156,6 +158,8 @@ class _StudioScreenState extends State<StudioScreen> {
           Positioned.fill(child: SaveProjectModal(onClose: state.closeSaveProjectModal)),
         if (state.showIaSuggestionPanel)
           Positioned.fill(child: IaSuggestionPanel(onClose: state.closeIaSuggestionPanel)),
+        if (state.showAiAmbiancePanel)
+          Positioned.fill(child: AiAmbiancePanel(onClose: state.closeAiAmbiancePanel)),
       ],
     );
   }
@@ -165,10 +169,12 @@ class _StudioTopbar extends StatelessWidget {
   final VoidCallback onImport;
   final VoidCallback onMetres;
   final VoidCallback onIaSuggestion;
+  final VoidCallback onAiAmbiance;
   const _StudioTopbar({
     required this.onImport,
     required this.onMetres,
     required this.onIaSuggestion,
+    required this.onAiAmbiance,
   });
 
   @override
@@ -226,6 +232,17 @@ class _StudioTopbar extends StatelessWidget {
             icon: FontAwesomeIcons.wandMagicSparkles,
             tip: 'Reconnaissance automatique (démo)',
             onTap: onIaSuggestion,
+          ),
+          // P17-VISUEL — "Aperçu d'ambiance IA" (Gemini image / Nano
+          // Banana). Le bouton reste toujours visible/cliquable : le
+          // panneau lui-même affiche un bouton "Générer" grisé +
+          // "fonction bientôt disponible" si kAiPreviewEnabled est faux
+          // ou qu'aucune clé Gemini n'est configurée (cas de cette
+          // passe, voir lib/data/ia_ambiance_preview.dart).
+          _ToolBtn(
+            icon: FontAwesomeIcons.wandSparkles,
+            tip: 'Aperçu d\'ambiance IA',
+            onTap: onAiAmbiance,
           ),
           // ⚠️ CORRECTION retour utilisateur ("les boutons d'enregistrement...
           // des projets... ne fonctionnent pas") — aucun bouton "Enregistrer"

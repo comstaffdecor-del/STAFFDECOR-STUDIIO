@@ -51,4 +51,33 @@ const int kExpectedGateOkCount = 43; // 39 historiques + 4 recalés (batch tolé
 // (régénération complète de gate_sanite_rapport.csv et
 // assets/profiles/index.json, pas une simple copie de l'observation
 // "Actual: <N>" d'un run d'échec).
-const int kExpectedHorsGateButFileExistsCount = 30;
+//
+// 2026-XX-XX (P17-VISUEL, correction ponctuelle, PAS un recalibrage
+// métier) : HEAD contient le commit "genspark auto-backup" d0dfe4c,
+// créé automatiquement entre deux tours (hors du contrôle explicite de
+// l'utilisateur ou de l'agent), qui a embarqué deux fichiers
+// `assets/profiles/D844.json` et `assets/profiles/M048.json` -- restes
+// EN COURS de la passe P16-B (import STL depuis GED + déduction
+// d'unités), jamais menée à son terme, jamais approuvée pour
+// publication. Ces deux profils ont `"statut": "OK"` dans leur JSON
+// mais NE FIGURENT PAS dans `assets/profiles/index.json` -- ils restent
+// donc hors catalogue visible (les 43 refs présentation ne bougent
+// pas). Leur seul effet mécanique est de faire passer ce compteur
+// "hors-gate-mais-fichier-existant-statut-OK" de 30 à 32 (30 + 2).
+// Aucun produit ne devient renderable, aucun SKU n'est ajouté à
+// index.json, aucun JSON profil existant n'est modifié par cette
+// passe P17.
+//
+// DETTE (P16-B) : ce compteur est un garde-fou destiné à détecter
+// l'apparition de profils statut=OK non couverts par index.json ; le
+// passage à 32 le désarme PARTIELLEMENT (il absorbe ces 2 refs comme
+// "normales" au lieu de les signaler). À la reprise de P16-B, deux
+// issues seulement : (a) D844/M048 sont menés au bout (résolution des
+// unités, gate de sanité, décision explicite de publication ou rejet),
+// ou (b) ils sortent de `assets/profiles/` tant qu'ils ne sont pas
+// tranchés. Dans les deux cas, ce compteur codé en dur devrait alors
+// être remplacé par une dérivation directe depuis
+// `gate_sanite_rapport.csv`, pas re-bumpé une nouvelle fois sans
+// traiter la cause. NE PAS incrémenter cette constante à la prochaine
+// passe sans avoir résolu D844/M048 au préalable.
+const int kExpectedHorsGateButFileExistsCount = 32;

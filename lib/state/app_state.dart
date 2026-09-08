@@ -550,6 +550,24 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Affiche/masque le panneau "Aperçu d'ambiance IA" (P17-VISUEL) —
+  /// même pattern que [showIaSuggestionPanel] ci-dessus. Le panneau
+  /// s'ouvre toujours (même si [kAiPreviewEnabled] est faux) : c'est
+  /// son propre contenu qui affiche le bouton grisé "fonction bientôt
+  /// disponible" dans ce cas, jamais un point d'entrée disparu sans
+  /// explication.
+  bool showAiAmbiancePanel = false;
+
+  void openAiAmbiancePanel() {
+    showAiAmbiancePanel = true;
+    notifyListeners();
+  }
+
+  void closeAiAmbiancePanel() {
+    showAiAmbiancePanel = false;
+    notifyListeners();
+  }
+
   /// Vrai si [productModalQte] est une estimation par défaut (aucun métré
   /// saisi pour cette pièce) plutôt qu'une quantité calculée à partir des
   /// dimensions réelles — utilisé par la modal produit pour afficher un

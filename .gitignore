@@ -51,3 +51,14 @@ app.*.map.json
 /tmp_review/
 tools/dxf_pipeline/logs/
 docs/logs/*_json.txt
+
+# P17-VISUEL (verif securite point 4) : le commit auto-backup d0dfe4c a
+# embarque 308 fichiers STL (~862 Mo, assets/solids/stl/) issus d'une
+# passe P16-B non terminee/non validee -- volume significatif, aucun
+# secret trouve dans ce commit (grep .env/credential/token vide), mais
+# ce repertoire ne doit plus etre capture par un futur backup
+# automatique. Pas de reecriture d'historique : les 308 fichiers deja
+# commit dans d0dfe4c restent en l'etat, ce gitignore ne fait qu'eviter
+# une recidive. A retirer seulement si P16-B decide un jour de
+# versionner ces STL de maniere explicite et volontaire.
+assets/solids/stl/

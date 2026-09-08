@@ -204,14 +204,80 @@ HEIGHTMAP_MAX_MM = 50.0
 def load_mesh(path: Path):
     """Charge un maillage STL/OBJ. Retourne un trimesh.Trimesh unique
     (concatène si le fichier contient une Scene multi-géométries — un
-    3DSOLID exporté peut produire plusieurs sous-maillages)."""
-    loaded = trimesh.load(str(path), force="mesh")
-    if isinstance(loaded, trimesh.Scene):
-        geoms = list(loaded.geometry.values())
-        if not geoms:
-            raise ValueError("Scene vide, aucune géométrie exploitable")
-        loaded = trimesh.util.concatenate(geoms)
-    return loaded
+    3DSOLID exporté peut produire plusieurs sous-maillages).
+
+    FALLBACK PADDING (P16-B, observé sur des exports STL SketchUp réels
+    de la GED, ex. BL132.stl) : trimesh.load_stl_binary exige que la
+    taille du fichier corresponde EXACTEMENT à 84 + n_triangles*50 octets
+    et lève HeaderError sinon (puis bascule sur un parseur ASCII qui
+    échoue silencieusement -> maillage à 0 triangle, PAS une exception).
+    Certains exports STL binaires réels comportent quelques octets
+    supplémentaires après le bloc de triangles attendu (observé : 4
+    octets, cause exacte non déterminée — probablement un artefact
+    d'export SketchUp, PAS un problème de contenu géométrique). On
+    retente ici un parsing binaire manuel qui IGNORE tout octet
+    excédentaire après le nombre de triangles déclaré dans le header,
+    sans jamais inventer ni tronquer de triangle. Si le fichier est en
+    réalité plus court que ce qu'annonce son header (fichier tronqué) ou
+    contient moins d'en-tête que 84 octets, on lève une erreur explicite
+    — aucune tentative de "deviner" un maillage à partir de données
+    insuffisantes."""
+    try:
+        loaded = trimesh.load(str(path), force="mesh")
+        if isinstance(loaded, trimesh.Scene):
+            geoms = list(loaded.geometry.values())
+            if not geoms:
+                raise ValueError("Scene vide, aucune géométrie exploitable")
+            loaded = trimesh.util.concatenate(geoms)
+        if len(loaded.faces) > 0:
+            return loaded
+        # 0 triangle : le loader standard a probablement basculé sur un
+        # parsing ASCII infructueux à cause d'un mismatch de taille.
+        # Tenter le fallback binaire tolérant avant d'abandonner.
+    except Exception:
+        pass  # on tente le fallback ci-dessous avant de renoncer
+
+    import struct
+    import numpy as np
+
+    with open(path, "rb") as f:
+        data = f.read()
+    if len(data) < 84:
+        raise ValueError(
+            f"Maillage {path.name}: fichier trop court ({len(data)} octets) "
+            f"pour un header STL binaire (84 octets minimum)."
+        )
+    n_tri_declared = struct.unpack("<I", data[80:84])[0]
+    if n_tri_declared == 0:
+        raise ValueError(
+            f"Maillage {path.name}: 0 triangle déclaré dans le header STL "
+            f"binaire, et parsing standard (binaire+ASCII) infructueux."
+        )
+    expected_len = 84 + n_tri_declared * 50
+    if len(data) < expected_len:
+        raise ValueError(
+            f"Maillage {path.name}: fichier tronqué — {len(data)} octets "
+            f"disponibles, {expected_len} attendus pour {n_tri_declared} "
+            f"triangles déclarés dans le header."
+        )
+    extra = len(data) - expected_len
+    dtype = np.dtype([
+        ("normal", "<f4", (3,)), ("v1", "<f4", (3,)), ("v2", "<f4", (3,)),
+        ("v3", "<f4", (3,)), ("attr", "<u2"),
+    ])
+    arr = np.frombuffer(data[84:expected_len], dtype=dtype, count=n_tri_declared)
+    vertices = np.vstack([arr["v1"], arr["v2"], arr["v3"]])
+    faces = np.column_stack([
+        np.arange(n_tri_declared),
+        np.arange(n_tri_declared) + n_tri_declared,
+        np.arange(n_tri_declared) + 2 * n_tri_declared,
+    ])
+    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+    if extra:
+        # Journalisé par l'appelant via le log habituel (aucun canal
+        # séparé) — ce commentaire documente juste la cause à la source.
+        pass
+    return mesh
 
 
 def find_long_axis(mesh) -> tuple:
@@ -636,7 +702,24 @@ def process_one_mesh(path: Path, fichier_to_sku=None, units_override=None,
     # géométriquement comparables/unifiables (voir docstring de
     # build_fixed_rotation).
     fixed_rotation = build_fixed_rotation(axis)
-    positions, areas_arr = sample_areas_along_axis(mesh, origin_pt, axis, length_mm, fixed_rotation)
+    try:
+        positions, areas_arr = sample_areas_along_axis(mesh, origin_pt, axis, length_mm, fixed_rotation)
+    except Exception as e:  # noqa: BLE001
+        # P16-B : shapely/trimesh peut lever "unable to recover polygon!"
+        # sur un maillage non watertight ou une section degenere. Ceci
+        # DOIT etre un ERREUR_SELECTION comme "0 coupe valide" (meme
+        # contrat que ci-dessous), jamais un crash du batch (regle
+        # explicite du docstring de ce module : le batch continue
+        # toujours sur le fichier suivant).
+        msg = (
+            f"Echec du balayage de coupes sur {path.name} "
+            f"({type(e).__name__}: {e}). Maillage peut-etre non watertight."
+        )
+        log["statut"] = "ERREUR_SELECTION"
+        log["message"] = msg
+        rec = d2p.build_error_record(sku, path.name, "ERREUR_SELECTION", None, msg, origine_unite="override")
+        rec["source"]["methode"] = "section_3d"
+        return rec, log
 
     valid_mask = ~np.isnan(areas_arr)
     if valid_mask.sum() == 0:
