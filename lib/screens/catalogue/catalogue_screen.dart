@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
 import '../../data/catalogue_data.dart';
+import '../../data/catalogue_visibility.dart';
 import '../../models/product.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/common_ui.dart';
@@ -43,6 +44,20 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   final _searchCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Amorce le chargement de assets/profiles/index.json (mémoïsé,
+    // fail-open) — voir lib/data/catalogue_visibility.dart. Tant que ce
+    // n'est pas résolu, applyPresentationVisibility renvoie la liste
+    // inchangée ; un setState() rejoue le filtre une fois prêt.
+    if (kPresentationFilter) {
+      CatalogueVisibilityGate.instance.ensureLoaded().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
@@ -51,8 +66,22 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final results = filterCatalogue(fam: state.catFam, q: state.catSearch);
-    final total = getCatalogueStats().total;
+    final resultsAllStatuts = filterCatalogue(fam: state.catFam, q: state.catSearch);
+    // Filtre de visibilité présentation (P15-PRES Volet 2, "Option A
+    // stricte") — point unique de branchement, réversible via
+    // kPresentationFilter. N'ajoute/n'écrit aucun champ dans les
+    // données produit : ne fait que retirer des éléments de cette
+    // liste locale d'affichage.
+    final results = applyPresentationVisibility(resultsAllStatuts, (p) => p.ref);
+    // Compteur explicite (P15-PRES Volet 2) : nombre de réfs "rendables"
+    // (dans assets/profiles/index.json) calculé sur [catalogueGed] au
+    // complet (458), et non sur le sous-ensemble filtré par DWG — pour
+    // afficher fidèlement "43 références rendables (catalogue complet :
+    // 458)" quel que soit l'état des filtres famille/recherche courants.
+    final rendablesCount = kPresentationFilter
+        ? applyPresentationVisibility(catalogueGed, (p) => p.ref).length
+        : catalogueGed.length;
+    final totalGed = catalogueGed.length;
 
     final perPage = state.catPerPage;
     final pageCount = (results.length / perPage).ceil().clamp(1, 999999);
@@ -81,7 +110,9 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                             style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600),
                           ),
                           TextSpan(
-                            text: '$total réf. GED',
+                            text: kPresentationFilter
+                                ? '$rendablesCount références rendables (catalogue complet : $totalGed)'
+                                : '$totalGed réf. GED',
                             style: const TextStyle(color: AppColors.text3, fontSize: 11),
                           ),
                         ],

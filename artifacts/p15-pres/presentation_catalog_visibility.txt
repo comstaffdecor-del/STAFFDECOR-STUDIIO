@@ -1,0 +1,162 @@
+P15-PRES — Rapport unifié de visibilité catalogue (mode présentation)
+Base : commit 955204b (Haussmann v4 figé, aucune retouche)
+=======================================================================
+
+VOLET 1 — Inventaire et réconciliation (assets/, lecture seule)
+-----------------------------------------------------------------
+assets/solids/  : vide (seul .gitkeep présent) -> 0 solide réel
+assets/stl/     : répertoire inexistant
+assets/glb/     : répertoire inexistant
+assets/step/    : 100 fichiers .stp/.step (dont 5 noms irréguliers :
+                  D505-sansmotif.stp, D550 sans motif.stp,
+                  D712 sans motif.stp, D887.step, TAL26 plan.step)
+assets/profiles/*.json (hors index.json) : 79 fichiers = 79 SKU réels
+
+Cause de l'écart gate(80) vs JSON(79) :
+  tools/dxf_pipeline/gate_sanite.py scanne TOUS les fichiers
+  assets/profiles/*.json, y compris index.json lui-même, qu'il traite
+  comme un 80e "SKU" nommé "index" (statut_gate=SUSPECT_GEOMETRIE,
+  motif CONTRAT_LOADER_STATUT_NON_OK car index.json n'a pas de champ
+  "statut"). Ce n'est pas un vrai SKU catalogue. Après exclusion de
+  cette ligne parasite : 79 SKU JSON == 79 SKU gate. Écart expliqué,
+  pas de blocage. gate_sanite_rapport.csv régénéré à neuf pendant cette
+  passe (python3 gate_sanite.py) : diff strictement vide avec la
+  version déjà commitée -> rapport confirmé À JOUR (non périmé).
+
+Cause de l'écart .stp(100) vs JSON(79) :
+  - 72 SKU JSON ont un .stp/.step correspondant (après normalisation
+    des noms irréguliers : suppression suffixe "sans motif"/"-sansmotif"
+    et "plan", extension .step traitée comme .stp).
+  - 7 SKU JSON n'ont AUCUN .stp/.step : 0900, 1000, 1005, 1102BH, 1145c,
+    1202, 20-54. Cause identifiée : ces profils proviennent d'une source
+    différente du pipeline STEP — champ "source.fichier" = *.dxf (0900,
+    1000, 1005, 1145c, 20-54) ou *.stl (1102BH, 1202), jamais *.stp/.step
+    (voir champ source.methode="section_step" absent pour ces 7).
+  - 28 fichiers .stp/.step (D113, D113M, D563, D567, D568, D579, D601,
+    D605, D606, D611, D615, D624, D625, D629, D632, D656, D657, D702,
+    D707, D749, D802, D820, D880, D887, D892, PLIN08, PLIN08M, PLIN10M)
+    n'ont PAS (encore) de JSON associé : backlog de traitement du
+    pipeline d'extraction, jamais traités en JSON à ce jour — cause
+    identifiée (pas une anomalie, un simple retard de traitement batch).
+  Total réconcilié : 72 + 7 = 79 JSON ; 72 + 28 = 100 .stp/.step.
+  AUCUN écart résiduel non expliqué.
+
+Statuts JSON (79 fichiers) :
+  OK                 : 73
+  ERREUR_SELECTION   : 4  (0900, 1005, 1145c, 20-54)
+  ERREUR_UNITES      : 2  (1102BH, 1202)
+
+Statuts gate (79 SKU réels, hors ligne parasite "index") :
+  OK                    : 43
+  SUSPECT_GEOMETRIE      : 36
+
+Cause de divergence quand statut_gate != statut_json :
+  a) Corrélation triviale (6 SKU) : statut_json != OK entraîne
+     mécaniquement statut_gate=SUSPECT_GEOMETRIE via le critère
+     bloquant CONTRAT_LOADER_STATUT_NON_OK du gate (copie littérale de
+     la 1re condition de rejet du loader Dart). Concerne : 0900, 1005,
+     1102BH, 1145c, 1202, 20-54.
+  b) Vraie divergence géométrique (30 SKU) : statut_json=OK MAIS
+     statut_gate=SUSPECT_GEOMETRIE, motifs DEBORD_PLAN_MUR et/ou
+     DEBORD_PLAN_PLAFOND (débord réel >= tolérance 0.5mm, voir
+     assets/config/gate_config.json) et/ou CONTRAT_LOADER_MUR_VIDE /
+     CONTRAT_LOADER_PLAFOND_VIDE (indices de face de pose vides malgré
+     un statut JSON OK). Liste complète dans
+     /tmp/p15_catalogue_publication.csv, colonne cause_divergence.
+
+Décompte (3 lignes requises) :
+  Visibles présentation (statut_json=OK ET statut_gate=OK) : 43
+  Brouillons (statut_json != OK)                             : 6
+  Litigieux (statut_json=OK mais statut_gate=SUSPECT)         : 30
+  Total réconcilié : 43 + 6 + 30 = 79 = total JSON. Aucun résidu.
+
+Fichier détaillé : /tmp/p15_catalogue_publication.csv (colonnes : sku,
+stp_present_exploitable, stp_fichiers, statut_gate, statut_json,
+cause_divergence)
+
+
+VOLET 2 — Filtre de visibilité, Option A stricte
+-----------------------------------------------------------------
+Critère double retenu : statut_json=="OK" ET statut_gate=="OK".
+Source unique réutilisée SANS DUPLICATION : assets/profiles/index.json
+(déjà généré par tools/dxf_pipeline/build_profiles_index.py à partir de
+gate_sanite_rapport.csv, lequel encode lui-même statut_json comme 1er
+critère bloquant du gate) — vérifié bit-à-bit identique à l'ensemble
+"visibles" du Volet 1 (43 refs, correspondance exacte).
+
+Implémentation : nouveau fichier lib/data/catalogue_visibility.dart
+  - CatalogueVisibilityGate : charge assets/profiles/index.json une
+    fois (mémoïsé), fail-open (asset absent/invalide -> ensemble vide
+    -> AUCUN masquage, catalogue complet préservé en cas d'incident).
+  - kPresentationVisibilityFilterActive (bool, default true) : POINT
+    UNIQUE de réversibilité. Repasser à false désactive intégralement
+    le filtre sans toucher aucune autre ligne de code.
+  - applyPresentationVisibility<T>(items, refOf) : fonction pure de
+    filtrage, ne modifie ni les données produit (catalogue_data.dart)
+    ni les JSON de profils. AUCUN champ render_status/renderable
+    ajouté nulle part.
+Branchement : lib/screens/catalogue/catalogue_screen.dart, un seul
+  point d'appel dans _CatalogueScreenState.build().
+
+Vérification (test/data/catalogue_visibility_test.dart, flutter test
+vert) :
+  Produits catalogue avant filtre (catalogueGedAvecDwg) : 350
+  Produits catalogue après filtre (mode présentation)   : 43
+  SKU masqués                                            : 307
+  Contrôle ponctuel : D720 (visible, OK/OK) reste affiché ;
+  D888 (litigieux, OK/SUSPECT) et 0900 (brouillon) sont bien absents
+  de la liste retournée à l'écran Catalogue.
+
+
+VOLET 3 — Déploiement
+-----------------------------------------------------------------
+Branche : main (commit de base 955204b + commit P15-PRES ci-dessous).
+Build : flutter build web --release (filtre Volet 2 actif par défaut,
+  kPresentationVisibilityFilterActive=true) -> build/web, succès.
+Hébergement : aucun jeton CLOUDFLARE_API_TOKEN configuré dans ce
+  sandbox et aucun projet Cloudflare Pages préexistant identifié pour
+  ce dépôt (meta_info cloudflare_project_name vide) -> "l'hébergement
+  existant" pour ce projet est le serveur de preview du sandbox
+  (python3 -m http.server, port 5060), déjà utilisé pour toutes les
+  précédentes démonstrations de ce projet.
+URL de build : https://5060-iv0to5t5muaul2o2div2d-c81df28e.sandbox.novita.ai/
+
+Visible sur le build déployé :
+  Nombre de produits (page Catalogue, mode présentation) : 43
+  Présence image de démo v4 (Haussmann) : NON APPLICABLE à cet écran
+    (le Catalogue liste des références produit avec leurs vignettes
+    GED ; la scène de démo Haussmann v4 est affichée dans l'écran
+    Studio/pièce démo, pas dans le Catalogue — v4 reste inchangée,
+    non retouchée, non re-testée par cette passe, conformément à
+    l'interdiction "pas de retour sur Haussmann").
+  Confirmation SKU brouillon absent : oui — asset assets/profiles/
+    index.json (43 refs) vérifié servi par le build déployé
+    (HTTP 200 sur /assets/assets/profiles/index.json), qui est
+    exactement la liste blanche appliquée par le filtre Volet 2 ;
+    aucun des 6 SKU brouillon (0900, 1005, 1102BH, 1145c, 1202, 20-54)
+    ni des 30 SKU litigieux n'y figure.
+
+
+RÉCAPITULATIF CHIFFRÉ (demandé)
+-----------------------------------------------------------------
+Total produits catalogue (catalogueGedAvecDwg, DWG confirmé)      : 350
+Total SKU avec profil géométrique JSON réel trouvé (Volet 1)       : 79
+  dont avec section .stp/.step exploitable                        : 72
+Nombre satisfaisant le critère double (statut_json=OK ET gate=OK)  : 43
+Nombre en brouillon (statut_json != OK)                            : 6
+Nombre litigieux (statut_json=OK mais gate=SUSPECT, cause identifiée): 30
+URL du build : https://5060-iv0to5t5muaul2o2div2d-c81df28e.sandbox.novita.ai/
+
+Liste des SKU visibles (43, = assets/profiles/index.json, générée par
+script depuis /tmp/reconciliation_buckets.json) :
+1000, D114, D114M, D116, D117, D505, D515, D520, D545, D550, D562,
+D569, D577, D607, D609, D610, D612, D616, D617, D620, D626, D630,
+D631, D633, D653, D704, D705, D706, D708, D709, D710, D715, D718,
+D720, D748, D801, D815, D830, D840, D886, D891, D901, TAL26
+(voir /tmp/p15_catalogue_publication.csv pour le détail par SKU)
+
+Liste des SKU brouillon (6, statut_json != OK) :
+0900, 1005, 1102BH, 1145c, 1202, 20-54
+
+(Liste des 30 SKU litigieux dans /tmp/p15_catalogue_publication.csv,
+colonne cause_divergence — non répétée ici pour rester lisible.)

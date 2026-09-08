@@ -390,6 +390,14 @@ def main():
         sys.exit(1)
 
     files = sorted(profiles_dir.glob("*.json"))
+    # Correctif d'hygiène (P15-PRES) : index.json est un fichier d'INDEX
+    # (pseudo-SKU {"refs": [...]}), pas un profil SKU — il n'a jamais eu
+    # de champ "sku"/"statut"/"profil_mm" et tombait systematiquement en
+    # SUSPECT_GEOMETRIE (CONTRAT_LOADER_*), gonflant le rapport a 80
+    # lignes pour 79 vrais profils SKU. On l'exclut explicitement du
+    # glob, par nom de fichier (pas par contenu, pour rester simple et
+    # ne pas risquer d'exclure un futur SKU nomme differemment).
+    files = [f for f in files if f.name != "index.json"]
     if args.sku:
         wanted = set(args.sku)
         files = [f for f in files if f.stem in wanted]
