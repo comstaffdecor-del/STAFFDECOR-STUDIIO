@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import '../../core/perspective/product_texture_cache.dart';
 import '../../core/perspective/room_painter.dart';
 import '../../core/theme.dart';
+import '../../data/catalogue_visibility.dart';
 import '../../models/persp_calib.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/common_ui.dart';
@@ -37,6 +38,24 @@ class StudioScreen extends StatefulWidget {
 
 class _StudioScreenState extends State<StudioScreen> {
   final _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    // ⚠️ CORRECTION P15-PRES-BIS — un utilisateur qui navigue directement
+    // vers Studio SANS jamais visiter Catalogue au préalable ne
+    // déclenchait jamais le chargement de assets/profiles/index.json
+    // (CatalogueVisibilityGate) : le bandeau produits Studio
+    // (product_strip.dart) restait alors non filtré (fail-open, no-op)
+    // tant que l'index n'était pas chargé par un autre écran. Amorce
+    // ici le MÊME chargement mémoïsé que catalogue_screen.dart, avec le
+    // même rejeu (setState) une fois résolu.
+    if (kPresentationFilter) {
+      CatalogueVisibilityGate.instance.ensureLoaded().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
 
   Future<void> _importPhoto() async {
     final file = await _picker.pickImage(source: ImageSource.gallery);

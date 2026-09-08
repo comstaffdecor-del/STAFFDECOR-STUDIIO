@@ -146,3 +146,140 @@ Vérification arithmétique : 43 + 36 = 79 (= total profils JSON).
   profil) = 458 (= total GED). Les deux totaux (79 et 458) sont donc
   chacun intégralement réconciliés, sans résidu.
 URL du build                                : https://5060-iv0to5t5muaul2o2div2d-c81df28e.sandbox.novita.ai/
+
+===========================================================================
+P15-PRES-BIS — CORRECTIONS (2 points), amont = 638ae4d
+===========================================================================
+
+POINT 1 — RÉPARTITION source.fichier PAR EXTENSION, croisée avec les 43
+---------------------------------------------------------------------------
+Champ analysé : `source.fichier` dans chacun des 79 fichiers
+  assets/profiles/<ref>.json (index.json exclu). Extension = suffixe du
+  nom de fichier ('.dxf', '.step', '.stl', '.stp'). Calcul Python
+  (json.load sur les 79 fichiers, assert len==79), croisé avec
+  l'appartenance normalisée (casse/espaces) aux 43 refs de index.json.
+
+  Extension   Dans les 43   Hors des 43   Total
+  .dxf        1             4             5
+  .step       1             0             1
+  .stl        0             2             2
+  .stp        41            30            71
+  TOTAL       43            36            79
+
+  Vérification arithmétique : 43 (dans les 43) + 36 (hors des 43) = 79
+  (= total profils JSON). Colonne "Dans les 43" somme à 43 = total
+  index.json. OK.
+
+  Détail des lignes non-.stp majoritaire :
+    .step : 1 profil, dans les 43
+    .stl  : 1102BH (hors, statut JSON ERREUR_UNITES),
+            1202   (hors, statut JSON ERREUR_UNITES)
+    .dxf  : 1000 (dans les 43) ; 0900, 1005, 1145c, 20-54 (hors,
+            statut JSON non-OK — voir liste des 36 écartés ci-dessus)
+
+  CONFIRMATION EXPLICITE DEMANDÉE : le nombre de profils dont la source
+  est un fichier .stl ET qui figurent dans les 43 refs visibles est
+  NUL (0/2 profils STL sont visibles). C'est la preuve directe qu'un
+  critère de visibilité "STL only" (ou "STL inclus") viderait
+  intégralement le sélecteur présentation à 0 résultat sur 43 — les
+  deux seuls profils sourcés en .stl (1102BH, 1202) sont d'ailleurs
+  déjà écartés pour une raison indépendante (statut JSON
+  ERREUR_UNITES), non liée à leur extension source.
+  Critère de visibilité INCHANGÉ par cette confirmation : appartenance
+  à assets/profiles/index.json (43 refs), toujours et uniquement.
+  Aucun critère par extension de fichier source n'a été introduit ni
+  envisagé comme remplacement.
+
+POINT 2 — BUG applyPresentationVisibility non branché partout
+---------------------------------------------------------------------------
+Constat : `applyPresentationVisibility` n'était appelé que depuis
+  lib/screens/catalogue/catalogue_screen.dart. Recherche exhaustive
+  (grep sur catalogueGed, getProdsByFamille, getProdByRef,
+  filterCatalogue, openProduct(, addToProject(, quickToggleProd(, et
+  les mots-clés recherche/favori/suggestion) dans tout lib/ :
+
+  Points de SÉLECTION de produit (listes navigables, où un NOUVEAU ref
+  peut être choisi) — DEUX au total dans toute l'application :
+    1. lib/screens/catalogue/catalogue_screen.dart — DÉJÀ filtré
+       (Volet 2, inchangé par cette passe).
+    2. lib/widgets/studio/product_strip.dart (_ProductStrip, bandeau
+       produits du Studio) — NON filtré avant cette passe. CORRIGÉ ICI.
+
+  Points de RÉSOLUTION (affichage d'un ref déjà sélectionné, pas de
+  liste navigable) — héritent automatiquement de la protection dès que
+  les deux points de sélection ci-dessus sont filtrés, aucune
+  modification nécessaire :
+    - lib/widgets/studio/product_modal.dart (résout state.productModalRef
+      via getProdByRef — un seul ref déjà choisi)
+    - lib/widgets/common/motif_preview.dart (résout les refs déjà
+      présents dans selectedProducts)
+    - lib/core/perspective/room_painter.dart (idem, résout selectedProducts
+      déjà choisis pour le rendu)
+    - lib/state/app_state.dart lignes ~652/716 (résolution getProdByRef
+      pour un ref déjà sélectionné)
+  Aucune modale de choix, recherche ou favoris distincte n'existe dans
+  le code actuel en dehors de ces deux points de sélection.
+
+  FICHIERS MODIFIÉS (liste complète pour cette correction) :
+  1. lib/widgets/studio/product_strip.dart
+     - Import ajouté : ../../data/catalogue_visibility.dart
+     - _ProductStrip.build() : remplacement de
+         final prods = getProdsByFamille(famille);
+       par
+         final prodsAllStatuts = getProdsByFamille(famille);
+         final prods = applyPresentationVisibility(prodsAllStatuts, (p) => p.ref);
+       Même constante kPresentationFilter, même jointure
+       normalizeSkuForJoin (casse+espaces) que catalogue_screen.dart.
+  2. lib/screens/studio/studio_screen.dart
+     - Import ajouté : ../../data/catalogue_visibility.dart
+     - _StudioScreenState.initState() ajouté : déclenche
+       CatalogueVisibilityGate.instance.ensureLoaded() (identique au
+       pattern de catalogue_screen.dart), avec setState() de rejeu une
+       fois l'index chargé. Corrige la lacune où un utilisateur
+       accédant directement à Studio (sans passer par Catalogue) ne
+       déclenchait jamais le chargement de index.json — le filtre
+       restait alors un no-op fail-open jusqu'au premier chargement
+       déclenché ailleurs.
+     Aucune autre logique de _StudioScreenState modifiée.
+
+  COMPTE AVANT/APRÈS — lib/widgets/studio/product_strip.dart
+  (nombre de produits listés par famille dans le bandeau Studio,
+  calculé sur catalogueGed (458) croisé avec les 43 refs de
+  index.json, jointure casse/espaces identique à la production) :
+
+    Famille          Avant   Après
+    Colonnes         14      1
+    Corniches        182     41
+    Encadrements     67      0
+    Lambris          21      0
+    Moulures         102     0
+    Ornements        4       0
+    Parements        37      0
+    Plinthes         21      1
+    Profils LED      10      0
+    TOTAL            458     43
+
+  Vérification arithmétique : la colonne "Après" somme à 43 (= total
+  index.json), la colonne "Avant" somme à 458 (= total catalogueGed).
+  Note UX (constat factuel, aucune action requise par le brief) :
+  plusieurs onglets famille du bandeau Studio (Encadrements, Lambris,
+  Moulures, Ornements, Parements, Profils LED) affichent désormais 0
+  produit une fois le filtre appliqué — message "Aucun produit dans
+  cette famille" déjà géré par le widget existant, aucun changement
+  requis pour ce cas.
+
+  COMPTE AVANT/APRÈS — lib/screens/catalogue/catalogue_screen.dart
+  (rappel, Volet 2, INCHANGÉ par cette passe) : 458 → 43 (global,
+  indépendant des filtres famille/recherche courants, affiché via le
+  compteur "rendablesCount").
+
+  Aucune écriture effectuée dans assets/profiles/*.json, index.json,
+  ni dans les 458 Produit de catalogue_data.dart pour ce point 2 —
+  seule la couche d'affichage/sélection (deux fichiers lib/widgets et
+  lib/screens listés ci-dessus) a été modifiée.
+
+DEUXIÈME URL DE BUILD (port 8080, inchangée par cette passe)
+---------------------------------------------------------------------------
+URL du build (preview sandbox, port 8080, URL PRÉSERVÉE à travers
+  cette correction, conformément à la consigne "l'URL ne doit pas
+  changer") : https://8080-iv0to5t5muaul2o2div2d-c81df28e.sandbox.novita.ai/

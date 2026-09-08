@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
 import '../../data/catalogue_data.dart';
+import '../../data/catalogue_visibility.dart';
 import '../../state/app_state.dart';
 
 // ⚠️ CORRECTION Bug #13 (retour utilisateur : "produits Lambris non
@@ -151,7 +152,16 @@ class _ProductStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final prods = getProdsByFamille(famille);
+    // Filtre de visibilité présentation (P15-PRES-BIS, correction —
+    // applyPresentationVisibility n'était branché que sur
+    // catalogue_screen.dart : le sélecteur produit du Studio affichait
+    // encore des produits hors des 43 refs validées de
+    // assets/profiles/index.json). Même constante [kPresentationFilter],
+    // même jointure insensible casse/espaces — voir
+    // lib/data/catalogue_visibility.dart et le point de branchement
+    // identique dans lib/screens/catalogue/catalogue_screen.dart.
+    final prodsAllStatuts = getProdsByFamille(famille);
+    final prods = applyPresentationVisibility(prodsAllStatuts, (p) => p.ref);
 
     if (prods.isEmpty) {
       return const Center(
