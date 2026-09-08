@@ -31,6 +31,44 @@
 
   <title>staff_decor_studio</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- P17-CACHE — démo sandbox — à retirer en production.
+       Désenregistrement défensif des anciens service workers + purge des
+       caches navigateur, pour éviter qu'un visiteur déjà passé sur une
+       build antérieure (avec service worker actif) reste bloqué sur une
+       version périmée de l'app.
+       Volontairement SANS location.reload() : aucun rechargement
+       automatique n'est déclenché ici, donc aucun risque de boucle de
+       rechargement -- pas besoin de garde-fou sessionStorage.
+       LIMITE CONNUE (à documenter, ne pas la présenter comme une
+       solution complète) : ce bloc ne peut rien faire sur un mobile déjà
+       pollué par un ancien service worker, car c'est précisément CET
+       ancien service worker -- pas ce nouveau index.html -- qui répond
+       aux requêtes de navigation depuis son propre cache. Ce qui nettoie
+       réellement un appareil déjà pollué, c'est --pwa-strategy=none :
+       le script du service worker enregistré finit par renvoyer 404,
+       et le navigateur désinscrit alors la registration de lui-même,
+       en général après un ou deux chargements. La parade immédiate côté
+       utilisateur reste la navigation privée, ou « cadenas → Paramètres
+       du site → Effacer et réinitialiser ». Un simple paramètre
+       ?v=... n'a aucun effet : le service worker Flutter le retire de
+       la clé avant de consulter son cache. -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        registrations.forEach(function (registration) {
+          registration.unregister();
+        });
+      }).catch(function () {});
+    }
+    if (window.caches && window.caches.keys) {
+      window.caches.keys().then(function (keys) {
+        keys.forEach(function (key) {
+          window.caches.delete(key);
+        });
+      }).catch(function () {});
+    }
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
