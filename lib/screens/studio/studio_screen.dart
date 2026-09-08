@@ -17,6 +17,7 @@ import '../../state/app_state.dart';
 import '../../widgets/common/common_ui.dart';
 import '../../widgets/common/motif_preview.dart';
 import '../../widgets/studio/calib_handles.dart';
+import '../../widgets/studio/ia_suggestion_panel.dart';
 import '../../widgets/studio/metres_panel.dart';
 import '../../widgets/studio/product_modal.dart';
 import '../../widgets/studio/product_strip.dart';
@@ -103,7 +104,11 @@ class _StudioScreenState extends State<StudioScreen> {
       children: [
         Column(
           children: [
-            _StudioTopbar(onImport: _importPhoto, onMetres: state.openMetresPanel),
+            _StudioTopbar(
+              onImport: _importPhoto,
+              onMetres: state.openMetresPanel,
+              onIaSuggestion: state.openIaSuggestionPanel,
+            ),
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -149,6 +154,8 @@ class _StudioScreenState extends State<StudioScreen> {
           Positioned.fill(child: MetresPanel(onClose: state.closeMetresPanel)),
         if (state.showSaveProjectModal)
           Positioned.fill(child: SaveProjectModal(onClose: state.closeSaveProjectModal)),
+        if (state.showIaSuggestionPanel)
+          Positioned.fill(child: IaSuggestionPanel(onClose: state.closeIaSuggestionPanel)),
       ],
     );
   }
@@ -157,7 +164,12 @@ class _StudioScreenState extends State<StudioScreen> {
 class _StudioTopbar extends StatelessWidget {
   final VoidCallback onImport;
   final VoidCallback onMetres;
-  const _StudioTopbar({required this.onImport, required this.onMetres});
+  final VoidCallback onIaSuggestion;
+  const _StudioTopbar({
+    required this.onImport,
+    required this.onMetres,
+    required this.onIaSuggestion,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -205,6 +217,16 @@ class _StudioTopbar extends StatelessWidget {
             onTap: state.toggleProductOverlay,
           ),
           _ToolBtn(icon: FontAwesomeIcons.rulerCombined, tip: 'Métrés', onTap: onMetres),
+          // P15-IA-DEMO (Volet B) — "Reconnaissance automatique" (démo).
+          // Le bouton reste toujours visible/cliquable, que le module soit
+          // activé ou non ([kIaSuggestionEnabled]) : s'il est désactivé, le
+          // panneau affiche directement le message d'incertitude permanent
+          // + le repli catalogue (jamais un bouton mort sans explication).
+          _ToolBtn(
+            icon: FontAwesomeIcons.wandMagicSparkles,
+            tip: 'Reconnaissance automatique (démo)',
+            onTap: onIaSuggestion,
+          ),
           // ⚠️ CORRECTION retour utilisateur ("les boutons d'enregistrement...
           // des projets... ne fonctionnent pas") — aucun bouton "Enregistrer"
           // n'existait auparavant dans toute l'application. Ouvre le modal de

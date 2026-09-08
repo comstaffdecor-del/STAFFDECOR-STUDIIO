@@ -535,6 +535,21 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Affiche/masque le panneau "Reconnaissance automatique" (P15-IA-DEMO,
+  /// Volet B) — voir [IaSuggestionPanel]. Même pattern que
+  /// [showMetresPanel]/[openMetresPanel]/[closeMetresPanel] ci-dessus.
+  bool showIaSuggestionPanel = false;
+
+  void openIaSuggestionPanel() {
+    showIaSuggestionPanel = true;
+    notifyListeners();
+  }
+
+  void closeIaSuggestionPanel() {
+    showIaSuggestionPanel = false;
+    notifyListeners();
+  }
+
   /// Vrai si [productModalQte] est une estimation par défaut (aucun métré
   /// saisi pour cette pièce) plutôt qu'une quantité calculée à partir des
   /// dimensions réelles — utilisé par la modal produit pour afficher un

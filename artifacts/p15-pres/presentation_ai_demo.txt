@@ -1,0 +1,116 @@
+P15-IA-DEMO — Volet B : "Suggestion automatique (démo)"
+=========================================================
+Base : commit b2ae3a0 (P15-PRES-BIS, déjà poussé sur main).
+
+1. MODULE ACTIVÉ : OUI (kIaSuggestionEnabled = true)
+   Fichier : lib/data/ia_suggestion.dart
+   Justification : round-trip Dart = 31/31 = 100% (voir section 3),
+   AUCUN échec observé -> pas de désactivation requise par le brief.
+
+2. MÉTHODE RETENUE : Piste 1 — similarité image (déterministe, locale,
+   sans réseau, sans modèle téléchargé).
+   - Descripteur : niveaux de gris 128x128 -> binarisation encre
+     (seuil gray<0.6) -> recadrage boîte englobante -> pooling par
+     blocs en grille 12x12 (144 valeurs) -> centrage (grille-moyenne)
+     -> 4 traits additionnels (aspect w/h, fill_ratio, centre de masse
+     relatif cy/cx) -> comparaison par similarité cosinus.
+   - Seuils d'exploitabilité (les DEUX doivent être vérifiés) :
+       kMinIaScore = 0.5   (score cosinus du meilleur candidat)
+       kMinIaGap   = 0.008 (écart top1-top2, discrimination)
+   - Piste 2 (scoring dimensionnel) NON retenue : le champ `famille`
+     des JSON profils est null dans 43/43 cas (un des 4 critères
+     nommés par le brief est donc inexploitable tel quel) ; Piste 1
+     a été validée à 100% en premier -> retenue comme "méthode prête".
+   - Libellé score UI : "correspondance X%" (jamais "confiance IA").
+
+3. TAUX ALLER-RETOUR (test Dart réel, pas seulement Python) :
+   Fichier : test/data/ia_suggestion_test.dart
+   Résultat : 31/31 = 100% sur les refs SCORABLES.
+   Détail périmètre : 43/43 refs de présentation ont été considérées,
+   mais seules 31/43 possèdent une vignette locale exploitable dans
+   assets/profiles/control/*.png (12/43 n'ont qu'une URL distante dans
+   catalogue_data.dart, inutilisable — aucun appel réseau autorisé) :
+   D116, D515, D545, D569, D612, D617, D633, D653, D715, D801, D815, D840.
+   Ces 12 restent hors du périmètre IA scorable mais restent TOUJOURS
+   accessibles via "Voir les 43 modèles validés" (catalogue manuel,
+   jamais restreint par ce module).
+   AUCUN échec -> AUCUNE compensation par mock nécessaire.
+
+4. SOURCE DE VÉRITÉ : assets/profiles/index.json, lu EXCLUSIVEMENT via
+   CatalogueVisibilityGate.instance (même gate, même jointure
+   normalizeSkuForJoin que le filtre présentation existant) — jamais
+   relu indépendamment par le nouveau module.
+
+5. CANDIDATS : 43 refs de présentation (le module IA ne peut noter que
+   les 31 qui ont une vignette locale, voir section 3 — sous-ensemble
+   explicitement disclosed, jamais un choix caché).
+   - Hors-index (458-43=415 GED) : EXCLUS (jamais lus par ce module).
+   - Brouillons/litigieux (36) : EXCLUS (même gate stricte).
+   - Fallback manuel ("Voir les 43 modèles validés" / "Choisir
+     manuellement") : TOUJOURS visible, quel que soit l'état du
+     panneau (idle/analyse/exploitable/incertain).
+
+6. ÉCRITURE : AUCUNE — index.json, <ref>.json, catalogue_data.dart
+   n'ont jamais été modifiés par ce Volet B.
+
+7. FICHIERS/ÉCRANS MODIFIÉS :
+   - lib/data/ia_suggestion.dart (NOUVEAU) — descripteur + gate + rank
+   - test/data/ia_suggestion_test.dart (NOUVEAU) — round-trip Dart réel
+     + tests de non-crash (image blanche, bytes corrompus)
+   - lib/widgets/studio/ia_suggestion_panel.dart (NOUVEAU) — UI parcours
+     complet (upload/scène actuelle -> analyse -> résultat/incertitude)
+   - lib/screens/studio/studio_screen.dart — ajout bouton outil
+     "Reconnaissance automatique (démo)" + montage du panneau
+   - lib/state/app_state.dart — showIaSuggestionPanel/open.../close...
+     (même pattern que showMetresPanel)
+   - pubspec.yaml — ajout de assets/profiles/control/ (déclaration
+     manquante : le sous-dossier n'était PAS bundlé auparavant malgré
+     assets/profiles/ déjà présent — non récursif par défaut dans
+     Flutter ; sans cette correction, les vignettes n'étaient pas
+     accessibles via rootBundle en Web release).
+
+8. EXEMPLES RÉELS (calculés par le code implémenté, test
+   test/data/_tmp_examples_test.dart exécuté puis supprimé — résultats
+   bruts, aucune valeur illustrative/fake) :
+
+   Exemple A — requête = vignette D720.png
+     1. D720   score=1.0000  correspondance 100%
+     2. D630   score=0.9500  correspondance 95%
+     3. D708   score=0.9496  correspondance 95%
+
+   Exemple B — requête = vignette PLIN10.png
+     1. 1000   score=0.9662  correspondance 97%
+     2. D620   score=0.9580  correspondance 96%
+     3. D630   score=0.9564  correspondance 96%
+
+   Note : ces schémas techniques (coupes de moulures) sont visuellement
+   proches par construction (même style de tracé matplotlib), d'où des
+   scores globalement élevés au sein du top-3 — c'est attendu et
+   documenté, pas un artefact caché.
+
+9. URL FINALE (inchangée) :
+   https://8080-iv0to5t5muaul2o2div2d-c81df28e.sandbox.novita.ai/
+
+   Codes HTTP vérifiés après rebuild+redémarrage (serveur Python
+   http.server, port 8080, servant build/web) :
+     GET /                                              -> 200
+     GET /assets/assets/profiles/index.json              -> 200 (43 refs)
+     GET /assets/assets/demo_scenes/haussmann.jpg         -> 200
+
+10. QUALITÉ :
+    flutter analyze : 0 erreur (info/warning pré-existants uniquement,
+    non liés à ce Volet B).
+    flutter test : suite complète verte (283 passed, 1 skip volontaire
+    documenté, 0 failed) — inclut le nouveau
+    test/data/ia_suggestion_test.dart.
+    flutter build web --release : succès.
+    Serveur 8080 : opérationnel, sert build/web, 3/3 endpoints à 200.
+
+11. GIT : commit "P15-IA-DEMO: suggestion automatique demo limitee aux
+    43 produits presentation" sur main, en amont de b2ae3a0, poussé sur
+    origin/main (voir git log/status en fin de rapport ci-dessous, ou
+    directement dans le dépôt).
+
+Exclusions explicites de cette passe (conformes au brief) : pas de test
+Playwright, pas de travail devis, pas de documentation longue au-delà
+de ce rapport.
