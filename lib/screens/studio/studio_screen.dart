@@ -115,6 +115,15 @@ class _StudioScreenState extends State<StudioScreen> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final photoZoneSize = Size(constraints.maxWidth, constraints.maxHeight * 0.62);
+                  final roomImage = state.roomImage;
+                  final localImgDraw = roomImage == null
+                      ? null
+                      : computeImgDraw(
+                          roomImage.width.toDouble(),
+                          roomImage.height.toDouble(),
+                          photoZoneSize.width,
+                          photoZoneSize.height,
+                        );
                   // Mémorise la taille de la zone photo pour que le
                   // chargement des scènes démo (loadDemoScene) puisse
                   // calculer un imgDraw correct même si l'utilisateur
@@ -141,7 +150,12 @@ class _StudioScreenState extends State<StudioScreen> {
                       SizedBox(
                         width: photoZoneSize.width,
                         height: photoZoneSize.height,
-                        child: _PhotoZone(size: photoZoneSize, onImport: _importPhoto, onDemo: _useDemoRoom),
+                        child: _PhotoZone(
+                          size: photoZoneSize,
+                          localImgDraw: localImgDraw,
+                          onImport: _importPhoto,
+                          onDemo: _useDemoRoom,
+                        ),
                       ),
                       const Expanded(child: CatBar()),
                     ],
@@ -297,9 +311,15 @@ class _ToolBtn extends StatelessWidget {
 
 class _PhotoZone extends StatelessWidget {
   final Size size;
+  final ImgDraw? localImgDraw;
   final VoidCallback onImport;
   final VoidCallback onDemo;
-  const _PhotoZone({required this.size, required this.onImport, required this.onDemo});
+  const _PhotoZone({
+    required this.size,
+    required this.localImgDraw,
+    required this.onImport,
+    required this.onDemo,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +351,7 @@ class _PhotoZone extends StatelessWidget {
                 builder: (context, _) => CustomPaint(
                   painter: RoomPainter(
                     roomImage: state.roomImage,
-                    imgDraw: state.imgDraw,
+                    imgDraw: localImgDraw,
                     calib: state.perspCalib ?? PerspCalib.defaultCalib,
                     selectedProducts: state.selectedProducts,
                     prodPositions: state.prodPositions,
