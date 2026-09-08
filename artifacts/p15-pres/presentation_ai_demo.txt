@@ -106,10 +106,11 @@ Base : commit b2ae3a0 (P15-PRES-BIS, déjà poussé sur main).
     flutter build web --release : succès.
     Serveur 8080 : opérationnel, sert build/web, 3/3 endpoints à 200.
 
-11. GIT : commit "P15-IA-DEMO: suggestion automatique demo limitee aux
-    43 produits presentation" sur main, en amont de b2ae3a0, poussé sur
-    origin/main (voir git log/status en fin de rapport ci-dessous, ou
-    directement dans le dépôt).
+11. GIT : commit 537f3cb "P15-IA-DEMO: suggestion automatique demo
+    limitee aux 43 produits presentation" sur main, en amont de b2ae3a0
+    (log: 537f3cb -> b2ae3a0 -> 638ae4d). Push confirmé :
+    b2ae3a0..537f3cb main -> main (origin/main). git status --short
+    vide (working tree clean) après commit+push.
 
 Exclusions explicites de cette passe (conformes au brief) : pas de test
 Playwright, pas de travail devis, pas de documentation longue au-delà
