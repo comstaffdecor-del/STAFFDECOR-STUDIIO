@@ -1,0 +1,14 @@
+P16-A — INVENTAIRE TABLEAU BE + STL GED (LECTURE SEULE) — Base 5ca2fa0
+
+1) Tableau BE : "Suivi Bib3 2025.xlsx" (repo+upload, quasi identiques, 12/113k cellules divergentes non structurantes). Feuil1=1916L x59col. Col STL = case binaire déclarative, AUCUN lien/chemin/URL (vérifié XML brut).
+2) GED (ged.staffdecor.fr) : répond mais redirige vers /login ; AUCUN .env/credential ici -> accès NON REPRODUCTIBLE dans ce sandbox. Crawl archivé antérieur (commit 2d5d3e9) = preuve documentaire seule, non actionnable.
+3) STL réels (extension stricte) : 337 refs BE déclarent STL=1 (flag non probant seul) ; 308 SKU confirmés par nom de fichier sur l'archive GED antérieure ; seuls 2 .stl PRÉSENTS localement (1102BH, 1202), tous deux en ERREUR_UNITES.
+4) Réconciliation -> /tmp/p16a_be_stl_reconciliation.csv (592 lignes) : deja_visible=43, corriger_unites=2, a_importer_puis_extraire_section=242 (non récupérable ici, faute GED), a_qualifier_be=305.
+5) 1102BH/1202 : échec = units_override.csv absent -> profil_mm=[] AVANT tout calcul de bbox (pas un facteur d'échelle silencieux). Correction possible = max 2 SKU débloqués, aucun effet de masse identifié.
+6) D577/D620 : source réelle .stp, statut OK, gate OK, présents dans index.json. Tous points d'affichage (catalogue, Studio, IA, fiche, comparateur/devis) filtrent via applyPresentationVisibility ou résolvent un ref déjà validé. CONFORME à la règle index.json, aucune fuite.
+7) Extensions/79 profils : .stp=71 .dxf=5 .stl=2 .step=1. Extensions/43 index : .stp=41 .dxf=1 .step=1 .stl=0 (confirmé).
+8) Estimation réaliste depuis CE sandbox : 43 + 0 (les 242 STL "archivés" non récupérables sans accès GED restauré ; échantillon local = 0/2 succès).
+9) Interdictions respectées : aucune écriture, aucun rebuild, serveur 8080 non relancé (PID inchangé).
+10) Livrables copiés dans artifacts/p16-be-stl/ ; flutter analyze 0 erreur ; commit+push effectués après ce rapport.
+
+CONCLUSION : rester à 43 pour la présentation. P16-B n'a de sens qu'après restauration accès GED + units_override.csv pour 1102BH/1202.
