@@ -119,6 +119,10 @@ class RoomPainter extends CustomPainter {
     final w = size.width, h = size.height;
 
     // ── 1. Photo (mode "contain") ou pièce démo générique. ──
+    // `dst` est hoisté hors du bloc `if` (P18-HOTFIX) : c'est exactement
+    // le Rect utilisé par drawImageRect ci-dessous, réutilisé plus bas
+    // comme borne de clipRect pour les overlays — jamais recalculé.
+    Rect? dst;
     if (roomImage != null && imgDraw != null) {
       final src = Rect.fromLTWH(
         0,
@@ -126,7 +130,7 @@ class RoomPainter extends CustomPainter {
         roomImage!.width.toDouble(),
         roomImage!.height.toDouble(),
       );
-      final dst = Rect.fromLTWH(imgDraw!.dx, imgDraw!.dy, imgDraw!.dw, imgDraw!.dh);
+      dst = Rect.fromLTWH(imgDraw!.dx, imgDraw!.dy, imgDraw!.dw, imgDraw!.dh);
       canvas.drawImageRect(roomImage!, src, dst, Paint());
     } else {
       _paintDemoRoom(canvas, w, h);
@@ -134,6 +138,40 @@ class RoomPainter extends CustomPainter {
 
     if (!withProducts || selectedProducts.isEmpty) return;
 
+    // ── P18-HOTFIX : clippe le dessin des overlays (corniches, plinthes,
+    // moulures, etc.) contre le Rect réel de la photo (`dst`), pour que
+    // rien ne déborde dans les bandes de letterbox en BoxFit.contain.
+    // Ne s'applique QUE quand une vraie photo est affichée (dst != null)
+    // — jamais sur `_paintDemoRoom`, déjà peinte plus haut hors de cette
+    // portée et volontairement non clippée (pièce démo générique, pas de
+    // bande de letterbox à respecter).
+    // try/finally obligatoire : VanishingPoint.compute() ci-dessous peut
+    // lever ArgumentError/StateError (cas dégénéré), et aucun autre
+    // `return` ne traverse cette portée après ce point — sans ce
+    // try/finally, une exception non capturée entre save() et restore()
+    // ferait fuir l'état du canvas vers les prochains paint() de la même
+    // session de rendu.
+    if (dst != null) {
+      canvas.save();
+      canvas.clipRect(dst);
+    }
+    try {
+      _paintOverlays(canvas, w, h);
+    } finally {
+      if (dst != null) {
+        canvas.restore();
+      }
+    }
+  }
+
+  /// Dessine tous les overlays produit (corniches, plinthes, moulures,
+  /// LED, lambris, parements, colonnes, encadrements, ornements) — extrait
+  /// de [paint] par P18-HOTFIX pour pouvoir l'entourer d'un save/clipRect/
+  /// restore appairé avec try/finally, sans dupliquer la logique. Aucun
+  /// changement de VP, calibration, snap, position ou géométrie ici :
+  /// code strictement identique à l'ancien corps de [paint], seulement
+  /// déplacé.
+  void _paintOverlays(Canvas canvas, double w, double h) {
     // ── 2. Calibration → coordonnées canvas → VP réel unique. ──
     final cp = CalibCanvasPoints.fromCalib(calib, imgDraw: imgDraw, w: w, h: h);
     final vp = VanishingPoint.compute(

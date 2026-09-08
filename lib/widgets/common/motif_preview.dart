@@ -65,7 +65,7 @@ class MotifPreviewBar extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         for (final prod in chips) ...[
-          _MotifChip(ref: prod.ref, imgUrl: prod.img),
+          _MotifChip(ref: prod.ref),
           const SizedBox(width: 6),
         ],
       ],
@@ -73,12 +73,24 @@ class MotifPreviewBar extends StatelessWidget {
   }
 }
 
-/// Une vignette : vraie photo produit, zoomée sur le centre (là où le
-/// relief est visible), avec libellé "Relief réel — {ref}".
+/// Une vignette : vraie photo produit (vignette CAD locale), zoomée sur le
+/// centre (là où le relief est visible), avec libellé "Relief réel — {ref}".
+///
+/// ⚠️ P18-HOTFIX : remplace l'ancien `Image.network(prod.img)` (staffdecor.fr,
+/// dépendance réseau, sujette au CORS — voir le diagnostic "vignettes
+/// blanches D520/PLIN08M" ci-dessous, désormais obsolète pour ce widget) par
+/// un asset LOCAL `assets/profiles/control/<ref>.png` — aucune vérification
+/// d'existence synchrone (pas idiomatique Flutter, un asset ne se sonde pas
+/// de façon synchrone) : c'est `errorBuilder` qui gère l'absence du fichier
+/// pour les refs sans vignette de contrôle (12/43 aujourd'hui : D116, D515,
+/// D545, D569, D612, D617, D633, D653, D715, D801, D815, D840 — placeholder
+/// neutre affiché pour ces refs, y compris D545 qui EST présent dans la
+/// bande). Sensible à la casse : `ref` doit correspondre exactement au nom
+/// de fichier PNG (les refs catalogue sont déjà en casse fixe, ex. 'D609',
+/// jamais 'd609').
 class _MotifChip extends StatelessWidget {
   final String ref;
-  final String imgUrl;
-  const _MotifChip({required this.ref, required this.imgUrl});
+  const _MotifChip({required this.ref});
 
   @override
   Widget build(BuildContext context) {
@@ -107,46 +119,24 @@ class _MotifChip extends StatelessWidget {
                 // (invisible) contre ~201-204 sur fond sombre. Voir commit
                 // d'obsolescence de 73787af pour le détail de la mesure.
                 color: AppColors.card2,
-                child: imgUrl.isEmpty
-                    ? const Icon(FontAwesomeIcons.image, size: 14, color: AppColors.text3)
-                    : ClipRect(
-                        child: Transform.scale(
-                          scale: 1.7,
-                          child: Image.network(
-                            imgUrl,
-                            fit: BoxFit.cover,
-                            // ⚠️ Fallback CORS (diagnostic vignettes blanches
-                            // D520/PLIN08M — détail complet dans le message de
-                            // commit) : bascule sur un <img> HTML, hors CORS
-                            // strict du fetch CanvasKit, UNIQUEMENT si le
-                            // fetch échoue ; inerte sinon.
-                            // ⚠️ Ce widget est composé DANS le RepaintBoundary
-                            // exporté par ComparateurScreen
-                            // ._downloadComparisonImage — un <img> HTML n'y
-                            // est pas capturé (vide au lieu de l'icône
-                            // d'erreur actuelle, pas une régression). NE PAS
-                            // reproduire sur les 3 autres sites Image.network
-                            // du dépôt sans revérifier leur exposition à un
-                            // export RepaintBoundary.
-                            webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              FontAwesomeIcons.image,
-                              size: 14,
-                              color: AppColors.text3,
-                            ),
-                            loadingBuilder: (context, child, progress) {
-                              if (progress == null) return child;
-                              return const Center(
-                                child: SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(strokeWidth: 1.6),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                child: ClipRect(
+                  child: Transform.scale(
+                    scale: 1.7,
+                    child: Image.asset(
+                      'assets/profiles/control/$ref.png',
+                      fit: BoxFit.cover,
+                      // Fallback local (P18-HOTFIX) : 12/43 refs n'ont pas
+                      // de vignette control/*.png sur disque — errorBuilder
+                      // est le seul mécanisme idiomatique pour ce cas (pas
+                      // de vérification d'existence synchrone en Flutter).
+                      errorBuilder: (_, __, ___) => const Icon(
+                        FontAwesomeIcons.image,
+                        size: 14,
+                        color: AppColors.text3,
                       ),
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 3),
