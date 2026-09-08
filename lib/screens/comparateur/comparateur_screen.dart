@@ -147,7 +147,21 @@ class _ComparateurScreenState extends State<ComparateurScreen> {
           child: RepaintBoundary(
             key: _compZoneKey,
             child: LayoutBuilder(
-              builder: (context, c) => _CompZone(size: Size(c.maxWidth, c.maxHeight)),
+              builder: (context, c) {
+                final roomImage = state.roomImage;
+                final localImgDraw = roomImage == null
+                    ? null
+                    : computeImgDraw(
+                        roomImage.width.toDouble(),
+                        roomImage.height.toDouble(),
+                        c.maxWidth,
+                        c.maxHeight,
+                      );
+                return _CompZone(
+                  size: Size(c.maxWidth, c.maxHeight),
+                  localImgDraw: localImgDraw,
+                );
+              },
             ),
           ),
         ),
@@ -312,7 +326,8 @@ class _LockedPanel extends StatelessWidget {
 
 class _CompZone extends StatelessWidget {
   final Size size;
-  const _CompZone({required this.size});
+  final ImgDraw? localImgDraw;
+  const _CompZone({required this.size, required this.localImgDraw});
 
   @override
   Widget build(BuildContext context) {
@@ -333,7 +348,7 @@ class _CompZone extends StatelessWidget {
               builder: (context, _) => CustomPaint(
                 painter: RoomPainter(
                   roomImage: state.roomImage,
-                  imgDraw: state.imgDraw,
+                  imgDraw: localImgDraw,
                   calib: calib,
                   selectedProducts: state.selectedProducts,
                   prodPositions: state.prodPositions,
@@ -350,7 +365,7 @@ class _CompZone extends StatelessWidget {
               child: CustomPaint(
                 painter: RoomPainter(
                   roomImage: state.roomImage,
-                  imgDraw: state.imgDraw,
+                  imgDraw: localImgDraw,
                   calib: calib,
                   selectedProducts: state.selectedProducts,
                   prodPositions: state.prodPositions,
