@@ -1,0 +1,338 @@
+sku,sku_normalise,designation,col_P_stl,col_N_step,col_H_dxf,col_G_dwg3d,excluded_reason,candidate_stl
+D100,D100,,1,,,,,OUI
+D101,D101,,1,1,,,,OUI
+D102,D102,,1,1,,,,OUI
+D103,D103,,1,1,,,,OUI
+D104,D104,,1,1,,,,OUI
+D105A,D105A,,1,1,,,,OUI
+D105B,D105B,,1,1,,,,OUI
+D106,D106,,1,1,,,,OUI
+D107,D107,,1,1,,,,OUI
+D108,D108,,1,1,,,,OUI
+D109,D109,,1,,,,,OUI
+D110,D110,,1,1,,,,OUI
+D113,D113,,1,1,,,,OUI
+D113M,D113M,,1,1,,,,OUI
+D114,D114,,1,1,,,,OUI
+D114M,D114M,,1,1,,,,OUI
+D116,D116,,1,1,,,,OUI
+D117,D117,,1,1,,,,OUI
+D118,D118,,1,1,,,,OUI
+D121,D121,,1,,,,,OUI
+D122,D122,,1,,,,,OUI
+D123,D123,,1,,,,,OUI
+D124,D124,,1,,,,,OUI
+D125,D125,,1,,,,,OUI
+D505,D505,,1,,,,,OUI
+D510,D510,,1,1,,,,OUI
+D513,D513,,1,,,,,OUI
+D515,D515,,1,1,,,,OUI
+D520,D520,,1,1,,,,OUI
+D525,D525,,1,,,,,OUI
+D530,D530,,1,,,,,OUI
+D535,D535,,1,,,,,OUI
+D540,D540,,1,,,,,OUI
+D545,D545,,1,1,,,,OUI
+D550,D550,,1,1,,,,OUI
+D555,D555,,1,,,,,OUI
+D556,D556,,1,,,,,OUI
+D560,D560,,1,1,,,,OUI
+D561,D561,,1,1,,,,OUI
+D562,D562,,1,1,,,,OUI
+D563,D563,,1,1,,,,OUI
+D564,D564,,1,1,,,,OUI
+D565,D565,,1,1,,,,OUI
+D566,D566,,1,,,,,OUI
+D567,D567,,1,1,,,,OUI
+D568,D568,,1,1,,,,OUI
+D569,D569,,1,1,,,,OUI
+D570,D570,,1,,,,,OUI
+D572,D572,,1,,,,,OUI
+D573,D573,,1,,,,,OUI
+D574,D574,,1,1,,,,OUI
+D575,D575,,1,1,,,,OUI
+D576,D576,,1,1,,,,OUI
+D577,D577,,1,1,,,,OUI
+D578,D578,,1,1,,,,OUI
+D579,D579,,1,1,,,,OUI
+D580,D580,,1,1,,,,OUI
+D601,D601,,1,1,,,,OUI
+D604,D604,,1,1,,,,OUI
+D605,D605,,1,,,,,OUI
+D606,D606,,1,1,,,,OUI
+D607,D607,,1,1,,,,OUI
+D608,D608,,1,1,,,,OUI
+D609,D609,,1,1,,,,OUI
+D610,D610,,1,1,,,,OUI
+D611,D611,,1,1,,,,OUI
+D612,D612,,1,1,,,,OUI
+D613,D613,,1,,,,,OUI
+D614,D614,,1,1,,,,OUI
+D615,D615,,1,1,,,,OUI
+D616,D616,,1,1,,,,OUI
+D616A,D616A,,1,,,,,OUI
+D616B,D616B,,1,,,,,OUI
+D617,D617,,1,1,,,,OUI
+D618,D618,,1,,,,,OUI
+D620,D620,,1,1,,,,OUI
+D621,D621,,1,1,,,,OUI
+D622,D622,,1,1,,,,OUI
+D623 (supprimée en gestion),D623(SUPPRIMÉEENGESTION),,1,1,,,STATUT_SUPPRIMÉE,NON
+D624,D624,,1,1,,,,OUI
+D625,D625,,1,1,,,,OUI
+D626,D626,,1,1,,,,OUI
+D627,D627,,1,,,,,OUI
+D628,D628,,1,1,,,,OUI
+D629,D629,,1,1,,,,OUI
+D630,D630,,1,1,,,,OUI
+D631,D631,,1,1,,,,OUI
+D632,D632,,1,1,,,,OUI
+D633,D633,,1,1,,,,OUI
+D650,D650,,1,1,,,,OUI
+D650L,D650L,,1,,,,,OUI
+D650A,D650A,,1,,,,,OUI
+D650B,D650B,,1,,,,,OUI
+D651,D651,,1,1,,,,OUI
+D652,D652,,1,1,,,,OUI
+D652A,D652A,,1,,,,,OUI
+D652B,D652B,,1,,,,,OUI
+D653,D653,,1,1,,,,OUI
+D654,D654,,1,,,,,OUI
+D655,D655,,1,,,,,OUI
+D656,D656,,1,1,,,,OUI
+D657,D657,,1,1,,,,OUI
+D658,D658,,1,,,,,OUI
+D702,D702,,1,1,,,,OUI
+D703,D703,,1,1,,,,OUI
+D704,D704,,1,1,,,,OUI
+D705,D705,,1,1,,,,OUI
+D706,D706,,1,1,,,,OUI
+D707,D707,,1,1,,,,OUI
+D708,D708,,1,1,,,,OUI
+D709,D709,,1,1,,,,OUI
+D710,D710,,1,1,,,,OUI
+D711,D711,,1,,,,,OUI
+D712,D712,,1,1,,,,OUI
+D713,D713,,1,1,,,,OUI
+D715,D715,,1,1,,,,OUI
+D716,D716,,1,,,,,OUI
+D717,D717,,1,1,,,,OUI
+D718,D718,,1,1,,,,OUI
+D720,D720,,1,1,,,,OUI
+D748,D748,,1,1,,,,OUI
+D749,D749,,1,1,,,,OUI
+D751,D751,,1,,,,,OUI
+D752,D752,,1,,,,,OUI
+D753,D753,,1,,,,,OUI
+D754,D754,,1,,,,,OUI
+D801,D801,,1,1,,,,OUI
+D802,D802,,1,1,,,,OUI
+D810,D810,,1,,,,,OUI
+D812,D812,,1,,,,,OUI
+D813,D813,,1,,,,,OUI
+D814,D814,,1,1,,,,OUI
+D815,D815,,1,1,,,,OUI
+D818,D818,,1,,,,,OUI
+D820,D820,,1,1,,,,OUI
+D830,D830,,1,1,,,,OUI
+D835,D835,,1,,,,,OUI
+D840,D840,,1,1,,,,OUI
+D843,D843,,1,,,,,OUI
+D844,D844,,1,,,,,OUI
+D845,D845,,1,1,,,,OUI
+D846,D846,,1,,,,,OUI
+D878,D878,,1,,,,,OUI
+D879,D879,,1,,,,,OUI
+D880,D880,,1,1,,,,OUI
+D880A,D880A,,1,,,,,OUI
+D880B,D880B,,1,,,,,OUI
+D881B,D881B,,1,,,,,OUI
+D881,D881,,1,,,,,OUI
+D882,D882,,1,,,,,OUI
+D886,D886,,1,1,,,,OUI
+D887,D887,,1,,,,,OUI
+D888,D888,,1,1,,,,OUI
+D889,D889,,1,,,,,OUI
+D896,D896,,1,1,,,,OUI
+D897,D897,,1,,,,,OUI
+D898,D898,,1,1,,,,OUI
+D899,D899,,1,,,,,OUI
+D900,D900,,1,,,,,OUI
+D901,D901,,1,,,,,OUI
+D903,D903,,1,,,,,OUI
+D905B,D905B,,1,,,,,OUI
+D905H,D905H,,1,,,,,OUI
+SDPA2,SDPA2,,1,,,,,OUI
+M038,M038,,1,,,,,OUI
+M048,M048,,1,,,,,OUI
+M060,M060,,1,,,,,OUI
+M067,M067,,1,,,,,OUI
+M071,M071,,1,,,,,OUI
+M202,M202,,1,,,,,OUI
+M209,M209,,1,,,,,OUI
+M250,M250,,1,,,,,OUI
+M251,M251,,1,,,,,OUI
+M252,M252,,1,,,,,OUI
+M253,M253,,1,,,,,OUI
+M254,M254,,1,,,,,OUI
+M302,M302,,1,,,,,OUI
+M303,M303,,1,,,,,OUI
+M306,M306,,1,,,,,OUI
+M400,M400,,1,,,,,OUI
+M401,M401,,1,,,,,OUI
+M401P,M401P,,1,,,,,OUI
+M402,M402,,1,,,,,OUI
+M403,M403,,1,,,,,OUI
+M404,M404,,1,,,,,OUI
+M405,M405,,1,,,,,OUI
+M501,M501,,1,,,,,OUI
+M502,M502,,1,1,,,,OUI
+M504,M504,,1,,,,,OUI
+M604,M604,,1,,,,,OUI
+M605,M605,,1,,,,,OUI
+1101,1101,,1,1,,,,OUI
+1101BH,1101BH,1/4 cercle,1,1,,,,OUI
+1101D,1101D,1/4 cercle décoré,1,,,,,OUI
+1101C,1101C,,1,,,,,OUI
+1101E,1101E,Angle 1101E - 90° - 15 x 8 cm,1,,,,,OUI
+1101H,1101H,Angle décoré,1,,,,,OUI
+1102,1102,,1,1,,,,OUI
+1103,1103,,1,1,,,,OUI
+1103H,1103H,Angle décoré,1,,,,,OUI
+1104,1104,,1,,,,,OUI
+1104B,1104B,Angle décoré,1,,,,,OUI
+1105,1105,,1,,,,,OUI
+1107,1107,,1,1,,,,OUI
+1107P,1107P,Doucine ,1,,,,,OUI
+1108,1108,,1,1,,,,OUI
+1112,1112,,1,,,,,OUI
+1120,1120,,1,1,,,,OUI
+1121,1121,,1,1,,,,OUI
+1124,1124,,1,1,,,,OUI
+1125,1125,,1,1,,,,OUI
+1130,1130,,1,1,,,,OUI
+1132,1132,,1,,,,,OUI
+1151,1151,,1,,,,,OUI
+1155,1155,,1,1,,,,OUI
+1156,1156,,1,1,,,,OUI
+1165,1165,,1,,,,,OUI
+1166,1166,,1,1,,,,OUI
+1200,1200,,1,1,,,,OUI
+1201,1201,,1,1,,,,OUI
+1202,1202,,1,,,,,OUI
+1204,1204,,1,,,,,OUI
+1204BH,1204BH,1/4 cercle,1,,,,,OUI
+1204H,1204H,Angle décoré,1,,,,,OUI
+1206,1206,,1,1,,,,OUI
+1207,1207,,1,1,,,,OUI
+1208,1208,,1,,,,,OUI
+1209,1209,,1,1,,,,OUI
+1210,1210,,1,1,,,,OUI
+1213,1213,Panneau angle de moulure 120 x 42 cm,1,,,,,OUI
+1213BH,1213BH,Panneau ornementé angle de moulure 42 x42 cm,1,,,,,OUI
+1213G,1213G,Panneau ornementé 67 x 42 cm,1,,,,,OUI
+1220,1220,,1,1,,,,OUI
+1221,1221,,1,1,,,,OUI
+1301,1301,,1,,,,,OUI
+1304,1304,,1,,,,,OUI
+1310,1310,,1,,,,,OUI
+1321,1321,,1,,,,,OUI
+1323,1323,,1,,,,,OUI
+1324,1324,,1,1,,,,OUI
+1325,1325,,1,,,,,OUI
+1341,1341,,1,,,,,OUI
+1343,1343,,1,1,,,,OUI
+1344,1344,,1,1,,,,OUI
+1345,1345,,1,1,,,,OUI
+1348,1348,,1,,,,,OUI
+1364,1364,,1,1,,,,OUI
+1365,1365,,1,1,,,,OUI
+1366,1366,,1,1,,,,OUI
+1367,1367,,1,1,,,,OUI
+1380,1380,,1,,,,,OUI
+ORN.1D,ORN.1D,Ornerment d'angle droit de style Louis XV dim 34.5 x 34.5 cm,1,,,,,OUI
+ORN.1G,ORN.1G,Ornement d'angle gauche de style Louis XV dim 34.5 x 34.5 cm,1,,,,,OUI
+ORN.2D,ORN.2D,Ornement d'angle droit de style Louis XV dim 28.4 x 16 cm,1,,,,,OUI
+ORN.2G,ORN.2G,Ornement d'angle gauche de style Louis XV dim 28.4 x 16 cm,1,,,,,OUI
+ORN.3D,ORN.3D,Ornement d'angle droit de style Louis XV dim 10.3 x 31.3 cm,1,,,,,OUI
+ORN.3G,ORN.3G,Ornement d'angle gauche de style Louis XV dim 10.3 x 31.3 cm,1,,,,,OUI
+ORN.4D,ORN.4D,Ornement d'angle droit de style Louis XV  dim 10 x 31.2 cm,1,,,,,OUI
+ORN.4G,ORN.4G,Ornement d'angle gauche de style Louis XV  dim 10 x 31.2 cm,1,,,,,OUI
+ORN.5D,ORN.5D,Ornement d'angle droit de style Louis XV  dim 13.4 x 27.2 cm,1,,,,,OUI
+ORN.5G,ORN.5G,Ornement d'angle droit de style Louis XV  dim 13.4 x 27.2 cm,1,,,,,OUI
+ORN.6D,ORN.6D,Ornement d'angle droit de style Louis XV dim 20.4 x 20.4 cm,1,,,,,OUI
+ORN.6G,ORN.6G,Ornement d'angle droit de style Louis XV dim 20.4 x 20.4 cm,1,,,,,OUI
+ORN.7D,ORN.7D,Ornement d'angle droit de style Louis XV  dim 14 x 11.8 cm,1,,,,,OUI
+ORN.7G,ORN.7G,Ornement d'angle gauche de style Louis XV  dim 14 x 11.8 cm,1,,,,,OUI
+ORN.8D,ORN.8D,Ornement d'angle droit grappe de raison dim 12.3 x 15 cm,1,,,,,OUI
+ORN.8G,ORN.8G,Ornement d'angle gauche grappe de raison dim 12.3 x 15 cm,1,,,,,OUI
+ORN.9,ORN.9,Ornement de style Louis XV  dim 60.5 x 15 cm,1,,,,,OUI
+ORN.10,ORN.10,Ornement de Style Louis XV dim 54.8 x 14.6 cm,1,,,,,OUI
+ORN.12,ORN.12,Ornement de style  dim 40 x 7.4cm,1,,,,,OUI
+ORN.15,ORN.15,Ornement de style  dim 39.5 x 10 cm,1,,,,,OUI
+ORN.16,ORN.16,Ornement de style  dim 30 x 6 cm,1,,,,,OUI
+ORN.19,ORN.19,"Ornement de style Louis XV dim 91 x 20,4 cm ",1,,,,,OUI
+ORN.26,ORN.26,Ornement floral  dim 11.8 x 25.4 cm,1,,,,,OUI
+ORN.36,ORN.36,Ornement de style Louis XV - dim 26.5 x 5.5 cm,1,,,,,OUI
+1409,1409,Décor,1,,,,,OUI
+7035,7035,,1,1,,,,OUI
+7036,7036,,1,1,,,,OUI
+7036U,7036U,,1,1,,,,OUI
+7036PLIN,7036PLIN,,1,1,,,,OUI
+7051,7051,,1,1,,,,OUI
+7070,7070,,1,1,,,,OUI
+7071,7071,,1,1,,,,OUI
+7072,7072,,1,1,,,,OUI
+7073,7073,,1,1,,,,OUI
+7074,7074,,1,1,,,,OUI
+7075,7075,,1,1,,,,OUI
+7078,7078,,1,1,,,,OUI
+CL12,CL12,,1,1,,,,OUI
+CL1213A,CL1213A,,1,,,,,OUI
+CL1213B,CL1213B,,1,,,,,OUI
+CL1213C,CL1213C,,1,,,,,OUI
+CL1213D,CL1213D,,1,,,,,OUI
+CL39 ,CL39,Parement  Stratistaff   218. 9 x 125.2 cm ép 3 cm ,1,1,,,,OUI
+SD7042,SD7042,,1,1,,,,OUI
+SD7047,SD7047,,1,1,,,,OUI
+SD7500,SD7500,,1,,,,,OUI
+SD7501,SD7501,,1,,,,,OUI
+SD7502,SD7502,,1,1,,,,OUI
+SD7503,SD7503,,1,1,,,,OUI
+3900,3900,,1,,,,,OUI
+3904,3904,,1,,,,,OUI
+3907,3907,,1,,,,,OUI
+7001,7001,,1,,,,,OUI
+7002,7002,,1,,,,,OUI
+7003,7003,,1,,,,,OUI
+0710,0710,,1,1,,1,,OUI
+0712,0712,,1,1,,,,OUI
+0714,0714,,1,1,,,,OUI
+0724,0724,,1,1,,,,OUI
+0726,0726,,1,1,,,,OUI
+0732,0732,,1,1,,,,OUI
+0734,0734,,1,1,,,,OUI
+0742,0742,,1,1,,,,OUI
+6200,6200,,1,1,,,,OUI
+0744,0744,,1,1,,,,OUI
+RADIA 1 simple ,RADIA1SIMPLE,Cache radiateur classique sans cimaise simple ,1,1,,,,OUI
+RADIA1 double ,RADIA1DOUBLE,Cache radiateur classique sans cimaise double,1,1,,,,OUI
+RADIA2 simple ,RADIA2SIMPLE,Cache radiateur classique avec  cimaise simple ,1,1,,,,OUI
+RADIA2 double ,RADIA2DOUBLE,Cache radiateur classique avec  cimaise  double,1,1,,,,OUI
+BL120,BL120,,1,1,1,,,OUI
+BL130,BL130,,1,1,1,,,OUI
+BL131,BL131,,1,1,,,,OUI
+BL132,BL132,,1,1,,,,OUI
+BL140,BL140,,1,1,1,,,OUI
+BL160,BL160,,1,1,,,,OUI
+BL170,BL170,,1,1,,,,OUI
+BL170A90E,BL170A90E,,1,1,,,,OUI
+BL170A90I,BL170A90I,,1,1,,,,OUI
+BL170R25I,BL170R25I,,1,1,,,,OUI
+BL170R25E,BL170R25E,,1,1,,,,OUI
+EBL0430,EBL0430,,1,1,,,,OUI
+EBP0430,EBP0430,,1,,,,,OUI
+EMB95,EMB95,,1,1,,,,OUI
+BP.PF1,BP.PF1,,1,1,1,,,OUI
+BP.PF2,BP.PF2,,1,1,1,,,OUI
+BP.PF3,BP.PF3,,1,1,1,,,OUI
