@@ -448,7 +448,21 @@ class _PhotoZone extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 EstimBadge(calibrated: state.isCalibrated),
-                if (state.calibAutoDetected) ...[
+                // P18-DEMO-SAFE : calibAutoDetected n'est mis à `true`
+                // QUE par le preset mesuré à la main de loadDemoScene
+                // (app_state.dart, avec edgeDetectConfidence forcé à
+                // 1.0, jamais mesuré) — autoDetectEdges() garde
+                // délibérément calibAutoDetected=false même en cas de
+                // détection réussie (barrières P9c/P9d non franchies,
+                // voir commentaire app_state.dart:176-191). Ce badge
+                // n'a donc aujourd'hui aucun cas d'apparition légitime
+                // sur une vraie détection ; `!state.isDemoRoom` le
+                // masque sur les scènes démo (où seul EstimBadge
+                // "Calibré ±3%" doit rester, lui exact car basé sur
+                // une calibration mesurée) sans changer son
+                // comportement pour un futur détecteur qui franchirait
+                // ces barrières sur une photo importée.
+                if (state.calibAutoDetected && !state.isDemoRoom) ...[
                   const SizedBox(width: 6),
                   _AutoCalibBadge(confidence: state.edgeDetectConfidence),
                 ],
