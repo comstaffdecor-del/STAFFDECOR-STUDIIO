@@ -261,18 +261,27 @@ class _ProductCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 alignment: Alignment.center,
-                child: prod.img.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          prod.img,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(FontAwesomeIcons.image, size: 16, color: AppColors.text3),
-                        ),
-                      )
-                    : const Icon(FontAwesomeIcons.image, size: 16, color: AppColors.text3),
+                // P16-C1 : vignette technique locale (aperçu de contrôle
+                // issu de la coupe géométrique du profil, PNG produit par
+                // le pipeline dxf_pipeline hors ligne) au lieu de la photo
+                // commerciale distante `prod.img` (staffdecor.fr). Ce
+                // widget ne dépend donc plus du réseau et présente une
+                // vue cohérente avec l'origine "BE" du produit plutôt
+                // qu'une photo marketing. `Image.asset` avec un asset
+                // absent lève une exception synchrone rattrapée par
+                // `errorBuilder` (12/43 réfs actuelles sans PNG de
+                // contrôle sur disque) — pas de vérification d'existence
+                // préalable, non idiomatique en Flutter (même schéma que
+                // `_MotifChip` dans motif_preview.dart).
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/profiles/control/${prod.ref}.png',
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    errorBuilder: (_, __, ___) => const _TechnicalPlaceholder(),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 6),
@@ -286,6 +295,32 @@ class _ProductCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Placeholder neutre affiché dans la grille catalogue quand
+/// `assets/profiles/control/<ref>.png` n'existe pas encore sur disque
+/// (12/43 réfs actuelles — voir `catalogue_visibility.dart` pour la
+/// liste des 43 réfs et le pipeline `tools/dxf_pipeline/` pour l'origine
+/// des PNG). Volontairement sans dépendance réseau.
+class _TechnicalPlaceholder extends StatelessWidget {
+  const _TechnicalPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(FontAwesomeIcons.drawPolygon, size: 16, color: AppColors.text3),
+        SizedBox(height: 4),
+        Text(
+          'STL BE — aperçu technique',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.text3, fontSize: 8.5),
+        ),
+      ],
     );
   }
 }
