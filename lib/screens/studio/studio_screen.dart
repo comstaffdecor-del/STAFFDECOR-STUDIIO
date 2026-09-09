@@ -479,7 +479,7 @@ class _PhotoZone extends StatelessWidget {
           // n'atteigne les GestureDetector des poignées (bug signalé par
           // l'utilisateur : "le drag and drop ne fonctionne pas").
           if (state.showCalibHandles && (hasPhoto || state.isDemoRoom))
-            Positioned.fill(child: CalibHandlesOverlay(canvasSize: size)),
+            Positioned.fill(child: CalibHandlesOverlay(canvasSize: size, imgDraw: localImgDraw)),
         ],
       ),
     );

@@ -14,7 +14,8 @@ import '../../state/app_state.dart';
 
 class CalibHandlesOverlay extends StatelessWidget {
   final Size canvasSize;
-  const CalibHandlesOverlay({super.key, required this.canvasSize});
+  final ImgDraw? imgDraw;
+  const CalibHandlesOverlay({super.key, required this.canvasSize, required this.imgDraw});
 
   @override
   Widget build(BuildContext context) {
@@ -31,15 +32,34 @@ class CalibHandlesOverlay extends StatelessWidget {
     return Stack(
       children: points.entries.map((e) {
         final isCeil = e.key.startsWith('ceil');
+        // Position affichée : alignée sur le rect image letterboxé
+        // (imgDraw) quand une photo est chargée — c'est le même
+        // référentiel que celui utilisé par le rendu réel (calib_canvas
+        // .dart:toCanvas). Repli strictement identique à l'ancien
+        // comportement (fraction du canvas entier) si imgDraw est null
+        // (cas salle démo procédurale, non affecté par ce correctif).
+        final handleX = imgDraw != null
+            ? imgDraw!.dx + e.value.xPct * imgDraw!.dw
+            : e.value.xPct * canvasSize.width;
+        final handleY = imgDraw != null
+            ? imgDraw!.dy + e.value.yPct * imgDraw!.dh
+            : e.value.yPct * canvasSize.height;
         return _Handle(
-          x: e.value.xPct * canvasSize.width,
-          y: e.value.yPct * canvasSize.height,
+          x: handleX,
+          y: handleY,
           color: isCeil ? AppColors.goldLight : AppColors.goldDark,
           onDrag: (dx, dy) {
-            final newX = ((e.value.xPct * canvasSize.width) + dx) /
-                canvasSize.width;
-            final newY = ((e.value.yPct * canvasSize.height) + dy) /
-                canvasSize.height;
+            // Conversion inverse du delta de drag : doit diviser par la
+            // MÊME grandeur que celle utilisée pour la position affichée
+            // ci-dessus (imgDraw.dw/dh), sinon la poignée dérive sous le
+            // doigt (le déplacement visuel ne correspond plus au delta
+            // en fraction xPct/yPct appliqué à la calibration).
+            final newX = imgDraw != null
+                ? e.value.xPct + dx / imgDraw!.dw
+                : ((e.value.xPct * canvasSize.width) + dx) / canvasSize.width;
+            final newY = imgDraw != null
+                ? e.value.yPct + dy / imgDraw!.dh
+                : ((e.value.yPct * canvasSize.height) + dy) / canvasSize.height;
             state.updateCalibPoint(
               e.key,
               CalibPoint(
