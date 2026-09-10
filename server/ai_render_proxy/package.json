@@ -1,0 +1,13 @@
+{
+  "name": "ai_render_proxy",
+  "version": "1.0.0",
+  "description": "Proxy serveur pour rendu IA de corniches (P19-MANOBANANA-QAD) - la cle API Gemini reste strictement cote serveur, jamais exposee au client Flutter.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
+  }
+}
