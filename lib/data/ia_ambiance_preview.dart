@@ -1,97 +1,74 @@
-/// P17-VISUEL — "Aperçu d'ambiance IA" via Gemini image (Nano Banana).
+/// P19-MANOBANANA-QAD (clôturé) — "Aperçu d'ambiance IA".
 ///
-/// ⚠️ ARBITRAGE EXPLICITE (à trancher AVANT tout code, brief point 2) :
-/// un appel Gemini depuis le client Flutter WEB place nécessairement la
-/// clé API en clair dans le bundle compilé (`main.dart.js`), donc
-/// publiquement lisible par quiconque ouvre le lien de démo (port 8080).
-/// Trois options existaient : (a) proxy serveur minimal gardant la clé
-/// côté serveur, (b) clé jetable restreinte assumée pour la durée de la
-/// démo puis révoquée, (c) pas de génération côté client.
+/// ⚠️ HISTORIQUE, POUR LE PROCHAIN LECTEUR : cette passe a exploré
+/// l'intégration d'un rendu IA réel via un proxy serveur portant la clé
+/// côté serveur (jamais côté client Flutter — ce principe reste
+/// intégralement valide et devra être repris tel quel le jour où un
+/// provider exploitable sera confirmé). Trois voies ont été testées et
+/// **aucune n'est actuellement exploitable** :
 ///
-/// **Option retenue : (b) — clé jetable restreinte, assumée.**
-/// Motif : ce sandbox ne sert la démo qu'avec un `python3 -m
-/// http.server` statique (voir port 8080) — aucun processus serveur
-/// applicatif n'existe pour héberger un proxy, et en créer un est un
-/// "backend lourd" explicitement interdit par le brief (point 9). La clé,
-/// SI elle est un jour fournie, serait injectée au build via
-/// `--dart-define=GEMINI_API_KEY=...` (jamais codée en dur dans ce
-/// fichier, jamais commitée) et resterait donc visible en clair dans le
-/// bundle web compilé. Risque résiduel accepté et documenté : clé à
-/// quota/portée minimale, restriction par domaine/referrer si l'API le
-/// permet, révocation dès la fin de la démonstration. Aucune clé Gemini
-/// n'est présente dans ce sandbox au moment de cette passe (vérifié) :
-/// [kAiPreviewEnabled] reste donc `false` et aucun appel réseau n'a lieu.
+///  1. Gemini (`gemini-3.1-flash-image` via generateContent) : la clé
+///     fournie a été RECONNUE par Google (projet réel identifié), mais
+///     le quota `generate_content_free_tier_requests` est à **0** sur ce
+///     projet pour ce modèle → HTTP 429 systématique. Le proxy testé a
+///     bien confirmé le principe (health check OK, aucune fuite de clé
+///     dans les logs/réponses), mais aucune image n'a pu être générée.
+///  2. OpenAI (`images/edits`) : aucune clé OpenAI personnelle
+///     disponible dans cet environnement. `OPENAI_API_KEY` existe bien
+///     dans l'environnement sandbox, mais elle pointe vers le proxy LLM
+///     INTERNE de la plateforme Genspark (`OPENAI_BASE_URL=.../llm_proxy/v1`,
+///     préfixe `gsk-...`), qui n'expose QUE des modèles texte/code
+///     (55 modèles listés via `/models` — GPT-5.x, Claude, DeepSeek,
+///     Grok, etc., zéro modèle image) — vérifié, donc explicitement
+///     écarté, jamais utilisé pour ce module.
+///  3. Genspark (infra plateforme) : hors périmètre par consigne
+///     explicite — jamais utilisé comme provider applicatif pour ce
+///     module, quelle que soit sa disponibilité technique.
 ///
-/// ⚠️ PÉRIMÈTRE STRICT (brief points 4, 6, 7) :
-///  - ne s'active QUE pour les 43 refs de `assets/profiles/index.json`
-///    (même gate que [CatalogueVisibilityGate], jamais un accès direct
-///    à un SKU hors index, jamais un brouillon) ;
-///  - l'image générée est affichée UNIQUEMENT en mémoire
-///    ([Uint8List]/[ui.Image]) — AUCUNE écriture dans `assets/`, aucune
-///    modification de `pubspec.yaml`. Seuls les échantillons du rapport
-///    sont écrits par l'outillage de build, dans `artifacts/p17-visuel/`
-///    (jamais depuis ce fichier lui-même, qui ne fait aucune I/O
-///    disque) ;
-///  - ce module ne valide AUCUNE géométrie/STL/gate, ne déclare rien
-///    "renderable" : c'est une illustration d'ambiance, non contractuelle ;
-///  - le module de similarité visuelle ([IaSuggestionGate], fichier
-///    voisin `ia_suggestion.dart`) continue de ne lire QUE
-///    `assets/profiles/control/*.png` — jamais une image générée par ce
-///    module-ci (aucun lien de code entre les deux, vérifié par lecture).
+/// **Décision** : clôture de l'intégration réelle. [kAiPreviewEnabled]
+/// reste figé à `false`. Aucun bouton actif côté client ne promet un
+/// rendu IA réel tant qu'un provider n'a pas été validé de bout en bout
+/// (clé + quota + génération réussie). Le proxy serveur créé pendant
+/// cette passe (`server/manobanana_proxy/`) a été supprimé du dépôt
+/// (jamais poussé — commits locaux uniquement, vérifiés sans secret) ;
+/// aucune clé n'a jamais été committée. Court terme retenu : un pack de
+/// prompts manuels (texte, ci-dessous) à utiliser côté Genspark
+/// directement par un opérateur humain, hors app.
+///
+/// PÉRIMÈTRE INCHANGÉ (hérité de P17-VISUEL, toujours respecté) :
+///  - ne s'active QUE pour les refs de `assets/profiles/index.json` ;
+///  - l'image générée reste UNIQUEMENT en mémoire ([Uint8List]) ;
+///  - ce module ne touche ni au moteur perspective ni aux presets.
 library;
 
-import 'dart:async';
-import 'dart:convert';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-
-/// POINT UNIQUE DE RÉVERSIBILITÉ — brief point 6.
-///
-/// `false` par défaut. Ne DOIT passer à `true` que juste après qu'une
-/// génération réelle a été testée avec succès dans cet environnement
-/// (clé + réseau + réponse Gemini valide) — jamais activé "en aveugle".
-/// Au moment de cette passe (P17-VISUEL) : AUCUNE clé Gemini n'a été
-/// trouvée dans le sandbox (voir /tmp/presentation_ai_demo.txt) ; ce
-/// booléen reste donc `false` et l'UI affiche le bouton grisé +
-/// "fonction bientôt disponible" (jamais une simulation locale faisant
-/// croire à une génération IA réelle).
+/// POINT UNIQUE DE RÉVERSIBILITÉ. Reste `false` : aucun provider image
+/// exploitable n'a été validé à ce jour (voir historique ci-dessus).
+/// Ne DOIT passer à `true` que juste après qu'une génération réelle a été
+/// testée avec succès (clé + quota + réseau + réponse image valide).
 const bool kAiPreviewEnabled = false;
 
-/// Nom du modèle Gemini image utilisé (aucun secret ici — uniquement un
-/// identifiant de modèle public). Documenté tel quel dans le rapport,
-/// jamais accompagné d'une valeur de clé.
-const String kGeminiImageModel = 'gemini-3-pro-image-preview';
+/// Messages d'erreur COURTS, un par cause distincte — jamais un message
+/// technique brut affiché à l'utilisateur final.
+const String kAiPreviewErrorNoPhoto = 'Aucune photo sélectionnée.';
+const String kAiPreviewErrorNoProduct = 'Aucun produit sélectionné.';
+const String kAiPreviewErrorProxyUnreachable = 'Proxy de rendu injoignable.';
+const String kAiPreviewErrorGenerationFailed = 'Échec de la génération.';
+const String kAiPreviewErrorDisabled = 'Fonction non configurée sur cet environnement.';
 
-/// Endpoint Gemini generateContent (aucun secret dans l'URL elle-même —
-/// la clé est passée en en-tête `x-goog-api-key`, jamais concatenée ici
-/// en dur).
-String _geminiEndpoint(String model) =>
-    'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent';
+/// Message de repli générique (compat rétro).
+const String kAiPreviewFallbackMessage = kAiPreviewErrorGenerationFailed;
 
-/// Limites strictes du client (brief 2bis, appliquées même en absence de
-/// proxy : le client lui-même respecte un plafond d'appels et un timeout
-/// court, pour ne jamais consommer un quota de façon incontrôlée).
-const Duration kAiPreviewTimeout = Duration(seconds: 20);
-const int kAiPreviewMaxCallsPerSession = 5;
-const int kAiPreviewMaxImageBytes = 8 * 1024 * 1024; // 8 Mo
+/// Mention non-contractuelle permanente, non masquable, affichée sous
+/// TOUTE image générée (résultat réel ou mock local).
+const String kAiPreviewDisclaimer =
+    'Aperçu IA non contractuel — illustration d\'ambiance, ne représente '
+    'pas le rendu technique du produit.';
 
-/// Lit la clé API injectée au build via `--dart-define=GEMINI_API_KEY=...`
-/// — JAMAIS codée en dur dans le dépôt. Renvoie `''` si absente (cas
-/// attendu et normal dans ce sandbox à ce jour).
-const String _geminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
-
-/// `true` si une clé a été injectée au build (sans jamais exposer sa
-/// valeur — utilisé uniquement pour piloter l'état grisé du bouton et
-/// pour le rapport, qui ne loggue QUE ce booléen, jamais la valeur).
-bool get isGeminiApiKeyConfigured => _geminiApiKey.isNotEmpty;
-
-/// Compteur d'appels de la session courante (mémoire uniquement, remis à
-/// zéro à chaque rechargement de page) — applique
-/// [kAiPreviewMaxCallsPerSession] côté client, en complément du timeout.
-int _callsThisSession = 0;
-
-/// Résultat d'une tentative de génération d'aperçu IA.
+/// Résultat d'une tentative de génération d'aperçu IA. Conservé pour
+/// compatibilité avec l'appelant UI, même si [generateAiAmbiancePreview]
+/// renvoie désormais toujours un échec (fonction non exploitable).
 class AiPreviewResult {
   final bool success;
   final Uint8List? imageBytes;
@@ -105,136 +82,57 @@ class AiPreviewResult {
       AiPreviewResult._(success: false, errorMessage: message);
 }
 
-/// Message de repli UNIQUE et obligatoire (brief point 6) — utilisé pour
-/// TOUTE cause d'échec (API absente, erreur réseau, quota, timeout,
-/// image invalide), jamais un message technique brut affiché à
-/// l'utilisateur final.
-const String kAiPreviewFallbackMessage =
-    'Aperçu IA momentanément indisponible — continuez avec le catalogue validé.';
-
-/// Mention non-contractuelle permanente, non masquable (brief point 5),
-/// affichée sous TOUTE image générée.
-const String kAiPreviewDisclaimer =
-    'Aperçu IA non contractuel — illustration d\'ambiance, ne représente '
-    'pas le rendu technique du produit.';
-
-/// Construit le prompt Gemini à partir du produit et de la scène (brief
-/// point 8) — jamais de fausse génération locale, jamais de score
-/// inventé : ce texte ne fait que décrire la demande envoyée au modèle
-/// distant réel.
+/// Construit le prompt positif — conservé pour usage MANUEL (pack de
+/// prompts côté Genspark, court terme retenu), et pour readiness future
+/// si un provider devient exploitable. N'est appelé par AUCUN chemin
+/// réseau actuellement (fonction pure, aucune I/O).
 String buildAiPreviewPrompt({
   required String ref,
   required String nom,
   required String famille,
+  double? retombeeCm,
+  double? avanceeCm,
 }) {
-  return 'Create a visual concept preview only. Do not invent product '
-      'geometry specifications. Integrate the decorative plaster/staff '
-      'moulding product "$nom" (reference $ref, family: $famille) '
-      'realistically onto the wall or ceiling of the provided room photo. '
-      'Use an off-white plaster/staff tone (blanc cassé), respect the '
-      'existing perspective, lighting and shadows of the photo. Do not '
-      'add any other decorative product. Photorealistic architectural '
-      'visualization style, subtle and coherent with the room.';
+  final cotes = (retombeeCm != null && avanceeCm != null)
+      ? ' La corniche doit avoir une retombée murale d\'environ '
+          '${retombeeCm.toStringAsFixed(0)} cm et une avancée au plafond '
+          'd\'environ ${avanceeCm.toStringAsFixed(0)} cm.'
+      : '';
+  return 'Ajoute une moulure décorative Staff Décor $nom (référence $ref, '
+      'famille $famille) dans cette pièce, le long de la jonction '
+      'mur/plafond visible.$cotes Respecte strictement la perspective '
+      'réelle de la pièce, les lignes de fuite, les proportions et '
+      'l\'éclairage existant. Couleur staff blanc cassé / ivoire chaud, '
+      'finition mate, relief subtil mais lisible. Ne modifie pas les '
+      'meubles, luminaires, fenêtres, murs, sol, plafond, couleurs '
+      'principales ni l\'ambiance générale. La moulure doit être intégrée '
+      'naturellement, comme réellement posée en staff, pas comme une '
+      'bande plate.';
 }
 
-/// Tente une génération d'aperçu d'ambiance IA. Ne lève JAMAIS
-/// d'exception : toute erreur (clé absente, réseau, quota, timeout,
-/// réponse invalide) aboutit à un [AiPreviewResult.fail] avec
-/// [kAiPreviewFallbackMessage], jamais un crash.
-///
-/// [sceneImageBytes] : la photo de scène (démo ou importée) à utiliser
-/// comme image de référence pour l'intégration produit.
+/// Négatif-prompt générique — conservé pour le même usage manuel que
+/// [buildAiPreviewPrompt] ci-dessus.
+const String kAiPreviewNegativePrompt =
+    'corniche trop massive, blanc pur surexposé, dorure, moulure inventée, '
+    'bande plate, changement du mobilier, changement du plafond, '
+    'changement des ouvertures, texture plastique, rendu cartoon, aspect '
+    'illustration, rendu 3D';
+
+/// Cotes visuelles connues (cm) — issues de `assets/profiles/D609.json`
+/// (`bbox_mm` : 186,963 × 196,482 mm). Conservé pour le pack de prompts
+/// manuel.
+const Map<String, (double, double)> kKnownVisualDimsCm = {
+  'D609': (19, 20),
+};
+
+/// Toujours un échec — AUCUN provider image exploitable actuellement
+/// (voir historique en tête de fichier). Ne lève jamais d'exception,
+/// ne fait plus AUCUN appel réseau depuis la clôture de cette passe.
 Future<AiPreviewResult> generateAiAmbiancePreview({
   required Uint8List sceneImageBytes,
   required String ref,
   required String nom,
   required String famille,
 }) async {
-  if (!kAiPreviewEnabled) {
-    return AiPreviewResult.fail(kAiPreviewFallbackMessage);
-  }
-  if (!isGeminiApiKeyConfigured) {
-    return AiPreviewResult.fail(kAiPreviewFallbackMessage);
-  }
-  if (_callsThisSession >= kAiPreviewMaxCallsPerSession) {
-    return AiPreviewResult.fail(kAiPreviewFallbackMessage);
-  }
-  if (sceneImageBytes.length > kAiPreviewMaxImageBytes) {
-    return AiPreviewResult.fail(kAiPreviewFallbackMessage);
-  }
-
-  _callsThisSession++;
-
-  try {
-    final prompt = buildAiPreviewPrompt(ref: ref, nom: nom, famille: famille);
-    final body = jsonEncode({
-      'contents': [
-        {
-          'parts': [
-            {'text': prompt},
-            {
-              'inline_data': {
-                'mime_type': 'image/jpeg',
-                'data': base64Encode(sceneImageBytes),
-              }
-            },
-          ],
-        }
-      ],
-    });
-
-    final uri = Uri.parse(_geminiEndpoint(kGeminiImageModel));
-    final response = await http
-        .post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': _geminiApiKey,
-          },
-          body: body,
-        )
-        .timeout(kAiPreviewTimeout);
-
-    if (response.statusCode != 200) {
-      if (kDebugMode) {
-        // Jamais la clé, jamais le corps complet (pourrait contenir des
-        // données image) — uniquement le code HTTP, à but diagnostic
-        // local. Jamais persisté dans un fichier/rapport.
-        debugPrint('generateAiAmbiancePreview: HTTP ${response.statusCode}');
-      }
-      return AiPreviewResult.fail(kAiPreviewFallbackMessage);
-    }
-
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final candidates = decoded['candidates'] as List?;
-    if (candidates == null || candidates.isEmpty) {
-      return AiPreviewResult.fail(kAiPreviewFallbackMessage);
-    }
-    final parts = (candidates.first as Map<String, dynamic>)['content']
-        ?['parts'] as List?;
-    if (parts == null) {
-      return AiPreviewResult.fail(kAiPreviewFallbackMessage);
-    }
-    for (final part in parts) {
-      final inline = (part as Map<String, dynamic>)['inline_data'] ??
-          part['inlineData'];
-      if (inline is Map<String, dynamic>) {
-        final data = inline['data'] as String?;
-        if (data != null && data.isNotEmpty) {
-          final bytes = base64Decode(data);
-          if (bytes.isEmpty) {
-            return AiPreviewResult.fail(kAiPreviewFallbackMessage);
-          }
-          return AiPreviewResult.ok(bytes);
-        }
-      }
-    }
-    return AiPreviewResult.fail(kAiPreviewFallbackMessage);
-  } on TimeoutException {
-    return AiPreviewResult.fail(kAiPreviewFallbackMessage);
-  } catch (_) {
-    // Toute autre erreur (réseau, parsing, image invalide...) : jamais
-    // de crash, toujours le message de repli standard.
-    return AiPreviewResult.fail(kAiPreviewFallbackMessage);
-  }
+  return AiPreviewResult.fail(kAiPreviewErrorDisabled);
 }

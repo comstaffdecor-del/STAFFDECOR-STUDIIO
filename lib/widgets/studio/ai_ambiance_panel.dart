@@ -56,10 +56,14 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
   String? _sceneLabel;
   Uint8List? _resultBytes;
   // true si _resultBytes provient du mock local (dart:ui, sans réseau),
-  // false si (un jour) une vraie génération Gemini a produit le résultat.
-  // Distinction OBLIGATOIRE pour ne jamais faire passer un mock pour une
-  // vraie IA (demande explicite utilisateur, réponse "oui").
+  // false si une vraie génération via le proxy manobanana a produit le
+  // résultat. Distinction OBLIGATOIRE pour ne jamais faire passer un mock
+  // pour une vraie IA (demande explicite utilisateur, réponse "oui").
   bool _resultIsMock = false;
+  // Message d'erreur COURT à afficher dans l'écran fallback (brief P19 :
+  // pas de photo, pas de produit, proxy injoignable, échec génération) --
+  // jamais un message technique brut.
+  String _lastErrorMessage = kAiPreviewErrorGenerationFailed;
 
   @override
   void initState() {
@@ -146,7 +150,16 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
   Future<void> _generate() async {
     final ref = _selectedRef;
     final scene = _sceneBytes;
-    if (ref == null || scene == null) return;
+    if (ref == null) {
+      _lastErrorMessage = kAiPreviewErrorNoProduct;
+      setState(() => _screenState = _AiScreenState.fallback);
+      return;
+    }
+    if (scene == null) {
+      _lastErrorMessage = kAiPreviewErrorNoPhoto;
+      setState(() => _screenState = _AiScreenState.fallback);
+      return;
+    }
     final prod = getProdByRef(ref);
 
     setState(() => _screenState = _AiScreenState.generating);
@@ -162,8 +175,10 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     setState(() {
       if (result.success && result.imageBytes != null) {
         _resultBytes = result.imageBytes;
+        _resultIsMock = false;
         _screenState = _AiScreenState.result;
       } else {
+        _lastErrorMessage = result.errorMessage ?? kAiPreviewErrorGenerationFailed;
         _screenState = _AiScreenState.fallback;
       }
     });
@@ -442,7 +457,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
         const SizedBox(height: 8),
         Text('Scène : ${_sceneLabel ?? ''}', style: const TextStyle(color: AppColors.text2, fontSize: 11.5)),
         const SizedBox(height: 16),
-        if (!kAiPreviewEnabled || !isGeminiApiKeyConfigured) ...[
+        if (!kAiPreviewEnabled) ...[
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -468,7 +483,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: (kAiPreviewEnabled && isGeminiApiKeyConfigured) ? _generate : null,
+            onPressed: kAiPreviewEnabled ? _generate : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.gold,
               foregroundColor: AppColors.bg,
@@ -488,7 +503,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
             ),
           ),
         ),
-        if (!kAiPreviewEnabled || !isGeminiApiKeyConfigured) ...[
+        if (!kAiPreviewEnabled) ...[
           const SizedBox(height: 10),
           const Row(
             children: [
@@ -626,15 +641,15 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.amber.withValues(alpha: 0.4)),
           ),
-          child: const Row(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(FontAwesomeIcons.circleExclamation, size: 16, color: AppColors.amber),
-              SizedBox(width: 10),
+              const Icon(FontAwesomeIcons.circleExclamation, size: 16, color: AppColors.amber),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  kAiPreviewFallbackMessage,
-                  style: TextStyle(color: AppColors.amber, fontSize: 12.5),
+                  _lastErrorMessage,
+                  style: const TextStyle(color: AppColors.amber, fontSize: 12.5),
                 ),
               ),
             ],

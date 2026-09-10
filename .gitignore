@@ -52,6 +52,17 @@ app.*.map.json
 tools/dxf_pipeline/logs/
 docs/logs/*_json.txt
 
+# P19-MANOBANANA-QAD (cloture) : integration IA reelle explorée puis
+# abandonnee -- aucun provider image exploitable (Gemini: cle reconnue
+# mais quota 0 ; OpenAI: aucune cle personnelle disponible ; Genspark:
+# hors perimetre par consigne). Le proxy server/manobanana_proxy/ a ete
+# supprime du depot. Garde-fou conserve au cas ou un proxy IA serait
+# recree un jour : jamais de node_modules ni de fichier .env versionne,
+# jamais une cle en dur dans un fichier de ce depot.
+server/*/node_modules/
+server/*/.env
+server/*/*.env
+
 # P17-VISUEL (verif securite point 4) : le commit auto-backup d0dfe4c a
 # embarque 308 fichiers STL (~862 Mo, assets/solids/stl/) issus d'une
 # passe P16-B non terminee/non validee -- volume significatif, aucun
