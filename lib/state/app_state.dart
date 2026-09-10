@@ -238,6 +238,10 @@ class AppState extends ChangeNotifier {
     // sur la VRAIE perspective de la photo dès qu'elle est disponible.
     perspCalib = PerspCalib.defaultCalib;
     calibAutoDetected = false;
+    // P18-DEMO-SAFE Pt.2 : la géométrie est réinitialisée ci-dessus mais
+    // isCalibrated restait à true — badge "Calibré ±3%" affiché à tort
+    // sur une calibration par défaut après une scène démo.
+    isCalibrated = false;
     notifyListeners();
     unawaited(autoDetectEdges());
   }
