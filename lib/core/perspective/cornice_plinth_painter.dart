@@ -473,17 +473,31 @@ void _drawCorniceStrip(
 /// `Color(0x...)` fixes qu'elle remplace (stop 0 = zone la plus éclairée,
 /// près du mur ; stop 1 = zone la plus éloignée/ombrée), mais teintées
 /// avec le VRAI plâtre du produit plutôt qu'un ivoire générique identique
-/// pour tous. Léger éclaircissement + désaturation (mélange vers blanc)
-/// sur les 2 premiers stops — simule l'éclairage rasant du plafond sans
-/// prétendre à un vrai relief (aucun nouveau mapping UV, voir contrainte
-/// du brief) — puis un léger assombrissement sur le dernier stop pour
-/// garder la lecture de profondeur déjà présente dans l'ancien gradient.
+/// pour tous.
+///
+/// ⚠️ CORRECTION "voie légère v2" (brief : le v1 restait trop mélangé
+/// vers le blanc — mélanges à 0.78/0.70/0.55 vers blanc noyaient encore
+/// [avgColor] dans un ivoire quasi identique à l'ancien gradient figé).
+/// Le mélange vers blanc du stop le plus clair est désormais borné à
+/// 0.25 (au lieu de 0.78) : la face plafond reste nettement identifiable
+/// comme du plâtre/gris plutôt qu'un blanc pur, tout en gardant un stop
+/// "mid" qui restitue [avgColor] tel quel (aucun mélange) et deux stops
+/// assombris (0.12 / 0.22 vers noir) pour la lecture de profondeur déjà
+/// présente dans l'ancien gradient. Géométrie, `Gradient.linear`, points
+/// et stops `[0.0, 0.25, 0.65, 1.0]` strictement inchangés — seules les
+/// 4 couleurs changent (voir contrainte du brief : pas de drawVertices,
+/// pas d'UV, pas de mapping texture complet).
 List<Color> _ceilingGradientFromAvgColor(Color avgColor) {
+  final light = Color.lerp(avgColor, const Color(0xFFFFFFFF), 0.25)!;
+  final mid = avgColor;
+  final shade = Color.lerp(avgColor, const Color(0xFF000000), 0.12)!;
+  final deep = Color.lerp(avgColor, const Color(0xFF000000), 0.22)!;
+
   return [
-    Color.lerp(avgColor, const Color(0xFFFFFFFF), 0.78)!.withValues(alpha: 0.90),
-    Color.lerp(avgColor, const Color(0xFFFFFFFF), 0.70)!.withValues(alpha: 0.92),
-    Color.lerp(avgColor, const Color(0xFFFFFFFF), 0.55)!.withValues(alpha: 0.95),
-    Color.lerp(avgColor, const Color(0xFF000000), 0.12)!.withValues(alpha: 0.80),
+    light.withValues(alpha: 0.92),
+    mid.withValues(alpha: 0.94),
+    shade.withValues(alpha: 0.96),
+    deep.withValues(alpha: 0.82),
   ];
 }
 
