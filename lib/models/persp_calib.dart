@@ -90,6 +90,27 @@ class PerspCalib {
   ///     net ≈ y83%.
   ///   - Scandinave (1920×1088) : plafond blanc uni, ombre de jonction
   ///     mur/plafond ≈ y7-8%, sol/tapis clair ≈ y81%.
+  // ⚠️ FACTORISATION (nettoyage post-intégration "moderne_corniche") —
+  // 'moderne' et 'moderne_corniche' partagent la MÊME photo/architecture
+  // (corniche décorative compositée en overlay sur l'image source
+  // 1960×1470, aucune géométrie de pièce modifiée) : elles doivent donc
+  // TOUJOURS utiliser des points de calibration strictement identiques.
+  // Avant cette factorisation, les 8 points étaient dupliqués littéralement
+  // dans les deux entrées de `demoPresets`, avec le risque qu'une future
+  // correction de calibration soit appliquée à l'une des deux clés sans
+  // l'autre (divergence silencieuse). Une seule constante privée, référencée
+  // deux fois ci-dessous, élimine ce risque. Valeurs numériques inchangées.
+  static const PerspCalib _calibModerne = PerspCalib(
+    ceilL: CalibPoint(xPct: 0.100, yPct: 0.095),
+    ceilR: CalibPoint(xPct: 0.900, yPct: 0.095),
+    floorL: CalibPoint(xPct: 0.100, yPct: 0.720),
+    floorR: CalibPoint(xPct: 0.900, yPct: 0.720),
+    wallTL: CalibPoint(xPct: 0.000, yPct: 0.105),
+    wallTR: CalibPoint(xPct: 1.000, yPct: 0.105),
+    wallBL: CalibPoint(xPct: 0.000, yPct: 0.740),
+    wallBR: CalibPoint(xPct: 1.000, yPct: 0.740),
+  );
+
   static const Map<String, PerspCalib> demoPresets = {
     'haussmann': PerspCalib(
       ceilL: CalibPoint(xPct: 0.120, yPct: 0.090),
@@ -101,35 +122,11 @@ class PerspCalib {
       wallBL: CalibPoint(xPct: 0.000, yPct: 0.900),
       wallBR: CalibPoint(xPct: 1.000, yPct: 0.890),
     ),
-    'moderne': PerspCalib(
-      ceilL: CalibPoint(xPct: 0.100, yPct: 0.095),
-      ceilR: CalibPoint(xPct: 0.900, yPct: 0.095),
-      floorL: CalibPoint(xPct: 0.100, yPct: 0.720),
-      floorR: CalibPoint(xPct: 0.900, yPct: 0.720),
-      wallTL: CalibPoint(xPct: 0.000, yPct: 0.105),
-      wallTR: CalibPoint(xPct: 1.000, yPct: 0.105),
-      wallBL: CalibPoint(xPct: 0.000, yPct: 0.740),
-      wallBR: CalibPoint(xPct: 1.000, yPct: 0.740),
-    ),
-    // ⚠️ AJOUT scène "moderne_corniche" (A3c) — même photo/architecture
-    // que 'moderne' (corniche décorative compositée en overlay sur la
-    // même image source 1960×1470, aucune géométrie de pièce modifiée) :
-    // valeurs STRICTEMENT IDENTIQUES au preset 'moderne' ci-dessus,
-    // dupliquées ici pour éviter que `forDemoScene` ne retombe sur
-    // `defaultCalib` (générique, décorrélé de la vraie architecture de
-    // cette photo — voir bug historique documenté plus haut). Aucune
-    // valeur de calibration n'est modifiée, seule une nouvelle clé est
-    // ajoutée à la map.
-    'moderne_corniche': PerspCalib(
-      ceilL: CalibPoint(xPct: 0.100, yPct: 0.095),
-      ceilR: CalibPoint(xPct: 0.900, yPct: 0.095),
-      floorL: CalibPoint(xPct: 0.100, yPct: 0.720),
-      floorR: CalibPoint(xPct: 0.900, yPct: 0.720),
-      wallTL: CalibPoint(xPct: 0.000, yPct: 0.105),
-      wallTR: CalibPoint(xPct: 1.000, yPct: 0.105),
-      wallBL: CalibPoint(xPct: 0.000, yPct: 0.740),
-      wallBR: CalibPoint(xPct: 1.000, yPct: 0.740),
-    ),
+    // 'moderne' et 'moderne_corniche' (A3c) pointent vers la MÊME
+    // constante de calibration (voir `_calibModerne` ci-dessus) — source
+    // unique de vérité, aucune divergence possible entre les deux clés.
+    'moderne': _calibModerne,
+    'moderne_corniche': _calibModerne,
     'provencal': PerspCalib(
       ceilL: CalibPoint(xPct: 0.100, yPct: 0.140),
       ceilR: CalibPoint(xPct: 0.900, yPct: 0.140),
