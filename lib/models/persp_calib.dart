@@ -111,6 +111,25 @@ class PerspCalib {
       wallBL: CalibPoint(xPct: 0.000, yPct: 0.740),
       wallBR: CalibPoint(xPct: 1.000, yPct: 0.740),
     ),
+    // ⚠️ AJOUT scène "moderne_corniche" (A3c) — même photo/architecture
+    // que 'moderne' (corniche décorative compositée en overlay sur la
+    // même image source 1960×1470, aucune géométrie de pièce modifiée) :
+    // valeurs STRICTEMENT IDENTIQUES au preset 'moderne' ci-dessus,
+    // dupliquées ici pour éviter que `forDemoScene` ne retombe sur
+    // `defaultCalib` (générique, décorrélé de la vraie architecture de
+    // cette photo — voir bug historique documenté plus haut). Aucune
+    // valeur de calibration n'est modifiée, seule une nouvelle clé est
+    // ajoutée à la map.
+    'moderne_corniche': PerspCalib(
+      ceilL: CalibPoint(xPct: 0.100, yPct: 0.095),
+      ceilR: CalibPoint(xPct: 0.900, yPct: 0.095),
+      floorL: CalibPoint(xPct: 0.100, yPct: 0.720),
+      floorR: CalibPoint(xPct: 0.900, yPct: 0.720),
+      wallTL: CalibPoint(xPct: 0.000, yPct: 0.105),
+      wallTR: CalibPoint(xPct: 1.000, yPct: 0.105),
+      wallBL: CalibPoint(xPct: 0.000, yPct: 0.740),
+      wallBR: CalibPoint(xPct: 1.000, yPct: 0.740),
+    ),
     'provencal': PerspCalib(
       ceilL: CalibPoint(xPct: 0.100, yPct: 0.140),
       ceilR: CalibPoint(xPct: 0.900, yPct: 0.140),

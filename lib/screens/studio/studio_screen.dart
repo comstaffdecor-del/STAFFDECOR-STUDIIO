@@ -27,6 +27,14 @@ import '../../widgets/studio/save_project_modal.dart';
 const _demoScenes = {
   'haussmann': ('🏛️', 'Haussmannien'),
   'moderne': ('◼', 'Contemporain'),
+  // ⚠️ AJOUT scène distincte "Moderne avec corniche" (A3c) — variante de
+  // `moderne` avec une corniche décorative compositée (masque A3b +
+  // correction couleur méthode A), ajoutée à côté de l'originale SANS
+  // l'écraser (rollback immédiat possible, comparaison client, référence
+  // `moderne` intacte). Même résolution source 1960×1470 que `moderne`
+  // → aucun nouveau preset de calibration requis, voir
+  // `PerspCalib.forDemoScene` (fallback explicite ci-dessous).
+  'moderne_corniche': ('◼', 'Moderne — corniche'),
   'provencal': ('🌿', 'Provençal'),
   'scandinave': ('❄', 'Scandinave'),
 };
