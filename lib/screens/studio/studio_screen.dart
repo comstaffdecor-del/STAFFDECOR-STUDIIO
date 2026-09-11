@@ -26,22 +26,19 @@ import '../../widgets/studio/save_project_modal.dart';
 
 const _demoScenes = {
   'haussmann': ('🏛️', 'Haussmannien'),
-  // ⚠️ CORRECTION démo (retour visuel : le picker ci-dessous est un
-  // `Row` non scrollable dans un `Positioned(bottom:10)` sans largeur
-  // contrainte — un 5e bouton "Moderne — corniche" séparé débordait/était
-  // tronqué, seuls 4 boutons restaient visibles, et "Contemporain"
-  // restait actif sur l'ancienne clé 'moderne'). Fix retenu pour la démo :
-  // le bouton "Contemporain" pointe désormais DIRECTEMENT sur
-  // 'moderne_corniche' (variante avec corniche compositée, masque A3b +
-  // correction couleur méthode A) au lieu de 'moderne' — même libellé,
-  // même position, aucun bouton supplémentaire, aucun risque de
-  // débordement. `assets/demo_scenes/moderne.jpg` (sans corniche) N'EST
-  // PLUS exposé dans ce picker, mais reste intact sur disque pour
-  // rollback (il suffit de remettre 'moderne' ici pour revenir en
-  // arrière). Calibration inchangée : `PerspCalib.forDemoScene` retourne
-  // déjà la même constante `_calibModerne` pour 'moderne' et
-  // 'moderne_corniche' (voir persp_calib.dart).
-  'moderne_corniche': ('◼', 'Contemporain'),
+  // ⚠️ ROLLBACK (brief "Stop patch scène — retour au moteur dynamique") :
+  // le bouton "Contemporain" avait été temporairement redirigé vers
+  // 'moderne_corniche' (image précomposée avec corniche compositée) pour
+  // un test visuel. Ce patch de scène ne doit PAS servir de solution
+  // produit — le rendu doit venir du moteur dynamique (RoomPainter +
+  // catalogue produit), pas d'une image de fond figée. Retour à la scène
+  // de test dynamique originale ('moderne' → moderne.jpg, sans corniche
+  // compositée) : c'est sur CETTE scène que le rendu D609 doit être
+  // diagnostiqué/corrigé. `assets/demo_scenes/moderne_corniche.jpg` reste
+  // sur disque comme référence visuelle/benchmark uniquement (voir
+  // `PerspCalib.forDemoScene('moderne_corniche')`, toujours défini mais
+  // non exposé dans ce picker).
+  'moderne': ('◼', 'Contemporain'),
   'provencal': ('🌿', 'Provençal'),
   'scandinave': ('❄', 'Scandinave'),
 };

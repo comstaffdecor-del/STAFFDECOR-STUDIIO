@@ -13,6 +13,7 @@
 library;
 
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter/material.dart';
 
 import '../../data/catalogue_data.dart';
@@ -50,6 +51,11 @@ class RoomPainter extends CustomPainter {
     ProductTextureCache.instance,
     ProfileDimsCache.instance,
   ]);
+
+  // ⚠️ TEMPORAIRE — voir commentaire au site d'appel dans le case
+  // 'Corniches' ci-dessous : évite de spammer le log à chaque frame de
+  // paint() (~60/s), une seule ligne par ref rencontrée par process.
+  static final Set<String> _loggedCorniceRefs = {};
 
   RoomPainter({
     required this.roomImage,
@@ -268,6 +274,26 @@ class RoomPainter extends CustomPainter {
                   retombeeMm: dims.retombeeMm,
                   projectionMm: dims.projectionMm,
                 );
+          // ⚠️ LOG DEBUG TEMPORAIRE (brief "Stop patch scène — retour au
+          // moteur dynamique", point 5) — diagnostic ponctuel pour vérifier
+          // si une ref donnée (ex. D609) utilise ses dimensions réelles ou
+          // le fallback StripThickness.corniceDefault. Rate-limité (une
+          // fois par ref) pour ne pas spammer paint() (~60 appels/s). À
+          // SUPPRIMER une fois le diagnostic conclu — pas une télémétrie
+          // permanente.
+          if (kDebugMode && !_loggedCorniceRefs.contains(item.ref)) {
+            _loggedCorniceRefs.add(item.ref);
+            debugPrint(
+              '[DIAG D609/corniche] ref=${item.ref} '
+              'profileDimsTrouve=${dims != null} '
+              'retombeeMm=${dims?.retombeeMm} '
+              'projectionMm=${dims?.projectionMm} '
+              'metresHauteur=$metresHauteur '
+              'pH(px)=$pH '
+              'stripPxCalcule=$stripPx '
+              'source=${stripPx != null ? "DIMENSIONS_REELLES" : "FALLBACK_corniceDefault"}',
+            );
+          }
           paintCorniceSet(
             canvas,
             vp,
