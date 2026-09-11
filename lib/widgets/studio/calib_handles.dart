@@ -27,6 +27,15 @@
 /// non touché) ni la logique de `AppState.updateCalibPoint` (switch à 8
 /// clés déjà complet avant ce changement) — uniquement l'UI qui expose les
 /// 4 points manquants.
+///
+/// Correctif UX (post-implémentation) : les poignées murs latéraux restent
+/// visuellement petites/discrètes (cercle 14px) mais leur zone tactile
+/// (`GestureDetector`) est élargie à 40px minimum via `_Handle.hitSize` —
+/// sans cela le cercle visible seul était trop petit pour être attrapé de
+/// façon fiable au doigt/souris. Le cercle reste centré dans cette zone.
+/// Ordre de dessin inchangé : murs latéraux d'abord (dessous), plafond/sol
+/// ensuite (dessus) — priorité de hit-test conservée aux grosses poignées
+/// en cas de chevauchement.
 library;
 
 import 'package:flutter/material.dart';
@@ -101,6 +110,12 @@ class CalibHandlesOverlay extends StatelessWidget {
         x: handleX,
         y: handleY,
         size: size,
+        // Zone tactile : identique au cercle visible pour les 4 points
+        // plafond/sol (comportement inchangé), mais élargie à 40px min.
+        // pour les points de mur latéral — le cercle reste petit/discret
+        // (14px) mais devient réellement attrapable au doigt/souris (voir
+        // brief correction UX post-implémentation).
+        hitSize: size < 40 ? 40 : size,
         color: color,
         opacity: opacity,
         onDrag: (dx, dy) {
@@ -162,6 +177,13 @@ class CalibHandlesOverlay extends StatelessWidget {
 class _Handle extends StatelessWidget {
   final double x, y;
   final double size;
+  // Taille de la zone tactile (GestureDetector) — peut être plus grande
+  // que [size] (cercle visible) pour rester utilisable au doigt/souris
+  // même quand le point est dessiné discret (cas des murs latéraux,
+  // cercle 14px / zone tactile 40px). Le cercle visible reste centré
+  // dans cette zone : aucun changement visuel pour les points
+  // plafond/sol, dont hitSize == size (22 == 22).
+  final double hitSize;
   final Color color;
   final double opacity;
   final void Function(double dx, double dy) onDrag;
@@ -169,6 +191,7 @@ class _Handle extends StatelessWidget {
     required this.x,
     required this.y,
     required this.size,
+    required this.hitSize,
     required this.color,
     required this.opacity,
     required this.onDrag,
@@ -177,25 +200,31 @@ class _Handle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: x - size / 2,
-      top: y - size / 2,
+      left: x - hitSize / 2,
+      top: y - hitSize / 2,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onPanUpdate: (d) => onDrag(d.delta.dx, d.delta.dy),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color.withValues(alpha: opacity),
-            border: Border.all(color: AppColors.bg, width: size >= 20 ? 2 : 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: opacity * 0.7),
-                blurRadius: size >= 20 ? 8 : 5,
-                spreadRadius: 1,
+        child: SizedBox(
+          width: hitSize,
+          height: hitSize,
+          child: Center(
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withValues(alpha: opacity),
+                border: Border.all(color: AppColors.bg, width: size >= 20 ? 2 : 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: opacity * 0.7),
+                    blurRadius: size >= 20 ? 8 : 5,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
