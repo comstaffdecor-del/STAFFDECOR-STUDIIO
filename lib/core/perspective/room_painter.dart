@@ -13,7 +13,6 @@
 library;
 
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter/material.dart';
 
 import '../../data/catalogue_data.dart';
@@ -51,11 +50,6 @@ class RoomPainter extends CustomPainter {
     ProductTextureCache.instance,
     ProfileDimsCache.instance,
   ]);
-
-  // ⚠️ TEMPORAIRE — voir commentaire au site d'appel dans le case
-  // 'Corniches' ci-dessous : évite de spammer le log à chaque frame de
-  // paint() (~60/s), une seule ligne par ref rencontrée par process.
-  static final Set<String> _loggedCorniceRefs = {};
 
   RoomPainter({
     required this.roomImage,
@@ -274,26 +268,15 @@ class RoomPainter extends CustomPainter {
                   retombeeMm: dims.retombeeMm,
                   projectionMm: dims.projectionMm,
                 );
-          // ⚠️ LOG DEBUG TEMPORAIRE (brief "Stop patch scène — retour au
-          // moteur dynamique", point 5) — diagnostic ponctuel pour vérifier
-          // si une ref donnée (ex. D609) utilise ses dimensions réelles ou
-          // le fallback StripThickness.corniceDefault. Rate-limité (une
-          // fois par ref) pour ne pas spammer paint() (~60 appels/s). À
-          // SUPPRIMER une fois le diagnostic conclu — pas une télémétrie
-          // permanente.
-          if (kDebugMode && !_loggedCorniceRefs.contains(item.ref)) {
-            _loggedCorniceRefs.add(item.ref);
-            debugPrint(
-              '[DIAG D609/corniche] ref=${item.ref} '
-              'profileDimsTrouve=${dims != null} '
-              'retombeeMm=${dims?.retombeeMm} '
-              'projectionMm=${dims?.projectionMm} '
-              'metresHauteur=$metresHauteur '
-              'pH(px)=$pH '
-              'stripPxCalcule=$stripPx '
-              'source=${stripPx != null ? "DIMENSIONS_REELLES" : "FALLBACK_corniceDefault"}',
-            );
-          }
+          // ⚠️ Face plafond teintée avec la couleur moyenne réelle du
+          // produit (brief "voie légère" — suppression du bandeau blanc
+          // artificiel) quand la texture est chargée ; `null` sinon
+          // (repli sur les 4 couleurs fixes d'origine, voir
+          // cornice_plinth_painter.dart::_drawCorniceStrip). Même pattern
+          // asynchrone/non-bloquant que texture/dims ci-dessus — pas de
+          // nouvel appel réseau, ce calcul est fait une fois par ref au
+          // moment où ProductTextureCache._load résout la texture.
+          final avgColor = ProductTextureCache.instance.getAverageColorIfLoaded(prod.ref);
           paintCorniceSet(
             canvas,
             vp,
@@ -304,6 +287,7 @@ class RoomPainter extends CustomPainter {
             th: corniceFor(stripPx, pH),
             ratio: ratio,
             texture: texture,
+            avgColor: avgColor,
           );
           break;
 

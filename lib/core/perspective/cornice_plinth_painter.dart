@@ -207,6 +207,7 @@ void paintCorniceSet(
   required StripThickness th,
   required double ratio,
   Image? texture,
+  Color? avgColor,
 }) {
   final lenLatG = dist(fTL, wallTL);
   final lenLatD = dist(wallTR, fTR);
@@ -276,6 +277,7 @@ void paintCorniceSet(
       th.faceHorizLat,
       ratio,
       texture,
+      avgColor,
     );
   }
   _drawCorniceStrip(
@@ -288,6 +290,7 @@ void paintCorniceSet(
     th.faceHorizFond,
     ratio,
     texture,
+    avgColor,
   );
   if (hasLatD) {
     _drawCorniceStrip(
@@ -300,6 +303,7 @@ void paintCorniceSet(
       th.faceHorizLat,
       ratio,
       texture,
+      avgColor,
     );
   }
 }
@@ -408,6 +412,7 @@ void _drawCorniceStrip(
   double depthPx,
   double ratio,
   Image? texture,
+  Color? avgColor,
 ) {
   final len = dist(topA, topB);
   if (len < 2) return;
@@ -434,14 +439,52 @@ void _drawCorniceStrip(
     ..lineTo(pB.dx, pB.dy)
     ..lineTo(pA.dx, pA.dy)
     ..close();
-  final grd = Gradient.linear(topA, pA, const [
-    Color(0xE6C3BEB7),
-    Color(0xEBF0EDE6),
-    Color(0xF2FFFDF8),
-    Color(0xCCE6E2DA),
-  ], const [0.0, 0.25, 0.65, 1.0]);
+  // ⚠️ CORRECTION "bandeau plafond blanc artificiel" (brief "voie légère") :
+  // même GéOMÉTRIE de gradient qu'avant (mêmes 4 stops, même
+  // Gradient.linear(topA, pA, ...), AUCUN drawVertices/UV) — seules les
+  // 4 COULEURS changent, dérivées de [avgColor] (couleur moyenne de la
+  // vraie photo produit, voir ProductTextureCache._computeAverageColor)
+  // quand elle est disponible, au lieu des 4 `Color(0x...)` fixes
+  // ivoire/blanc précédentes — identiques pour TOUS les produits, d'où le
+  // bandeau blanc signalé (D609 comme n'importe quelle autre corniche).
+  // Repli sur les 4 couleurs d'origine si [avgColor] est encore `null`
+  // (texture pas encore chargée / échec réseau) — aucune régression pour
+  // ce cas, comportement visuel strictement identique à avant ce commit.
+  final ceilColors = avgColor == null
+      ? const [
+          Color(0xE6C3BEB7),
+          Color(0xEBF0EDE6),
+          Color(0xF2FFFDF8),
+          Color(0xCCE6E2DA),
+        ]
+      : _ceilingGradientFromAvgColor(avgColor);
+  final grd = Gradient.linear(
+    topA,
+    pA,
+    ceilColors,
+    const [0.0, 0.25, 0.65, 1.0],
+  );
   canvas.drawPath(path, Paint()..shader = grd);
   drawEdgeLine(canvas, pA, pB, const Color(0x8CB4ACA2), 0.7);
+}
+
+/// Dérive les 4 couleurs du gradient de la face plafond à partir de la
+/// couleur moyenne réelle du produit ([avgColor]) — même rôle que les 4
+/// `Color(0x...)` fixes qu'elle remplace (stop 0 = zone la plus éclairée,
+/// près du mur ; stop 1 = zone la plus éloignée/ombrée), mais teintées
+/// avec le VRAI plâtre du produit plutôt qu'un ivoire générique identique
+/// pour tous. Léger éclaircissement + désaturation (mélange vers blanc)
+/// sur les 2 premiers stops — simule l'éclairage rasant du plafond sans
+/// prétendre à un vrai relief (aucun nouveau mapping UV, voir contrainte
+/// du brief) — puis un léger assombrissement sur le dernier stop pour
+/// garder la lecture de profondeur déjà présente dans l'ancien gradient.
+List<Color> _ceilingGradientFromAvgColor(Color avgColor) {
+  return [
+    Color.lerp(avgColor, const Color(0xFFFFFFFF), 0.78)!.withValues(alpha: 0.90),
+    Color.lerp(avgColor, const Color(0xFFFFFFFF), 0.70)!.withValues(alpha: 0.92),
+    Color.lerp(avgColor, const Color(0xFFFFFFFF), 0.55)!.withValues(alpha: 0.95),
+    Color.lerp(avgColor, const Color(0xFF000000), 0.12)!.withValues(alpha: 0.80),
+  ];
 }
 
 /// Un segment de plinthe. Port exact de `_drawPlinthStrip`.
