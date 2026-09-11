@@ -26,15 +26,22 @@ import '../../widgets/studio/save_project_modal.dart';
 
 const _demoScenes = {
   'haussmann': ('🏛️', 'Haussmannien'),
-  'moderne': ('◼', 'Contemporain'),
-  // ⚠️ AJOUT scène distincte "Moderne avec corniche" (A3c) — variante de
-  // `moderne` avec une corniche décorative compositée (masque A3b +
-  // correction couleur méthode A), ajoutée à côté de l'originale SANS
-  // l'écraser (rollback immédiat possible, comparaison client, référence
-  // `moderne` intacte). Même résolution source 1960×1470 que `moderne`
-  // → aucun nouveau preset de calibration requis, voir
-  // `PerspCalib.forDemoScene` (fallback explicite ci-dessous).
-  'moderne_corniche': ('◼', 'Moderne — corniche'),
+  // ⚠️ CORRECTION démo (retour visuel : le picker ci-dessous est un
+  // `Row` non scrollable dans un `Positioned(bottom:10)` sans largeur
+  // contrainte — un 5e bouton "Moderne — corniche" séparé débordait/était
+  // tronqué, seuls 4 boutons restaient visibles, et "Contemporain"
+  // restait actif sur l'ancienne clé 'moderne'). Fix retenu pour la démo :
+  // le bouton "Contemporain" pointe désormais DIRECTEMENT sur
+  // 'moderne_corniche' (variante avec corniche compositée, masque A3b +
+  // correction couleur méthode A) au lieu de 'moderne' — même libellé,
+  // même position, aucun bouton supplémentaire, aucun risque de
+  // débordement. `assets/demo_scenes/moderne.jpg` (sans corniche) N'EST
+  // PLUS exposé dans ce picker, mais reste intact sur disque pour
+  // rollback (il suffit de remettre 'moderne' ici pour revenir en
+  // arrière). Calibration inchangée : `PerspCalib.forDemoScene` retourne
+  // déjà la même constante `_calibModerne` pour 'moderne' et
+  // 'moderne_corniche' (voir persp_calib.dart).
+  'moderne_corniche': ('◼', 'Contemporain'),
   'provencal': ('🌿', 'Provençal'),
   'scandinave': ('❄', 'Scandinave'),
 };
