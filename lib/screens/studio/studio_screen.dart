@@ -496,7 +496,8 @@ class _PhotoZone extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(
-                  'Faites glisser les repères dorés pour ajuster la perspective — plafond ●● sol ●●',
+                  'Faites glisser les repères dorés pour ajuster la perspective — '
+                  'plafond ●● sol ●● (murs latéraux : petits points discrets aux bords)',
                   style: TextStyle(color: AppColors.gold, fontSize: 10.5),
                 ),
               ),
