@@ -24,6 +24,7 @@ library;
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
+import 'package:flutter/painting.dart' show HSLColor;
 import 'persp_geometry.dart';
 import 'vanishing_point.dart';
 import 'profile_strip.dart';
@@ -442,8 +443,8 @@ void _drawCorniceStrip(
   // ⚠️ CORRECTION "bandeau plafond blanc artificiel" (brief "voie légère") :
   // même GéOMÉTRIE de gradient qu'avant (mêmes 4 stops, même
   // Gradient.linear(topA, pA, ...), AUCUN drawVertices/UV) — seules les
-  // 4 COULEURS changent, dérivées de [avgColor] (couleur moyenne de la
-  // vraie photo produit, voir ProductTextureCache._computeAverageColor)
+  // COULEURS ET ALPHAS changent, dérivés de [avgColor] (couleur moyenne de
+  // la vraie photo produit, voir ProductTextureCache._computeAverageColor)
   // quand elle est disponible, au lieu des 4 `Color(0x...)` fixes
   // ivoire/blanc précédentes — identiques pour TOUS les produits, d'où le
   // bandeau blanc signalé (D609 comme n'importe quelle autre corniche).
@@ -475,23 +476,38 @@ void _drawCorniceStrip(
 /// avec le VRAI plâtre du produit plutôt qu'un ivoire générique identique
 /// pour tous.
 ///
-/// ⚠️ CORRECTION "voie légère v2" (brief : le v1 restait trop mélangé
-/// vers le blanc — mélanges à 0.78/0.70/0.55 vers blanc noyaient encore
-/// [avgColor] dans un ivoire quasi identique à l'ancien gradient figé).
-/// Le mélange vers blanc du stop le plus clair est désormais borné à
-/// 0.25 (au lieu de 0.78) : la face plafond reste nettement identifiable
-/// comme du plâtre/gris plutôt qu'un blanc pur, tout en gardant un stop
-/// "mid" qui restitue [avgColor] tel quel (aucun mélange) et deux stops
-/// assombris (0.12 / 0.22 vers noir) pour la lecture de profondeur déjà
-/// présente dans l'ancien gradient. Géométrie, `Gradient.linear`, points
-/// et stops `[0.0, 0.25, 0.65, 1.0]` strictement inchangés — seules les
-/// 4 couleurs changent (voir contrainte du brief : pas de drawVertices,
-/// pas d'UV, pas de mapping texture complet).
+/// ⚠️ CORRECTION "voie légère v3 — normalisation plâtre" (brief "vérifier
+/// avgColor, stabiliser D609") : mesure factuelle sur D609 (script de
+/// diagnostic temporaire, algorithme identique à
+/// `ProductTextureCache._computeAverageColor`, exécuté sur l'image réelle
+/// téléchargée en HTTP 200) donne `avgColor = RGB(199,199,199)`,
+/// HSL(H=0, S=0.000, L=0.780) — un gris neutre (PAS beige/sale, S=0) mais
+/// dont la luminosité (0.780) tombe sous le seuil jugé sûr par le brief
+/// (220-235, soit L≈0.86-0.92) pour être utilisé BRUT dans le gradient :
+/// le v2 précédent (mélange vers blanc borné à 0.25, stop "mid" =
+/// avgColor pur) aurait donc affiché un gris plus soutenu que souhaité
+/// sur certains produits. On ne construit donc plus le gradient depuis
+/// [avgColor] brut, mais depuis une base "plâtre normalisée"
+/// ([plasterBase]) : désaturation forte (S plafonnée à 0.08 — élimine
+/// tout dérapage beige/terreux si un futur produit a une teinte plus
+/// saturée) + luminosité plancher à 0.84 (jamais plus sombre que ça,
+/// même si le produit est un gris profond) — tout en conservant la
+/// légère teinte/chaleur du produit quand sa saturation d'origine est
+/// déjà faible. Géométrie, `Gradient.linear`, points et stops
+/// `[0.0, 0.25, 0.65, 1.0]` strictement inchangés — seules les couleurs
+/// ET alphas du gradient changent (voir contrainte du brief : pas de
+/// drawVertices, pas d'UV, pas de mapping texture complet).
 List<Color> _ceilingGradientFromAvgColor(Color avgColor) {
-  final light = Color.lerp(avgColor, const Color(0xFFFFFFFF), 0.25)!;
-  final mid = avgColor;
-  final shade = Color.lerp(avgColor, const Color(0xFF000000), 0.12)!;
-  final deep = Color.lerp(avgColor, const Color(0xFF000000), 0.22)!;
+  final hsl = HSLColor.fromColor(avgColor);
+  final plasterBase = hsl
+      .withSaturation(hsl.saturation.clamp(0.0, 0.08))
+      .withLightness(hsl.lightness < 0.84 ? 0.84 : hsl.lightness)
+      .toColor();
+
+  final light = Color.lerp(plasterBase, const Color(0xFFFFFFFF), 0.12)!;
+  final mid = plasterBase;
+  final shade = Color.lerp(plasterBase, const Color(0xFF000000), 0.08)!;
+  final deep = Color.lerp(plasterBase, const Color(0xFF000000), 0.16)!;
 
   return [
     light.withValues(alpha: 0.92),
