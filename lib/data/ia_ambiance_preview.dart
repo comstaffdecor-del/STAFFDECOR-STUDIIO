@@ -1,39 +1,37 @@
-/// P19-MANOBANANA-QAD (clôturé) — "Aperçu d'ambiance IA".
+/// P19-MANOBANANA-QAD — "Aperçu d'ambiance IA".
 ///
-/// ⚠️ HISTORIQUE, POUR LE PROCHAIN LECTEUR : cette passe a exploré
-/// l'intégration d'un rendu IA réel via un proxy serveur portant la clé
-/// côté serveur (jamais côté client Flutter — ce principe reste
-/// intégralement valide et devra être repris tel quel le jour où un
-/// provider exploitable sera confirmé). Trois voies ont été testées et
-/// **aucune n'est actuellement exploitable** :
+/// ⚠️ HISTORIQUE (mis à jour) : cette passe avait exploré l'intégration
+/// d'un rendu IA réel via un proxy serveur portant la clé côté serveur
+/// (jamais côté client Flutter — ce principe reste intégralement
+/// valide). Trois voies avaient été testées, avec un blocage quota=0
+/// systématique côté Gemini à l'époque :
 ///
-///  1. Gemini (`gemini-3.1-flash-image` via generateContent) : la clé
-///     fournie a été RECONNUE par Google (projet réel identifié), mais
-///     le quota `generate_content_free_tier_requests` est à **0** sur ce
-///     projet pour ce modèle → HTTP 429 systématique. Le proxy testé a
-///     bien confirmé le principe (health check OK, aucune fuite de clé
-///     dans les logs/réponses), mais aucune image n'a pu être générée.
+///  1. Gemini (`gemini-3.1-flash-image` / `gemini-3.1-flash-lite-image`
+///     via generateContent) : une PREMIÈRE clé testée avait bien été
+///     RECONNUE par Google (projet réel identifié), mais le quota
+///     `generate_content_free_tier_requests` était à **0** → HTTP 429
+///     systématique sur 3 variantes de modèle testées.
 ///  2. OpenAI (`images/edits`) : aucune clé OpenAI personnelle
-///     disponible dans cet environnement. `OPENAI_API_KEY` existe bien
-///     dans l'environnement sandbox, mais elle pointe vers le proxy LLM
-///     INTERNE de la plateforme Genspark (`OPENAI_BASE_URL=.../llm_proxy/v1`,
-///     préfixe `gsk-...`), qui n'expose QUE des modèles texte/code
-///     (55 modèles listés via `/models` — GPT-5.x, Claude, DeepSeek,
-///     Grok, etc., zéro modèle image) — vérifié, donc explicitement
-///     écarté, jamais utilisé pour ce module.
+///     disponible dans cet environnement (`OPENAI_API_KEY` pointe vers
+///     le proxy LLM interne Genspark, texte/code uniquement).
 ///  3. Genspark (infra plateforme) : hors périmètre par consigne
-///     explicite — jamais utilisé comme provider applicatif pour ce
-///     module, quelle que soit sa disponibilité technique.
+///     explicite.
 ///
-/// **Décision** : clôture de l'intégration réelle. [kAiPreviewEnabled]
-/// reste figé à `false`. Aucun bouton actif côté client ne promet un
-/// rendu IA réel tant qu'un provider n'a pas été validé de bout en bout
-/// (clé + quota + génération réussie). Le proxy serveur créé pendant
-/// cette passe (`server/manobanana_proxy/`) a été supprimé du dépôt
-/// (jamais poussé — commits locaux uniquement, vérifiés sans secret) ;
-/// aucune clé n'a jamais été committée. Court terme retenu : un pack de
-/// prompts manuels (texte, ci-dessous) à utiliser côté Genspark
-/// directement par un opérateur humain, hors app.
+/// **Mise à jour (test live serveur, nouvelle clé fournie) :** une
+/// NOUVELLE clé a été testée en direct côté serveur (appel minimal
+/// `generateContent`, prompt "generate a small neutral plaster cornice
+/// preview on a white wall") → **HTTP 200, image réellement générée**
+/// (JPEG 1408×768, ~528 Ko), confirmé aussi en conditions réelles via
+/// le proxy `server/ai_render_proxy/` avec une vraie photo de scène et
+/// le SKU D609 (HTTP 200, image ~794 Ko en 4,4 s). Le quota n'est donc
+/// PAS bloqué pour cette clé. [kAiPreviewEnabled] passe à `true` sur
+/// cette base.
+///
+/// La clé vit UNIQUEMENT dans `server/ai_render_proxy/.env` (fichier
+/// gitignored, jamais committé) et n'est JAMAIS embarquée dans le
+/// client Flutter : ce fichier appelle uniquement l'URL PUBLIQUE du
+/// proxy (voir [kAiRenderProxyBaseUrl]), qui lui-même détient la clé
+/// côté serveur et ne la renvoie/logge jamais (voir server.js).
 ///
 /// PÉRIMÈTRE INCHANGÉ (hérité de P17-VISUEL, toujours respecté) :
 ///  - ne s'active QUE pour les refs de `assets/profiles/index.json` ;
@@ -41,13 +39,25 @@
 ///  - ce module ne touche ni au moteur perspective ni aux presets.
 library;
 
+import 'dart:convert';
 import 'dart:typed_data';
 
-/// POINT UNIQUE DE RÉVERSIBILITÉ. Reste `false` : aucun provider image
-/// exploitable n'a été validé à ce jour (voir historique ci-dessus).
-/// Ne DOIT passer à `true` que juste après qu'une génération réelle a été
-/// testée avec succès (clé + quota + réseau + réponse image valide).
-const bool kAiPreviewEnabled = false;
+import 'package:http/http.dart' as http;
+
+/// URL PUBLIQUE du proxy serveur (jamais la clé elle-même — le proxy la
+/// détient côté serveur dans son propre `.env`, jamais exposée ici).
+/// ⚠️ Cette URL dépend du sandbox de développement courant : si le
+/// sandbox est recréé, régénérer l'URL publique du port 8091 et la
+/// remplacer ici (seul point à mettre à jour, aucune clé concernée).
+const String kAiRenderProxyBaseUrl =
+    'https://8091-iv0to5t5muaul2o2div2d-c81df28e.sandbox.novita.ai';
+
+/// POINT UNIQUE DE RÉVERSIBILITÉ. Passé à `true` après confirmation
+/// d'une génération réelle réussie (clé + quota + réseau + réponse
+/// image valide), voir historique ci-dessus. Remettre à `false` en cas
+/// de nouveau blocage quota/clé pour désactiver proprement le flux IA
+/// sans retirer de code.
+const bool kAiPreviewEnabled = true;
 
 /// Messages d'erreur COURTS, un par cause distincte — jamais un message
 /// technique brut affiché à l'utilisateur final.
@@ -66,9 +76,7 @@ const String kAiPreviewDisclaimer =
     'Aperçu IA non contractuel — illustration d\'ambiance, ne représente '
     'pas le rendu technique du produit.';
 
-/// Résultat d'une tentative de génération d'aperçu IA. Conservé pour
-/// compatibilité avec l'appelant UI, même si [generateAiAmbiancePreview]
-/// renvoie désormais toujours un échec (fonction non exploitable).
+/// Résultat d'une tentative de génération d'aperçu IA.
 class AiPreviewResult {
   final bool success;
   final Uint8List? imageBytes;
@@ -83,9 +91,11 @@ class AiPreviewResult {
 }
 
 /// Construit le prompt positif — conservé pour usage MANUEL (pack de
-/// prompts côté Genspark, court terme retenu), et pour readiness future
-/// si un provider devient exploitable. N'est appelé par AUCUN chemin
-/// réseau actuellement (fonction pure, aucune I/O).
+/// prompts côté Genspark) et pour référence. Le prompt RÉELLEMENT
+/// envoyé au modèle est reconstruit côté SERVEUR (voir
+/// `server/ai_render_proxy/server.js` → `buildPrompt`), à partir d'un
+/// gabarit fixe + du sku + des cotes lues sur disque : jamais ce texte
+/// client qui n'est envoyé à aucun réseau.
 String buildAiPreviewPrompt({
   required String ref,
   required String nom,
@@ -110,8 +120,8 @@ String buildAiPreviewPrompt({
       'bande plate.';
 }
 
-/// Négatif-prompt générique — conservé pour le même usage manuel que
-/// [buildAiPreviewPrompt] ci-dessus.
+/// Négatif-prompt générique — conservé pour référence (non envoyé au
+/// modèle, voir note ci-dessus sur `buildPrompt` côté serveur).
 const String kAiPreviewNegativePrompt =
     'corniche trop massive, blanc pur surexposé, dorure, moulure inventée, '
     'bande plate, changement du mobilier, changement du plafond, '
@@ -120,19 +130,87 @@ const String kAiPreviewNegativePrompt =
 
 /// Cotes visuelles connues (cm) — issues de `assets/profiles/D609.json`
 /// (`bbox_mm` : 186,963 × 196,482 mm). Conservé pour le pack de prompts
-/// manuel.
+/// manuel / référence.
 const Map<String, (double, double)> kKnownVisualDimsCm = {
   'D609': (19, 20),
 };
 
-/// Toujours un échec — AUCUN provider image exploitable actuellement
-/// (voir historique en tête de fichier). Ne lève jamais d'exception,
-/// ne fait plus AUCUN appel réseau depuis la clôture de cette passe.
+/// Détecte le MIME réel à partir des octets magiques (PNG/JPEG), avec
+/// repli sur JPEG par défaut — miroir de `detectMimeType` côté serveur,
+/// utilisé ici uniquement pour renseigner le champ `mimeType` envoyé
+/// (le serveur re-détecte de toute façon lui-même par sécurité).
+String _guessMimeType(Uint8List bytes) {
+  if (bytes.length >= 8 &&
+      bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
+    return 'image/png';
+  }
+  if (bytes.length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) {
+    return 'image/jpeg';
+  }
+  return 'image/jpeg';
+}
+
+/// Génère un aperçu d'ambiance IA réel via le proxy serveur (jamais la
+/// clé côté client). Retourne un échec avec un message court si :
+/// - la fonction est désactivée ([kAiPreviewEnabled] == false) ;
+/// - le proxy est injoignable (réseau, timeout, DNS) ;
+/// - Google/le proxy renvoie une erreur (429, 403, 500...) ;
+/// - la réponse ne contient aucune image.
+/// Ne lève jamais d'exception — toute erreur est convertie en
+/// [AiPreviewResult.fail] avec un message utilisateur générique (le
+/// détail technique reste uniquement dans les logs serveur, jamais
+/// exposé au client).
 Future<AiPreviewResult> generateAiAmbiancePreview({
   required Uint8List sceneImageBytes,
   required String ref,
   required String nom,
   required String famille,
 }) async {
-  return AiPreviewResult.fail(kAiPreviewErrorDisabled);
+  if (!kAiPreviewEnabled) {
+    return AiPreviewResult.fail(kAiPreviewErrorDisabled);
+  }
+
+  final uri = Uri.parse('$kAiRenderProxyBaseUrl/api/ai-render');
+  final body = jsonEncode({
+    'imageBase64': base64Encode(sceneImageBytes),
+    'mimeType': _guessMimeType(sceneImageBytes),
+    'sku': ref,
+  });
+
+  http.Response resp;
+  try {
+    resp = await http
+        .post(uri, headers: const {'Content-Type': 'application/json'}, body: body)
+        .timeout(const Duration(seconds: 45));
+  } catch (_) {
+    // Timeout, DNS, connexion refusée, etc. — jamais de détail réseau
+    // brut affiché à l'utilisateur final.
+    return AiPreviewResult.fail(kAiPreviewErrorProxyUnreachable);
+  }
+
+  Map<String, dynamic>? json;
+  try {
+    json = jsonDecode(resp.body) as Map<String, dynamic>;
+  } catch (_) {
+    return AiPreviewResult.fail(kAiPreviewErrorGenerationFailed);
+  }
+
+  if (resp.statusCode != 200 || json['ok'] != true) {
+    // Le message technique (Google 429/403/etc.) reste dans les logs
+    // implicites de la requête HTTP ; l'utilisateur final ne voit que
+    // le message court générique.
+    return AiPreviewResult.fail(kAiPreviewErrorGenerationFailed);
+  }
+
+  final imageBase64 = json['imageBase64'] as String?;
+  if (imageBase64 == null || imageBase64.isEmpty) {
+    return AiPreviewResult.fail(kAiPreviewErrorGenerationFailed);
+  }
+
+  try {
+    final bytes = base64Decode(imageBase64);
+    return AiPreviewResult.ok(bytes);
+  } catch (_) {
+    return AiPreviewResult.fail(kAiPreviewErrorGenerationFailed);
+  }
 }
