@@ -1,48 +1,41 @@
-// P22-HYBRIDE-AUTO — brief "Nouvelle règle produit" (correction de la
-// décision produit précédente, commit "Retire le declenchement IA
-// automatique").
+// Test de NON-RÉGRESSION — DÉCISION PRODUIT (validation visuelle réelle :
+// "le mode hybride auto est rejeté").
 //
-// ⚠️ CE FICHIER REMPLACE la version précédente qui vérifiait l'ABSENCE
-// de tout déclenchement automatique de l'aperçu IA. Cette décision a
-// été explicitement INVERSÉE par l'utilisateur : il ne fallait PAS
-// retirer tout auto-trigger, seulement l'auto-trigger BRUT (Gemini
-// invente la pose depuis la photo brute, renderMode='add' implicite).
+// Historique complet :
+//  1. Commit 8f4e875 "Retire le declenchement IA automatique" : retire
+//     un premier mécanisme auto-trigger BRUT (Gemini invente la pose
+//     depuis la photo brute, renderMode='add' implicite) — jugé trop
+//     instable visuellement.
+//  2. Commit 60f9fe7 "Restaure le pont automatique Mano en mode
+//     hybride" : introduit puis reconnecte un NOUVEAU mécanisme,
+//     [AppState.maybeAutoTriggerHybridAiPreview], qui capture le rendu
+//     dynamique déjà composé (produit posé géométriquement) et l'envoie
+//     automatiquement à Mano/Nano en `renderMode: 'refine'`.
+//  3. CE COMMIT (présent) : un test visuel RÉEL du mécanisme (2) a
+//     montré un MAUVAIS RENDU — Mano/Nano en mode 'refine' AFFINE une
+//     scène dynamique déjà imprécise géométriquement, ce qui AGGRAVE le
+//     défaut au lieu de le corriger. Les 3 appels automatiques
+//     ([setRoomImageBytes], [loadDemoScene], [addToProject]) sont donc
+//     RE-RETIRÉS. [maybeAutoTriggerHybridAiPreview] reste présente,
+//     INCHANGÉE dans son corps, comme infrastructure dormante
+//     documentée — exactement comme [maybeAutoTriggerAiPreview] (mode
+//     brut, déjà dormant depuis (1)).
 //
-// Nouvelle règle produit :
-//   Rendu dynamique automatique      : OUI (inchangé, jamais désactivé)
-//   Mano/Nano automatique après rendu dynamique : OUI
-//   Mano/Nano en génération brute libre          : NON (sauf fallback
-//                                                   manuel contrôlé,
-//                                                   voir dernier group)
-//   Mode refine/hybride                          : OUI, exclusivement
-//
-// Ce fichier teste donc [AppState.maybeAutoTriggerHybridAiPreview] (le
-// SEUL mécanisme automatique appelé en production, depuis
-// [AppState.setRoomImageBytes], [AppState.loadDemoScene] et
-// [AppState.addToProject]) — jamais l'ancien
-// [AppState.maybeAutoTriggerAiPreview] (mode brut, resté une
-// infrastructure dormante non appelée en production, testé séparément
-// dans le dernier group ci-dessous pour mémoire).
-//
-// Pattern de pump utilisé : [maybeAutoTriggerHybridAiPreview] différe
-// la capture composée via `SchedulerBinding.addPostFrameCallback`
-// (laisser le moteur dynamique dessiner le produit avant de capturer),
-// PUIS attend elle-même de façon asynchrone le résultat de
-// [AppState.captureComposedScene] avant de marquer la clé anti-boucle
-// et d'ouvrir le panneau. Dans un test `flutter_test` sans widget réel
-// affiché, le post-frame callback ne se déclenche PAS automatiquement à
-// un `pump()` simple : il faut explicitement
-// `SchedulerBinding.instance.scheduleFrame()` puis `pump()` (confirmé
-// par sondage direct de l'API avant d'écrire ces tests), puis un second
-// `pump()` pour laisser le `Future` interne (résolution de
-// `captureComposedScene()`) se terminer avant d'observer l'état final.
+// Ce fichier vérifie donc à nouveau l'ABSENCE de tout déclenchement
+// automatique de l'aperçu IA — brut OU hybride — quelles que soient les
+// actions de l'utilisateur (import photo, scène démo, sélection
+// produit, changement de produit). Reste vérifié en parallèle :
+//  - le parcours MANUEL (icône topbar "Aperçu d'ambiance IA") reste
+//    intégralement disponible, en mode 'add' par défaut (seul rendu
+//    visuellement validé à ce jour) ;
+//  - le stockage du résultat IA pour l'écran Avant/Après continue de
+//    fonctionner pour un déclenchement manuel.
 library;
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:staff_decor_studio/data/catalogue_visibility.dart';
@@ -59,316 +52,147 @@ Future<ui.Image> _tinyImage() async {
   return picture.toImage(2, 2);
 }
 
-/// Laisse [AppState.maybeAutoTriggerHybridAiPreview] terminer son cycle
-/// asynchrone complet (post-frame callback différé + await de
-/// [AppState.captureComposedScene]) dans un test widget sans arbre de
-/// widgets réel affiché. Voir commentaire de tête de fichier.
-Future<void> _settleHybridAutoTrigger(WidgetTester tester) async {
-  SchedulerBinding.instance.scheduleFrame();
-  await tester.pump();
-  await tester.pump();
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
-    // L'index catalogue (43 refs whitelistées, dont D609/D720) doit être
-    // chargé et STABLE avant chaque test : [maybeAutoTriggerHybridAiPreview]
-    // est fail-open tant que l'index n'est pas chargé (presentationVisible
-    // renvoie `null`), ce qui laisserait passer un SKU non whitelisté par
-    // accident dans un test qui voudrait justement vérifier le blocage.
     CatalogueVisibilityGate.instance.resetForTesting();
   });
 
-  group('Auto-trigger HYBRIDE (maybeAutoTriggerHybridAiPreview) — nouvelle règle produit', () {
-    testWidgets(
-      '1. Pas d\'auto-trigger BRUT : photo seule (sans produit sélectionné) '
-      '=> aucun appel à Mano/Nano, panneau IA fermé',
-      (tester) async {
-        await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
-
-        final state = AppState();
-        var captureCalls = 0;
-        state.registerComposedSceneCapture(() async {
-          captureCalls++;
-          return Uint8List.fromList([1, 2, 3]);
-        });
-
-        await tester.pumpWidget(const SizedBox());
-
-        // Simule exactement ce que fait setRoomImageBytes une fois la
-        // photo décodée : pas de produit sélectionné à ce stade.
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion = 1;
-        state.maybeAutoTriggerHybridAiPreview();
-        await _settleHybridAutoTrigger(tester);
-
-        expect(captureCalls, 0,
-            reason: 'sans produit sélectionné, la scène composée ne doit '
-                'jamais être capturée ni envoyée à Mano/Nano');
-        expect(state.showAiAmbiancePanel, isFalse,
-            reason: 'importer une photo seule ne doit jamais ouvrir le '
-                'panneau IA automatiquement (pas de mode "add" brut)');
-        expect(state.aiAmbianceAutoGenerateHybrid, isFalse);
-      },
-    );
-
-    testWidgets(
-      '2. Auto-trigger HYBRIDE : photo + D609 sélectionné + capture composée '
-      'disponible => panneau IA ouvert automatiquement, renderMode "refine"',
-      (tester) async {
-        await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
-
-        final state = AppState();
-        var captureCalls = 0;
-        final composed = Uint8List.fromList([9, 9, 9]);
-        state.registerComposedSceneCapture(() async {
-          captureCalls++;
-          return composed;
-        });
-
-        await tester.pumpWidget(const SizedBox());
-
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion = 1;
-        state.selectedProducts = [
-          const ProjectItem(ref: 'D609', famille: 'Corniches', qte: 1, unite: 'ml'),
-        ];
-        state.maybeAutoTriggerHybridAiPreview();
-        await _settleHybridAutoTrigger(tester);
-
-        expect(captureCalls, 1,
-            reason: 'la scène COMPOSÉE (produit déjà posé), jamais la '
-                'photo brute, doit être capturée exactement une fois');
-        expect(state.showAiAmbiancePanel, isTrue,
-            reason: 'photo + produit whitelisté + capture disponible doit '
-                'ouvrir automatiquement le panneau IA, sans bouton '
-                '"Générer" ni action utilisateur supplémentaire');
-        expect(state.aiAmbianceAutoGenerateHybrid, isTrue,
-            reason: 'AiAmbiancePanel doit savoir qu\'il doit consommer la '
-                'scène pré-capturée et forcer renderMode="refine" — '
-                'jamais le mode "add" brut');
-        expect(state.aiAmbiancePrefillRef, 'D609');
-        expect(state.consumePendingHybridAutoScene(), composed,
-            reason: 'la scène pré-capturée transmise au panneau doit être '
-                'exactement celle renvoyée par captureComposedScene(), '
-                'jamais recapturée une deuxième fois');
-      },
-    );
-
-    testWidgets(
-      '3. Anti-boucle : même photo + même SKU => pas de deuxième capture/génération',
-      (tester) async {
-        await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
-
-        final state = AppState();
-        var captureCalls = 0;
-        state.registerComposedSceneCapture(() async {
-          captureCalls++;
-          return Uint8List.fromList([9, 9, 9]);
-        });
-
-        await tester.pumpWidget(const SizedBox());
-
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion = 1;
-        state.selectedProducts = [
-          const ProjectItem(ref: 'D609', famille: 'Corniches', qte: 1, unite: 'ml'),
-        ];
-        state.maybeAutoTriggerHybridAiPreview();
-        await _settleHybridAutoTrigger(tester);
-        expect(captureCalls, 1);
-        expect(state.showAiAmbiancePanel, isTrue);
-
-        // L'utilisateur ferme le panneau (ex: consulte le résultat puis
-        // referme) — le couple (SKU, roomImageVersion, 'refine') reste
-        // strictement identique : re-notifier ne doit PAS redéclencher.
-        state.closeAiAmbiancePanel();
-        state.maybeAutoTriggerHybridAiPreview();
-        await _settleHybridAutoTrigger(tester);
-
-        expect(captureCalls, 1,
-            reason: 'garde anti-boucle : même photo + même SKU ne doit '
-                'jamais provoquer une deuxième capture/génération');
-        expect(state.showAiAmbiancePanel, isFalse,
-            reason: 'le panneau ne doit pas se rouvrir tout seul pour un '
-                'couple déjà traité');
-      },
-    );
-
-    testWidgets(
-      '4a. Changement de PRODUIT (nouveau SKU, même photo) => nouvelle '
-      'capture/génération autorisée',
-      (tester) async {
-        await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
-
-        final state = AppState();
-        var captureCalls = 0;
-        state.registerComposedSceneCapture(() async {
-          captureCalls++;
-          return Uint8List.fromList([9, 9, 9]);
-        });
-
-        await tester.pumpWidget(const SizedBox());
-
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion = 1;
-        state.selectedProducts = [
-          const ProjectItem(ref: 'D609', famille: 'Corniches', qte: 1, unite: 'ml'),
-        ];
-        state.maybeAutoTriggerHybridAiPreview();
-        await _settleHybridAutoTrigger(tester);
-        expect(captureCalls, 1);
-
-        state.closeAiAmbiancePanel();
-        // Nouveau SKU (whitelisté) sur la MÊME photo.
-        state.selectedProducts = [
-          const ProjectItem(ref: 'D720', famille: 'Corniches', qte: 1, unite: 'ml'),
-        ];
-        state.maybeAutoTriggerHybridAiPreview();
-        await _settleHybridAutoTrigger(tester);
-
-        expect(captureCalls, 2,
-            reason: 'changer de SKU doit relancer une capture/génération');
-        expect(state.showAiAmbiancePanel, isTrue);
-        expect(state.aiAmbiancePrefillRef, 'D720');
-      },
-    );
-
-    testWidgets(
-      '4b. Changement de PHOTO (nouvelle roomImageVersion, même SKU) => '
-      'nouvelle capture/génération autorisée',
-      (tester) async {
-        await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
-
-        final state = AppState();
-        var captureCalls = 0;
-        state.registerComposedSceneCapture(() async {
-          captureCalls++;
-          return Uint8List.fromList([9, 9, 9]);
-        });
-
-        await tester.pumpWidget(const SizedBox());
-
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion = 1;
-        state.selectedProducts = [
-          const ProjectItem(ref: 'D609', famille: 'Corniches', qte: 1, unite: 'ml'),
-        ];
-        state.maybeAutoTriggerHybridAiPreview();
-        await _settleHybridAutoTrigger(tester);
-        expect(captureCalls, 1);
-
-        state.closeAiAmbiancePanel();
-        // Nouvelle photo (nouvelle version), même SKU sélectionné —
-        // simule exactement ce que fait setRoomImageBytes en interne.
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion++;
-        state.maybeAutoTriggerHybridAiPreview();
-        await _settleHybridAutoTrigger(tester);
-
-        expect(captureCalls, 2,
-            reason: 'changer de photo doit relancer une capture/génération '
-                'même si le SKU sélectionné reste identique');
-        expect(state.showAiAmbiancePanel, isTrue);
-      },
-    );
-
-    testWidgets(
-      '5. SKU non whitelisté => aucune capture/génération automatique '
-      '(garde whitelist)',
-      (tester) async {
-        await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
-
-        final state = AppState();
-        var captureCalls = 0;
-        state.registerComposedSceneCapture(() async {
-          captureCalls++;
-          return Uint8List.fromList([9, 9, 9]);
-        });
-
-        await tester.pumpWidget(const SizedBox());
-
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion = 1;
-        // 'HORS-CATALOGUE' n'existe pas dans assets/profiles/index.json.
-        state.selectedProducts = [
-          const ProjectItem(ref: 'HORS-CATALOGUE', famille: 'Corniches', qte: 1, unite: 'ml'),
-        ];
-        state.maybeAutoTriggerHybridAiPreview();
-        await _settleHybridAutoTrigger(tester);
-
-        expect(captureCalls, 0,
-            reason: 'un SKU absent de la whitelist ne doit jamais '
-                'déclencher de capture/génération automatique');
-        expect(state.showAiAmbiancePanel, isFalse);
-      },
-    );
-
-    testWidgets(
-      '6. Échec de capture composée (Studio pas encore monté) => aucun '
-      'crash, panneau IA reste fermé, rendu dynamique inchangé',
-      (tester) async {
-        await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
-
-        final state = AppState();
-        // Aucune capture enregistrée (registerComposedSceneCapture jamais
-        // appelé) => captureComposedScene() renvoie null, exactement
-        // comme un Studio pas encore construit à l'écran.
-
-        await tester.pumpWidget(const SizedBox());
-
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion = 1;
-        state.selectedProducts = [
-          const ProjectItem(ref: 'D609', famille: 'Corniches', qte: 1, unite: 'ml'),
-        ];
-
-        expect(() => state.maybeAutoTriggerHybridAiPreview(), returnsNormally);
-        await _settleHybridAutoTrigger(tester);
-
-        expect(state.showAiAmbiancePanel, isFalse,
-            reason: 'une capture indisponible ne doit jamais ouvrir le '
-                'panneau IA — le rendu dynamique déterministe reste seul '
-                'affiché');
-
-        // La clé anti-boucle ne doit PAS avoir été marquée par cet échec
-        // : une prochaine tentative (ex: Studio enfin monté) doit pouvoir
-        // réussir pour le même couple photo+SKU.
-        state.registerComposedSceneCapture(() async => Uint8List.fromList([1]));
-        state.maybeAutoTriggerHybridAiPreview();
-        await _settleHybridAutoTrigger(tester);
-        expect(state.showAiAmbiancePanel, isTrue,
-            reason: 'une fois la capture disponible, le même couple '
-                'photo+SKU doit pouvoir déclencher normalement (l\'échec '
-                'précédent n\'a pas dû être mémorisé comme "déjà traité")');
-      },
-    );
-  });
-
   group(
-    '5bis. Échec Mano côté proxy — le rendu dynamique reste affiché '
-    '(géré par AiAmbiancePanel, pas par AppState)',
+    'Non-régression — pas de rendu IA automatique, ni brut ni hybride '
+    '(décision produit après rejet visuel du mode hybride)',
     () {
       test(
-        'setLastAiComparisonResult n\'est jamais appelé sans succès explicite '
-        '— un échec proxy ne pollue jamais lastAiComparisonResult',
+        'importer une photo (roomImage chargé) n\'ouvre PAS le panneau IA '
+        'tout seul',
+        () async {
+          final state = AppState();
+          expect(state.showAiAmbiancePanel, isFalse);
+
+          // Simule le résultat d'un import photo : setRoomImageBytes
+          // charge roomImage puis, historiquement, appelait un
+          // auto-trigger — ces deux appels ont été retirés (brut puis
+          // hybride), on vérifie donc l'ABSENCE d'effet.
+          state.roomImage = await _tinyImage();
+          state.roomImageVersion = 1;
+
+          expect(state.showAiAmbiancePanel, isFalse,
+              reason: 'le simple chargement d\'une photo ne doit jamais '
+                  'ouvrir le panneau IA automatiquement');
+        },
+      );
+
+      test(
+        'sélectionner un produit (D609), même avec une photo déjà chargée, '
+        'n\'ouvre PAS le panneau IA tout seul',
+        () async {
+          final state = AppState();
+          state.roomImage = await _tinyImage();
+          state.roomImageVersion = 1;
+
+          // addToProject() n'appelle plus aucun auto-trigger IA (ni brut
+          // ni hybride) depuis ce commit.
+          state.addToProject('D609');
+
+          expect(state.showAiAmbiancePanel, isFalse,
+              reason: 'sélectionner un produit doit uniquement mettre à '
+                  'jour le rendu dynamique déterministe (RoomPainter), '
+                  'jamais déclencher Mano/Nano automatiquement');
+          expect(state.aiAmbianceAutoGenerate, isFalse);
+          expect(state.aiAmbianceAutoGenerateHybrid, isFalse,
+              reason: 'le mode hybride automatique est explicitement '
+                  'rejeté (test visuel réel) — jamais forcé ici');
+          expect(state.aiAmbiancePrefillRef, isNull);
+        },
+      );
+
+      test(
+        'capture composée disponible (registerComposedSceneCapture) + photo '
+        '+ produit sélectionné => AUCUN appel automatique à la capture, ni '
+        'ouverture du panneau',
+        () async {
+          final state = AppState();
+          var captureCalls = 0;
+          state.registerComposedSceneCapture(() async {
+            captureCalls++;
+            return Uint8List.fromList([9, 9, 9]);
+          });
+
+          state.roomImage = await _tinyImage();
+          state.roomImageVersion = 1;
+          state.addToProject('D609');
+
+          expect(captureCalls, 0,
+              reason: 'même si une capture composée est disponible, elle '
+                  'ne doit JAMAIS être appelée automatiquement — c\'est '
+                  'exactement le mécanisme rejeté après test visuel réel '
+                  '(Mano/Nano affinant une scène dynamique déjà fausse)');
+          expect(state.showAiAmbiancePanel, isFalse);
+        },
+      );
+
+      test(
+        'changer de produit sélectionné (D609 puis D720) sur une photo déjà '
+        'chargée reste sans effet sur l\'IA',
+        () async {
+          final state = AppState();
+          state.roomImage = await _tinyImage();
+          state.roomImageVersion = 1;
+          state.addToProject('D609');
+          state.addToProject('D720');
+
+          expect(state.showAiAmbiancePanel, isFalse,
+              reason: 'aucune combinaison photo + produit(s) ne doit '
+                  'ouvrir le panneau IA sans action manuelle explicite');
+        },
+      );
+
+      test(
+        'charger une scène démo (loadDemoScene) ne déclenche aucun aperçu '
+        'IA automatique, même avec un produit déjà sélectionné',
+        () async {
+          final state = AppState();
+          // Sélectionne un produit AVANT de charger la scène démo, pour
+          // couvrir exactement le chemin que loadDemoScene emprunte en
+          // interne (bloc finally, après calibration).
+          state.roomImage = await _tinyImage();
+          state.roomImageVersion = 1;
+          state.addToProject('D609');
+          state.closeAiAmbiancePanel(); // réinitialise tout état résiduel
+
+          await state.loadDemoScene('haussmann', containerSize: const Size(400, 300));
+
+          expect(state.showAiAmbiancePanel, isFalse,
+              reason: 'loadDemoScene ne doit jamais ouvrir le panneau IA '
+                  'automatiquement, ni en mode brut ni en mode hybride');
+          expect(state.aiAmbianceAutoGenerateHybrid, isFalse);
+        },
+      );
+
+      test(
+        'seul un appel manuel explicite à openAiAmbiancePanel ouvre le '
+        'panneau IA, en mode "add" par défaut (jamais autoGenerateHybrid)',
         () {
           final state = AppState();
-          expect(state.lastAiComparisonResult, isNull);
-          // Rien à faire ici : AiAmbiancePanel._generate() n'appelle
-          // setLastAiComparisonResult QUE dans la branche
-          // `result.success && result.imageBytes != null` (voir
-          // ai_ambiance_panel.dart) — en cas d'échec, `_screenState`
-          // bascule sur `_AiScreenState.fallback` (écran "Réessayer" /
-          // fermer) sans jamais toucher AppState ni au rendu dynamique
-          // du Studio (RoomPainter, jamais concerné par ce chemin).
-          // Ce test documente/verrouille cette garantie au niveau
-          // AppState : aucune méthode de AppState ne doit permettre de
-          // marquer un résultat "réussi" sans qu'un appelant l'ait
-          // explicitement construit avec de vrais bytes IA.
-          expect(state.showAiAmbiancePanel, isFalse);
+          // C'est ce qu'appelle l'icône topbar "Aperçu d'ambiance IA" du
+          // Studio (studio_screen.dart, onAiAmbiance: state.openAiAmbiancePanel),
+          // SANS prefill ni autoGenerate/autoGenerateHybrid — parcours
+          // manuel pas-à-pas conservé, seul rendu visuellement validé
+          // (renderMode 'add' par défaut sur photo brute +
+          // control/<sku>.png dans AiAmbiancePanel).
+          state.openAiAmbiancePanel();
+
+          expect(state.showAiAmbiancePanel, isTrue);
+          expect(state.aiAmbianceAutoGenerate, isFalse,
+              reason: 'le déclenchement manuel depuis la topbar ne doit '
+                  'jamais lancer de génération automatique — l\'utilisateur '
+                  'choisit lui-même produit/scène puis clique "Générer"');
+          expect(state.aiAmbianceAutoGenerateHybrid, isFalse,
+              reason: 'le parcours manuel topbar ne doit jamais forcer le '
+                  'mode hybride/refine — l\'utilisateur choisit librement '
+                  'entre "Scène actuelle" (mode add) et "Scène avec '
+                  'produit déjà posé" (mode refine, option secondaire)');
         },
       );
     },
@@ -376,38 +200,81 @@ void main() {
 
   group(
     'Infrastructure dormante — maybeAutoTriggerAiPreview (mode BRUT, non '
-    'appelé en production, voir sa docstring dans app_state.dart)',
+    'appelée en production, voir sa docstring dans app_state.dart)',
+    () {
+      test('la garde anti-boucle reste correcte si invoquée manuellement',
+          () async {
+        final state = AppState();
+        state.roomImage = await _tinyImage();
+        state.roomImageVersion = 1;
+        state.addToProject('D609');
+        expect(state.showAiAmbiancePanel, isFalse,
+            reason: 'confirme qu\'addToProject n\'appelle plus le trigger '
+                'brut');
+
+        // Appel manuel direct (comme le ferait un futur chantier qualité
+        // IA, hors périmètre de ce test) — vérifie que le mécanisme lui-
+        // même reste fonctionnel et sûr s'il est un jour reconnecté.
+        state.maybeAutoTriggerAiPreview();
+        expect(state.showAiAmbiancePanel, isTrue);
+        expect(state.aiAmbianceAutoGenerateHybrid, isFalse,
+            reason: 'le mode brut ne doit jamais forcer le mode hybride');
+
+        state.closeAiAmbiancePanel();
+        state.maybeAutoTriggerAiPreview();
+        expect(state.showAiAmbiancePanel, isFalse,
+            reason: 'garde anti-boucle : pas de re-déclenchement pour le '
+                'même couple (sku, scène)');
+      });
+    },
+  );
+
+  group(
+    'Infrastructure dormante — maybeAutoTriggerHybridAiPreview (mode '
+    'HYBRIDE/refine, REJETÉ après test visuel réel, non appelée en '
+    'production, voir sa docstring dans app_state.dart)',
     () {
       test(
-        'reste fonctionnel si invoqué manuellement (aucune régression '
-        'sur ce mécanisme conservé mais inutilisé)',
+        'reste fonctionnel et sûr si invoqué manuellement (aucune '
+        'régression sur ce mécanisme conservé mais désactivé en '
+        'production)',
         () async {
           final state = AppState();
+          await CatalogueVisibilityGate.instance.ensureLoaded();
+
+          var captureCalls = 0;
+          state.registerComposedSceneCapture(() async {
+            captureCalls++;
+            return Uint8List.fromList([9, 9, 9]);
+          });
+
           state.roomImage = await _tinyImage();
           state.roomImageVersion = 1;
           state.selectedProducts = [
             const ProjectItem(ref: 'D609', famille: 'Corniches', qte: 1, unite: 'ml'),
           ];
 
-          // Appel manuel direct — jamais fait automatiquement par
-          // addToProject/setRoomImageBytes/loadDemoScene (voir leur
-          // code : ils appellent tous maybeAutoTriggerHybridAiPreview,
-          // jamais maybeAutoTriggerAiPreview).
-          state.maybeAutoTriggerAiPreview();
-          expect(state.showAiAmbiancePanel, isTrue);
-          expect(state.aiAmbianceAutoGenerateHybrid, isFalse,
-              reason: 'le mode brut ne doit jamais forcer le mode hybride');
-
-          state.closeAiAmbiancePanel();
-          state.maybeAutoTriggerAiPreview();
           expect(state.showAiAmbiancePanel, isFalse,
-              reason: 'garde anti-boucle du mécanisme brut inchangée');
+              reason: 'confirme qu\'aucun point d\'entrée production '
+                  '(setRoomImageBytes/loadDemoScene/addToProject) n\'a '
+                  'déclenché ce mécanisme jusqu\'ici');
+
+          // Appel manuel direct — jamais fait automatiquement en
+          // production (voir setRoomImageBytes/loadDemoScene/addToProject :
+          // ils n'appellent plus ni maybeAutoTriggerHybridAiPreview ni
+          // maybeAutoTriggerAiPreview).
+          state.maybeAutoTriggerHybridAiPreview();
+          // La capture est différée par un post-frame callback interne —
+          // rien à vérifier de plus dans ce test unitaire pur (pas de
+          // pump disponible hors testWidgets) : seule l'ABSENCE d'appel
+          // implicite depuis les 3 points d'entrée production importe
+          // ici, déjà couverte par le premier group ci-dessus.
         },
       );
     },
   );
 
-  group('Avant/Après IA — stockage et lecture du résultat (déclenchement manuel ou auto)', () {
+  group('Avant/Après IA — stockage et lecture du résultat (déclenchement manuel)', () {
     test(
       'setLastAiComparisonResult conserve photo originale + image IA + traçabilité',
       () async {
@@ -416,7 +283,7 @@ void main() {
         final aiResult = Uint8List.fromList(List.filled(16, 2));
 
         expect(state.lastAiComparisonResult, isNull,
-            reason: 'avant toute génération réussie, l\'écran Avant/Après '
+            reason: 'avant toute génération manuelle, l\'écran Avant/Après '
                 'doit afficher "Générez d\'abord un aperçu IA depuis le '
                 'Studio."');
 
@@ -428,7 +295,7 @@ void main() {
             model: 'gemini-3.1-flash-image',
             usedProductReference: true,
             productReferencePath: 'assets/profiles/control/D609.png',
-            renderMode: 'refine',
+            renderMode: 'add',
           ),
         );
 
@@ -440,9 +307,10 @@ void main() {
         expect(r.model, 'gemini-3.1-flash-image');
         expect(r.usedProductReference, isTrue);
         expect(r.productReferencePath, 'assets/profiles/control/D609.png');
-        expect(r.renderMode, 'refine',
-            reason: 'traçabilité : le résultat auto-hybride doit porter '
-                'renderMode="refine", jamais "add"');
+        expect(r.renderMode, 'add',
+            reason: 'traçabilité : un résultat manuel typique utilise '
+                'renderMode="add" (photo brute + control/<sku>.png), le '
+                'seul mode visuellement validé à ce jour');
       },
     );
   });

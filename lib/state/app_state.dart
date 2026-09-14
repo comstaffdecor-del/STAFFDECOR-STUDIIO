@@ -294,16 +294,15 @@ class AppState extends ChangeNotifier {
     isCalibrated = false;
     notifyListeners();
     unawaited(autoDetectEdges());
-    // P22-HYBRIDE-AUTO (brief "nouvelle règle produit") — nouvelle photo
-    // chargée : si un produit est déjà sélectionné, le moteur dynamique
-    // vient de le (re)poser sur cette nouvelle photo (rendu affiché
-    // immédiatement, INCHANGÉ) ; on tente EN PLUS, automatiquement et en
-    // arrière-plan, l'amélioration de réalisme Nano/Mano sur CETTE scène
-    // déjà composée (jamais sur la photo brute — voir docstring de
-    // [maybeAutoTriggerHybridAiPreview] pour tous les garde-fous). Ne
-    // PAS confondre avec l'ancien [maybeAutoTriggerAiPreview] (mode
-    // "add" brut, resté désactivé, voir sa docstring).
-    maybeAutoTriggerHybridAiPreview();
+    // P22-HYBRIDE-AUTO — RETIRÉ après test visuel réel (décision produit,
+    // voir docstring complète de [maybeAutoTriggerHybridAiPreview]) :
+    // Mano/Nano en mode 'refine' sur une capture du rendu dynamique
+    // produit un résultat visuellement dégradé, parce qu'il affine une
+    // pose déjà fausse/imprécise au lieu de la corriger. AUCUN
+    // déclenchement automatique de l'IA ne doit avoir lieu ici — la
+    // fonction reste disponible mais n'est plus appelée nulle part en
+    // production (voir aussi [setRoomImageBytes]/[loadDemoScene]/
+    // [addToProject] pour les 2 autres points retirés).
   }
 
   /// Recalcule [imgDraw] quand la taille du conteneur change (rotation,
@@ -408,10 +407,9 @@ class AppState extends ChangeNotifier {
           unawaited(autoDetectEdges());
         }
       }
-      // P22-HYBRIDE-AUTO — même déclenchement automatique HYBRIDE que
-      // pour une photo importée (voir setRoomImageBytes ci-dessus),
-      // garde-fous et anti-boucle inclus.
-      maybeAutoTriggerHybridAiPreview();
+      // P22-HYBRIDE-AUTO — RETIRÉ (voir setRoomImageBytes ci-dessus et
+      // docstring de [maybeAutoTriggerHybridAiPreview]) : rejet visuel
+      // confirmé par test réel, aucun déclenchement automatique ici.
     }
   }
 
@@ -733,11 +731,38 @@ class AppState extends ChangeNotifier {
     openAiAmbiancePanel(prefillRef: ref, autoGenerate: true);
   }
 
-  /// P22-HYBRIDE-AUTO — brief "nouvelle règle produit" : restaure un
-  /// déclenchement AUTOMATIQUE de l'aperçu IA, mais UNIQUEMENT en mode
-  /// hybride/refine (jamais le mode "add" brut retiré ci-dessus).
+  /// P22-HYBRIDE-AUTO (INFRASTRUCTURE DORMANTE — REJETÉE après test
+  /// visuel réel, voir décision produit ci-dessous).
   ///
-  /// Flow attendu :
+  /// ⚠️ DÉCISION PRODUIT (mise à jour, brief "validation : le mode
+  /// hybride auto est rejeté") : ce mécanisme avait été implémenté puis
+  /// reconnecté à [setRoomImageBytes]/[loadDemoScene]/[addToProject]
+  /// (brief "nouvelle règle produit" précédent), mais un test visuel
+  /// réel a montré que Mano/Nano en mode 'refine' sur une capture du
+  /// rendu dynamique produit un MAUVAIS RENDU : l'IA affine (améliore le
+  /// réalisme de) une scène déjà composée qui peut être géométriquement
+  /// imprécise, ce qui AGGRAVE le défaut au lieu de le corriger — pire
+  /// visuellement que le rendu dynamique déterministe seul. Les 3 appels
+  /// automatiques ont donc été RETIRÉS (voir commentaires dans
+  /// [setRoomImageBytes], [loadDemoScene], [addToProject]).
+  ///
+  /// La fonction reste ici, INCHANGÉE et non appelée nulle part dans
+  /// lib/ (sauf tests de non-régression), exactement comme
+  /// [maybeAutoTriggerAiPreview] (mode brut, déjà dormant) — ne PAS la
+  /// réappeler en production sans une nouvelle validation visuelle
+  /// explicite. Mano/Nano reste disponible en mode MANUEL via l'icône
+  /// topbar "Aperçu d'ambiance IA" ([openAiAmbiancePanel] sans
+  /// `autoGenerateHybrid`), avec `renderMode: 'add'` par défaut sur
+  /// photo brute + `control/<sku>.png` — c'est le SEUL rendu visuellement
+  /// validé à ce jour. Le mode 'refine'/hybride reste accessible comme
+  /// option secondaire dans le panneau ("Scène avec produit déjà posé"),
+  /// jamais automatique.
+  ///
+  /// Documentation du mécanisme conservée ci-dessous pour mémoire (flow
+  /// et garde-fous qui restent corrects si ce chantier est un jour
+  /// rouvert avec un moteur dynamique plus précis) :
+  ///
+  /// Flow attendu (NON appliqué en production) :
   ///   1. l'utilisateur importe une photo ;
   ///   2. l'utilisateur choisit un produit (SKU whitelisté) ;
   ///   3. le moteur dynamique déterministe (RoomPainter/
@@ -1043,11 +1068,9 @@ class AppState extends ChangeNotifier {
     );
     notifyListeners();
     save();
-    // P22-HYBRIDE-AUTO — nouveau produit sélectionné : même
-    // déclenchement automatique HYBRIDE que ci-dessus (voir
-    // setRoomImageBytes), déclenché seulement si une photo/scène est
-    // déjà chargée (garde dans maybeAutoTriggerHybridAiPreview).
-    maybeAutoTriggerHybridAiPreview();
+    // P22-HYBRIDE-AUTO — RETIRÉ (voir setRoomImageBytes ci-dessus et
+    // docstring de [maybeAutoTriggerHybridAiPreview]) : rejet visuel
+    // confirmé par test réel, aucun déclenchement automatique ici.
   }
 
   /// Quantité nette pour une famille, avec repli sur une estimation
