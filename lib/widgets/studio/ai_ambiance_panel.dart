@@ -32,6 +32,35 @@ import 'common_modal.dart';
 
 enum _AiScreenState { pickProduct, pickScene, ready, generating, result, fallback }
 
+/// Point d'injection UNIQUEMENT pour les tests (voir
+/// `test/widget/ai_ambiance_panel_render_mode_test.dart`) — permet
+/// d'observer/remplacer l'appel réseau réel de [generateAiAmbiancePreview]
+/// (ex: vérifier le `renderMode` réellement envoyé selon la scène choisie
+/// dans l'UI, sans jamais toucher le vrai réseau/proxy/Gemini). `null`
+/// par défaut : le comportement de PRODUCTION appelle toujours la vraie
+/// fonction réseau — ce hook ne change RIEN pour un utilisateur réel.
+@visibleForTesting
+Future<AiPreviewResult> Function({
+  required Uint8List sceneImageBytes,
+  required String ref,
+  required String nom,
+  required String famille,
+  required String renderMode,
+})? debugGenerateAiAmbiancePreviewOverride;
+
+/// P21-HYBRIDE (correction revue, brief "sécurisation test hybride") —
+/// fonction PURE extraite pour rendre la règle de résolution du
+/// `renderMode` testable unitairement, sans passer par un test widget
+/// lourd (pompes `pumpAndSettle` autour d'un appel réseau simulé,
+/// instable et lent). Règle inchangée : 'refine' uniquement quand la
+/// scène provient de [_useComposedScene] (rendu dynamique déjà
+/// composé) ; 'add' dans tous les autres cas (comportement historique
+/// : photo brute, scène démo, import direct).
+@visibleForTesting
+String resolveRenderModeForScene({required bool isHybridScene}) {
+  return isHybridScene ? 'refine' : 'add';
+}
+
 const _demoScenesForAi = {
   'haussmann': 'Haussmannien',
   'moderne': 'Contemporain',
@@ -54,7 +83,22 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
   String? _selectedRef;
   Uint8List? _sceneBytes;
   String? _sceneLabel;
+  // P21-HYBRIDE — vrai uniquement quand [_sceneBytes] provient de
+  // [_useComposedScene] (capture RepaintBoundary du rendu déjà composé
+  // par le moteur dynamique, corniche déjà placée géométriquement) —
+  // pilote le `renderMode` envoyé au proxy dans [_generate] : 'refine'
+  // au lieu de 'add'. Remis à false par toute autre sélection de scène
+  // (_useCurrentScene / _uploadScene / _useDemoScene / _reset).
+  bool _isHybridScene = false;
   Uint8List? _resultBytes;
+  // P21-HYBRIDE (correction revue) — mode RÉELLEMENT appliqué par le
+  // SERVEUR pour la dernière génération réussie (`result.renderMode`,
+  // lu tel quel depuis la réponse JSON du proxy). C'EST cette valeur,
+  // et non [_isHybridScene] (qui n'est qu'une intention côté client,
+  // envoyée AVANT l'appel), qui pilote l'affichage du badge dans
+  // [_buildResult] — jamais ce qu'on CROIT avoir demandé, toujours ce
+  // qui a VRAIMENT tourné côté serveur.
+  String? _resultRenderMode;
   // true si _resultBytes provient du mock local (dart:ui, sans réseau),
   // false si une vraie génération via le proxy manobanana a produit le
   // résultat. Distinction OBLIGATOIRE pour ne jamais faire passer un mock
@@ -71,6 +115,56 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     if (kPresentationFilter) {
       CatalogueVisibilityGate.instance.ensureLoaded().then((_) {
         if (mounted) setState(() {});
+      });
+    }
+    // Court-circuit "Générer aperçu IA" (bouton contextuel Studio) — le
+    // produit ET la scène sont déjà connus au moment où ce panneau est
+    // ouvert depuis la zone photo (photo importée + SKU sélectionné) :
+    // on saute directement les écrans "choix produit"/"choix scène" et,
+    // si demandé, on lance la génération réelle (proxy Gemini) sans
+    // action supplémentaire de l'utilisateur. N'affecte JAMAIS l'entrée
+    // générique depuis l'icône topbar (prefillRef == null dans ce cas).
+    final state = context.read<AppState>();
+    final prefillRef = state.aiAmbiancePrefillRef;
+    final autoGenerate = state.aiAmbianceAutoGenerate;
+    // P22-HYBRIDE-AUTO (brief "nouvelle règle produit") — ce panneau
+    // peut être ouvert AUTOMATIQUEMENT par
+    // [AppState.maybeAutoTriggerHybridAiPreview] (via
+    // `state.openAiAmbiancePanel(..., autoGenerateHybrid: true)`,
+    // affiché par `studio_screen.dart` exactement comme une ouverture
+    // manuelle) : dans ce cas précis, la scène à utiliser n'est PAS la
+    // photo brute courante ([_useCurrentScene]) mais la scène DÉJÀ
+    // COMPOSÉE par le moteur dynamique, pré-capturée par AppState au
+    // moment du déclenchement ([consumePendingHybridAutoScene]) —
+    // jamais recapturée ici, pour utiliser exactement le même
+    // instantané que celui qui a servi à décider la clé anti-boucle.
+    final autoGenerateHybrid = state.aiAmbianceAutoGenerateHybrid;
+    if (prefillRef != null) {
+      _selectedRef = prefillRef;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        if (autoGenerateHybrid) {
+          final composedBytes = state.consumePendingHybridAutoScene();
+          if (composedBytes == null) {
+            // Capture indisponible entre-temps (Studio démonté, etc.) —
+            // jamais de génération sur une scène absente/périmée.
+            return;
+          }
+          setState(() {
+            _sceneBytes = composedBytes;
+            _sceneLabel = 'Scène avec produit déjà posé (rendu dynamique)';
+            _isHybridScene = true;
+            _screenState = _AiScreenState.ready;
+          });
+          if (!mounted) return;
+          await _generate();
+          return;
+        }
+        await _useCurrentScene();
+        if (!mounted) return;
+        if (autoGenerate && _sceneBytes != null) {
+          await _generate();
+        }
       });
     }
   }
@@ -103,11 +197,43 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
       setState(() {
         _sceneBytes = byteData.buffer.asUint8List();
         _sceneLabel = 'Scène actuelle du Studio';
+        _isHybridScene = false;
         _screenState = _AiScreenState.ready;
       });
     } catch (_) {
       _showNoSceneMessage();
     }
+  }
+
+  /// P21-HYBRIDE — capture la scène TELLE QU'AFFICHÉE dans le Studio,
+  /// c'est-à-dire déjà composée par le moteur dynamique déterministe
+  /// (RoomPainter/cornice_plinth_painter) : la corniche sélectionnée y
+  /// est déjà placée géométriquement (bonne ligne plafond/mur, bonne
+  /// perspective, bon positionnement), contrairement à [_useCurrentScene]
+  /// qui ré-encode la photo BRUTE (sans produit). Utilise
+  /// [AppState.captureComposedScene] (RepaintBoundary posé dans
+  /// `studio_screen.dart`, jamais une réimplémentation du rendu ici).
+  /// En cas d'échec de capture (Studio jamais construit, etc.), retombe
+  /// explicitement sur le message d'absence de scène — jamais un
+  /// silence qui laisserait l'utilisateur bloqué sur l'écran précédent.
+  Future<void> _useComposedScene() async {
+    final state = context.read<AppState>();
+    if (state.roomImage == null || state.selectedProducts.isEmpty) {
+      _showNoSceneMessage();
+      return;
+    }
+    final bytes = await state.captureComposedScene();
+    if (!mounted) return;
+    if (bytes == null) {
+      _showNoSceneMessage();
+      return;
+    }
+    setState(() {
+      _sceneBytes = bytes;
+      _sceneLabel = 'Scène avec produit déjà posé (rendu dynamique)';
+      _isHybridScene = true;
+      _screenState = _AiScreenState.ready;
+    });
   }
 
   Future<void> _useDemoScene(String key, String label) async {
@@ -116,6 +242,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
       setState(() {
         _sceneBytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
         _sceneLabel = 'Scène démo — $label';
+        _isHybridScene = false;
         _screenState = _AiScreenState.ready;
       });
     } catch (_) {
@@ -132,6 +259,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
       setState(() {
         _sceneBytes = bytes;
         _sceneLabel = 'Photo importée';
+        _isHybridScene = false;
         _screenState = _AiScreenState.ready;
       });
     } catch (_) {
@@ -163,25 +291,77 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     final prod = getProdByRef(ref);
 
     setState(() => _screenState = _AiScreenState.generating);
+    // P20-AUTO : marque une génération en cours au niveau AppState —
+    // c'est CETTE garde (et non un état local au panneau, détruit à la
+    // fermeture) que consulte maybeAutoTriggerAiPreview pour ne jamais
+    // superposer deux générations pour la même scène/produit.
+    final appState = context.read<AppState>();
+    appState.setAiAmbianceGenerating(true);
 
-    final result = await generateAiAmbiancePreview(
-      sceneImageBytes: scene,
-      ref: ref,
-      nom: prod?.nom ?? ref,
-      famille: prod?.famille ?? '',
-    );
+    // P21-HYBRIDE — voir docstring de [resolveRenderModeForScene]
+    // (fonction pure, testée unitairement dans
+    // test/widget/ai_ambiance_panel_render_mode_test.dart).
+    final renderMode = resolveRenderModeForScene(isHybridScene: _isHybridScene);
+
+    final AiPreviewResult result;
+    try {
+      // debugGenerateAiAmbiancePreviewOverride reste null en production
+      // (voir docstring) — seul un test peut le renseigner.
+      final override = debugGenerateAiAmbiancePreviewOverride;
+      result = override != null
+          ? await override(
+              sceneImageBytes: scene,
+              ref: ref,
+              nom: prod?.nom ?? ref,
+              famille: prod?.famille ?? '',
+              renderMode: renderMode,
+            )
+          : await generateAiAmbiancePreview(
+              sceneImageBytes: scene,
+              ref: ref,
+              nom: prod?.nom ?? ref,
+              famille: prod?.famille ?? '',
+              renderMode: renderMode,
+            );
+    } finally {
+      appState.setAiAmbianceGenerating(false);
+    }
 
     if (!mounted) return;
     setState(() {
       if (result.success && result.imageBytes != null) {
         _resultBytes = result.imageBytes;
         _resultIsMock = false;
+        // P21-HYBRIDE (correction revue) — traçabilité RÉELLE : ce que
+        // le serveur a effectivement appliqué (result.renderMode),
+        // jamais [_isHybridScene] qui n'est que l'intention envoyée
+        // avant l'appel réseau.
+        _resultRenderMode = result.renderMode;
         _screenState = _AiScreenState.result;
       } else {
         _lastErrorMessage = result.errorMessage ?? kAiPreviewErrorGenerationFailed;
         _screenState = _AiScreenState.fallback;
       }
     });
+
+    // Stocke le résultat réussi dans AppState (jamais pour le mock local,
+    // voir _generateLocalMock) pour que l'écran Avant/Après (Comparateur)
+    // puisse afficher photo originale vs image IA sans relancer Gemini.
+    // `scene` est la MÊME photo/scène qui vient d'être envoyée au proxy
+    // ci-dessus — c'est bien le "AVANT" correspondant à ce "APRÈS".
+    if (result.success && result.imageBytes != null) {
+      appState.setLastAiComparisonResult(
+        AiComparisonResult(
+          originalImageBytes: scene,
+          aiImageBytes: result.imageBytes!,
+          sku: ref,
+          model: result.model,
+          usedProductReference: result.usedProductReference,
+          productReferencePath: result.productReferencePath,
+          renderMode: result.renderMode,
+        ),
+      );
+    }
   }
 
   /// Effet local de démo (dart:ui, AUCUN appel réseau) — proposé quand la
@@ -226,8 +406,10 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
       _selectedRef = null;
       _sceneBytes = null;
       _sceneLabel = null;
+      _isHybridScene = false;
       _resultBytes = null;
       _resultIsMock = false;
+      _resultRenderMode = null;
       _screenState = _AiScreenState.pickProduct;
     });
   }
@@ -406,6 +588,32 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        // P21-HYBRIDE — nouvelle option : au lieu d'envoyer la photo
+        // BRUTE (l'IA doit alors deviner seule position/échelle/ligne de
+        // la corniche, source d'incohérences visuelles), on envoie la
+        // scène DÉJÀ COMPOSÉE par le moteur dynamique (corniche déjà
+        // placée géométriquement). L'IA n'a plus qu'à en améliorer le
+        // réalisme (voir renderMode='refine' dans [_generate]).
+        // Grisée si aucune photo/produit n'est encore chargé dans le
+        // Studio — jamais un bouton mort sans explication.
+        SizedBox(
+          width: double.infinity,
+          child: BtnOutline(
+            label: 'Scène avec produit déjà posé (rendu dynamique)',
+            icon: FontAwesomeIcons.layerGroup,
+            onTap: (state.roomImage != null && state.selectedProducts.isNotEmpty)
+                ? _useComposedScene
+                : null,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Recommandé : le moteur dynamique place la corniche, l\'IA '
+          'améliore uniquement le réalisme (matière, ombres, lumière) — '
+          'sans en changer la position.',
+          style: TextStyle(color: AppColors.text3, fontSize: 10.5),
+        ),
         const SizedBox(height: 10),
         const Text('ou une scène démo :', style: TextStyle(color: AppColors.text3, fontSize: 11)),
         const SizedBox(height: 8),
@@ -581,6 +789,39 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // P21-HYBRIDE (correction revue) — badge de traçabilité basé
+        // EXCLUSIVEMENT sur [_resultRenderMode] (= result.renderMode,
+        // ce que le SERVEUR a réellement appliqué), jamais sur
+        // [_isHybridScene] (l'intention côté client avant l'appel) —
+        // sinon le badge pourrait afficher "HYBRIDE" alors même que le
+        // serveur aurait silencieusement retombé sur 'add' (valeur
+        // invalide/absente). Jamais affiché pour le mock local, qui
+        // n'appelle jamais le proxy et n'a donc aucun renderMode réel.
+        if (!isMock)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.gold.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  _resultRenderMode == 'refine'
+                      ? 'MODE HYBRIDE — réalisme sur corniche déjà posée'
+                      : 'MODE STANDARD — corniche ajoutée depuis photo brute',
+                  style: const TextStyle(
+                    color: AppColors.gold,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (isMock)
           Container(
             margin: const EdgeInsets.only(bottom: 8),

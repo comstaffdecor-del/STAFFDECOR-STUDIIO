@@ -3,7 +3,11 @@
 /// perspective disjoints de l'ancienne version (Bug #5).
 library;
 
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -53,9 +57,111 @@ class StudioScreen extends StatefulWidget {
 class _StudioScreenState extends State<StudioScreen> {
   final _picker = ImagePicker();
 
+  // P21-HYBRIDE — clé de capture de la zone photo TELLE QU'AFFICHÉE
+  // (photo + corniche déjà placée par RoomPainter), enregistrée dans
+  // AppState (voir [AppState.registerComposedSceneCapture]) pour que
+  // AiAmbiancePanel puisse récupérer cette image composée SANS jamais
+  // toucher au moteur de rendu lui-même — même pattern RepaintBoundary
+  // + toImage() déjà utilisé par comparateur_screen.dart pour le
+  // téléchargement Avant/Après.
+  final GlobalKey _photoZoneCaptureKey = GlobalKey();
+
+  // ⚠️ CORRECTION revue (sécurisation dispose) — context.read<AppState>()
+  // directement dans dispose() reposait sur le fait que l'InheritedWidget
+  // Provider soit toujours résolvable à ce moment précis du cycle de vie
+  // (vrai en pratique ici, mais fragile par principe : dispose() peut être
+  // appelé après que l'arbre ait déjà commencé à se démonter). On capture
+  // donc la référence AppState dans [didChangeDependencies] (seul point du
+  // cycle de vie où context.read est garanti sûr ET rejoué à chaque
+  // changement d'ancêtre Provider), et dispose() n'utilise plus JAMAIS
+  // context — seulement ce champ déjà résolu.
+  late AppState _appState;
+
+  // P21-HYBRIDE (correction revue) — dernier [ImgDraw] connu, mémorisé à
+  // CHAQUE build du LayoutBuilder ci-dessous (voir `localImgDraw` plus
+  // bas) : c'est le rectangle EXACT (dx, dy, dw, dh, en pixels LOGIQUES
+  // de la zone photo) où l'image de la pièce est réellement dessinée en
+  // mode "contain" — le reste de la zone (bandes de letterboxing) ne
+  // doit JAMAIS être envoyé à Gemini. Simple affectation de champ, pas
+  // un setState : aucun risque de rebuild pendant build().
+  ImgDraw? _lastImgDraw;
+
+  // Même pixelRatio utilisé pour `boundary.toImage(...)` ci-dessous ET
+  // pour la conversion `imgDraw.dx/dy/dw/dh` (pixels logiques) en
+  // coordonnées PHYSIQUES de crop — doit rester la même constante aux
+  // deux endroits, sinon le rectangle recadré serait faux.
+  static const double _capturePixelRatio = 2.0;
+
+  /// Capture la zone photo TELLE QU'AFFICHÉE (RepaintBoundary posé
+  /// directement autour du CustomPaint/RoomPainter, voir [_PhotoZone]),
+  /// PUIS recadre strictement sur le rectangle image réel [_lastImgDraw]
+  /// (en coordonnées physiques = pixels logiques × [_capturePixelRatio])
+  /// pour ne jamais envoyer à Gemini les bandes de letterboxing autour
+  /// de la photo. L'alpha est aplati sur un fond blanc opaque (jamais de
+  /// transparence dans l'image envoyée au proxy).
+  Future<Uint8List?> _captureComposedScene() async {
+    final imgDraw = _lastImgDraw;
+    if (imgDraw == null) return null; // pas de photo/scène chargée
+    ui.Image? captured;
+    ui.Image? cropped;
+    try {
+      final boundary = _photoZoneCaptureKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      captured = await boundary.toImage(pixelRatio: _capturePixelRatio);
+
+      // Rectangle réel de l'image (hors letterboxing), en pixels
+      // PHYSIQUES — voir docstring ci-dessus.
+      final cropX = imgDraw.dx * _capturePixelRatio;
+      final cropY = imgDraw.dy * _capturePixelRatio;
+      final cropW = imgDraw.dw * _capturePixelRatio;
+      final cropH = imgDraw.dh * _capturePixelRatio;
+
+      // Clamp défensif : ne jamais dépasser les bornes de l'image
+      // capturée (arrondis flottants, cas limites de layout).
+      final maxW = captured.width.toDouble();
+      final maxH = captured.height.toDouble();
+      final safeX = cropX.clamp(0.0, maxW);
+      final safeY = cropY.clamp(0.0, maxH);
+      final safeW = cropW.clamp(1.0, maxW - safeX);
+      final safeH = cropH.clamp(1.0, maxH - safeY);
+      if (safeW <= 0 || safeH <= 0) return null;
+
+      final srcRect = Rect.fromLTWH(safeX, safeY, safeW, safeH);
+      final dstRect = Rect.fromLTWH(0, 0, safeW, safeH);
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder, dstRect);
+      // Aplatit l'alpha sur un fond BLANC opaque avant de dessiner le
+      // recadrage — jamais de transparence envoyée au proxy (une bande
+      // transparente serait interprétée de façon imprévisible par
+      // Gemini, contrairement à un fond neutre).
+      canvas.drawRect(dstRect, Paint()..color = const Color(0xFFFFFFFF));
+      canvas.drawImageRect(captured, srcRect, dstRect, Paint());
+      final picture = recorder.endRecording();
+      cropped = await picture.toImage(safeW.round(), safeH.round());
+
+      final byteData = await cropped.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return null;
+      return byteData.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    } finally {
+      captured?.dispose();
+      cropped?.dispose();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    // Enregistre le capteur dès le premier frame — désenregistré dans
+    // dispose() pour ne jamais laisser un callback pointant vers un
+    // widget démonté (voir AppState.registerComposedSceneCapture).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AppState>().registerComposedSceneCapture(_captureComposedScene);
+    });
     // ⚠️ CORRECTION P15-PRES-BIS — un utilisateur qui navigue directement
     // vers Studio SANS jamais visiter Catalogue au préalable ne
     // déclenchait jamais le chargement de assets/profiles/index.json
@@ -69,6 +175,24 @@ class _StudioScreenState extends State<StudioScreen> {
         if (mounted) setState(() {});
       });
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Capture la référence AppState ICI (pas dans dispose()) — voir
+    // commentaire sur le champ [_appState] ci-dessus.
+    _appState = context.read<AppState>();
+  }
+
+  @override
+  void dispose() {
+    // ⚠️ Désenregistre le capteur pour ne jamais laisser AppState
+    // pointer vers un widget démonté (voir registerComposedSceneCapture).
+    // Utilise [_appState] (résolu dans didChangeDependencies), jamais
+    // context.read(...) directement dans dispose().
+    _appState.registerComposedSceneCapture(null);
+    super.dispose();
   }
 
   Future<void> _importPhoto() async {
@@ -136,6 +260,13 @@ class _StudioScreenState extends State<StudioScreen> {
                           photoZoneSize.width,
                           photoZoneSize.height,
                         );
+                  // P21-HYBRIDE (correction revue) — mémorise le
+                  // rectangle image réel courant pour que
+                  // _captureComposedScene() puisse cropper exactement
+                  // sur lui (jamais les bandes de letterboxing autour).
+                  // Simple affectation de champ (pas setState) : safe à
+                  // exécuter pendant build().
+                  _lastImgDraw = localImgDraw;
                   // Mémorise la taille de la zone photo pour que le
                   // chargement des scènes démo (loadDemoScene) puisse
                   // calculer un imgDraw correct même si l'utilisateur
@@ -167,6 +298,7 @@ class _StudioScreenState extends State<StudioScreen> {
                           localImgDraw: localImgDraw,
                           onImport: _importPhoto,
                           onDemo: _useDemoRoom,
+                          captureKey: _photoZoneCaptureKey,
                         ),
                       ),
                       const Expanded(child: CatBar()),
@@ -326,11 +458,19 @@ class _PhotoZone extends StatelessWidget {
   final ImgDraw? localImgDraw;
   final VoidCallback onImport;
   final VoidCallback onDemo;
+  // P21-HYBRIDE — clé RepaintBoundary posée directement autour du
+  // CustomPaint (RoomPainter), AVANT la transformation InteractiveViewer
+  // (zoom/pan utilisateur) et AVANT les overlays UI (badges, vignette
+  // motif, sélecteur scène démo) — la capture reflète donc exactement
+  // le rendu du moteur dynamique déterministe, jamais le zoom courant
+  // ni les éléments d'interface superposés.
+  final GlobalKey captureKey;
   const _PhotoZone({
     required this.size,
     required this.localImgDraw,
     required this.onImport,
     required this.onDemo,
+    required this.captureKey,
   });
 
   @override
@@ -358,19 +498,22 @@ class _PhotoZone extends StatelessWidget {
               scaleEnabled: !state.showCalibHandles,
               minScale: 1.0,
               maxScale: 4.0,
-              child: ListenableBuilder(
-                listenable: ProductTextureCache.instance,
-                builder: (context, _) => CustomPaint(
-                  painter: RoomPainter(
-                    roomImage: state.roomImage,
-                    imgDraw: localImgDraw,
-                    calib: state.perspCalib ?? PerspCalib.defaultCalib,
-                    selectedProducts: state.selectedProducts,
-                    prodPositions: state.prodPositions,
-                    withProducts: state.showProductOverlay,
-                    metresHauteur: state.metresHauteur,
+              child: RepaintBoundary(
+                key: captureKey,
+                child: ListenableBuilder(
+                  listenable: ProductTextureCache.instance,
+                  builder: (context, _) => CustomPaint(
+                    painter: RoomPainter(
+                      roomImage: state.roomImage,
+                      imgDraw: localImgDraw,
+                      calib: state.perspCalib ?? PerspCalib.defaultCalib,
+                      selectedProducts: state.selectedProducts,
+                      prodPositions: state.prodPositions,
+                      withProducts: state.showProductOverlay,
+                      metresHauteur: state.metresHauteur,
+                    ),
+                    size: size,
                   ),
-                  size: size,
                 ),
               ),
             ),

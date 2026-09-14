@@ -63,6 +63,15 @@ server/*/node_modules/
 server/*/.env
 server/*/*.env
 
+# Issue #2 (quotas serveur proxy IA) : store local de compteurs
+# IP/jour + global/jour (server/ai_render_proxy/server.js ->
+# reserveAiQuota). Contient uniquement des hash d'IP + compteurs
+# journaliers, jamais de cle/secret, mais reste local a chaque
+# environnement (ne doit jamais etre versionne ni partage entre
+# environnements).
+server/*/.ai_quota_store.json
+server/*/.ai_quota_store.json.tmp
+
 # P17-VISUEL (verif securite point 4) : le commit auto-backup d0dfe4c a
 # embarque 308 fichiers STL (~862 Mo, assets/solids/stl/) issus d'une
 # passe P16-B non terminee/non validee -- volume significatif, aucun
