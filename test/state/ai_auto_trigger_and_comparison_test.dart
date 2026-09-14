@@ -1,24 +1,29 @@
-// Test P20-AUTO / Avant-Après IA — vérifie, SANS aucun appel réseau réel,
-// le câblage logique demandé par le brief :
+// Test de NON-RÉGRESSION — DÉCISION PRODUIT (retour utilisateur : "le
+// rendu IA automatique n'est pas acceptable visuellement — la corniche
+// est trop artificielle et pas assez professionnelle").
 //
-//   1) import photo (roomImage chargé) + sélection produit (D609)
-//      => maybeAutoTriggerAiPreview() ouvre le panneau IA en mode
-//         auto-generate, avec le bon prefillRef ;
-//   2) la garde anti-boucle empêche un second déclenchement pour le
-//      MÊME couple (sku, roomImageVersion) tant que rien ne change ;
-//   3) un changement de scène (nouvelle image) OU de produit sélectionné
-//      autorise un nouveau déclenchement ;
-//   4) après une génération IA réussie, AppState.lastAiComparisonResult
-//      contient bien {photo originale, image IA, sku, model,
-//      usedProductReference, productReferencePath} — c'est cette donnée
-//      que l'écran Avant/Après ("Aperçu IA") lit pour afficher
-//      avant/après SANS jamais relancer Gemini.
+// Historique : une passe précédente (P20-AUTO) avait câblé un
+// déclenchement AUTOMATIQUE de l'aperçu IA (Gemini/Nano Banana) dès
+// qu'une photo était importée et qu'un produit était sélectionné, sans
+// action utilisateur. Ce comportement a été explicitement RETIRÉ (voir
+// commentaires dans app_state.dart : setRoomImageBytes, loadDemoScene,
+// addToProject) car Gemini reste instable d'une génération à l'autre —
+// un rendu automatique imposé peut dégrader l'image de marque.
 //
-// Ce test ne remplace PAS la validation visuelle manuelle du parcours
-// complet sur le lien 8083 (import réel, clic Avant/Après, lecture de
-// l'image affichée à l'écran) — il prouve seulement que la logique
-// d'état (AppState) qui alimente cet écran est correctement câblée,
-// de façon reproductible et automatisée.
+// Ce fichier de test a été RÉÉCRIT pour vérifier l'inverse de ce qu'il
+// vérifiait avant : que le Studio n'ouvre JAMAIS le panneau IA tout
+// seul, quelles que soient les actions de l'utilisateur (import photo,
+// scène démo, sélection produit). Le mécanisme `maybeAutoTriggerAiPreview`
+// reste présent dans AppState (infrastructure dormante, documentée) mais
+// n'est plus appelé nulle part dans lib/ — seul un appel manuel explicite
+// (comme fait ici) peut encore l'invoquer, ce que ce test utilise
+// justement pour prouver que la garde anti-boucle reste correcte SI ce
+// chantier est un jour rouvert.
+//
+// Reste inchangé et toujours vérifié : le stockage du résultat IA dans
+// AppState pour l'écran Avant/Après (Comparateur, mode "Aperçu IA"),
+// qui continue de fonctionner pour un déclenchement MANUEL de l'IA
+// (icône topbar Studio), lui non retiré.
 library;
 
 import 'dart:typed_data';
@@ -42,113 +47,106 @@ Future<ui.Image> _tinyImage() async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('P20-AUTO — déclenchement automatique aperçu IA', () {
+  group('Non-régression — pas de rendu IA automatique (décision produit)', () {
     test(
-      'import photo + sélection produit ouvre le panneau IA en mode auto-generate',
+      'importer une photo (roomImage chargé) n\'ouvre PAS le panneau IA tout seul',
       () async {
         final state = AppState();
+        expect(state.showAiAmbiancePanel, isFalse);
+
+        // Simule le résultat d'un import photo (setRoomImageBytes charge
+        // roomImage puis, historiquement, appelait maybeAutoTriggerAiPreview
+        // — cet appel a été retiré, on vérifie donc l'ABSENCE d'effet).
         state.roomImage = await _tinyImage();
         state.roomImageVersion = 1;
 
-        expect(state.showAiAmbiancePanel, isFalse);
-
-        state.addToProject('D609');
-
-        expect(state.showAiAmbiancePanel, isTrue,
-            reason: 'la sélection produit doit ouvrir automatiquement le '
-                'panneau IA, sans action manuelle');
-        expect(state.aiAmbiancePrefillRef, 'D609');
-        expect(state.aiAmbianceAutoGenerate, isTrue,
-            reason: 'la génération doit démarrer seule, jamais via un '
-                'bouton');
-      },
-    );
-
-    test(
-      'garde anti-boucle : ne redéclenche pas pour le même couple (sku, scène)',
-      () async {
-        final state = AppState();
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion = 1;
-        state.addToProject('D609');
-        expect(state.showAiAmbiancePanel, isTrue);
-
-        // L'utilisateur ferme le panneau (ex: consulte le devis) —
-        // sans changement de photo ni de produit.
-        state.closeAiAmbiancePanel();
-        expect(state.showAiAmbiancePanel, isFalse);
-
-        // Un notifyListeners quelconque (ex: saisie de métrés) ne doit
-        // JAMAIS rouvrir le panneau IA pour ce même couple déjà généré.
-        state.maybeAutoTriggerAiPreview();
         expect(state.showAiAmbiancePanel, isFalse,
-            reason: 'aucune re-génération en boucle pour un couple '
-                '(sku, scène) déjà déclenché');
+            reason: 'le simple chargement d\'une photo ne doit jamais '
+                'ouvrir le panneau IA automatiquement');
       },
     );
 
     test(
-      'un changement de scène (nouvelle photo) autorise un nouveau déclenchement',
+      'sélectionner un produit (D609) n\'ouvre PAS le panneau IA tout seul',
+      () async {
+        final state = AppState();
+        state.roomImage = await _tinyImage();
+        state.roomImageVersion = 1;
+
+        // addToProject() n'appelle plus maybeAutoTriggerAiPreview().
+        state.addToProject('D609');
+
+        expect(state.showAiAmbiancePanel, isFalse,
+            reason: 'sélectionner un produit doit uniquement mettre à '
+                'jour le rendu dynamique déterministe (RoomPainter), '
+                'jamais déclencher Gemini automatiquement');
+        expect(state.aiAmbianceAutoGenerate, isFalse);
+        expect(state.aiAmbiancePrefillRef, isNull);
+      },
+    );
+
+    test(
+      'importer une photo PUIS sélectionner un produit reste sans effet sur l\'IA',
       () async {
         final state = AppState();
         state.roomImage = await _tinyImage();
         state.roomImageVersion = 1;
         state.addToProject('D609');
-        state.closeAiAmbiancePanel();
-
-        // Nouvelle photo importée => nouvelle version de scène.
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion = 2;
-        state.maybeAutoTriggerAiPreview();
-
-        expect(state.showAiAmbiancePanel, isTrue,
-            reason: 'un changement de photo doit relancer un aperçu IA '
-                'pour le produit déjà sélectionné');
-        expect(state.aiAmbiancePrefillRef, 'D609');
-      },
-    );
-
-    test(
-      'un changement de produit sélectionné autorise un nouveau déclenchement',
-      () async {
-        final state = AppState();
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion = 1;
-        state.addToProject('D609');
-        state.closeAiAmbiancePanel();
-
-        // Autre produit sélectionné (même scène) — la clé anti-boucle
-        // inclut le sku, donc le déclenchement doit repartir.
         state.addToProject('D720');
-        expect(state.showAiAmbiancePanel, isTrue);
-        expect(state.aiAmbiancePrefillRef, 'D720');
+
+        expect(state.showAiAmbiancePanel, isFalse,
+            reason: 'aucune combinaison photo + produit ne doit ouvrir '
+                'le panneau IA sans action manuelle explicite');
       },
     );
 
     test(
-      'aucune génération concurrente : pas de déclenchement si une génération est déjà en cours',
-      () async {
+      'seul un appel manuel explicite à openAiAmbiancePanel ouvre le panneau IA',
+      () {
         final state = AppState();
-        state.roomImage = await _tinyImage();
-        state.roomImageVersion = 1;
-        state.setAiAmbianceGenerating(true);
+        // C'est ce qu'appelle l'icône topbar "Aperçu d'ambiance IA" du
+        // Studio (studio_screen.dart, onAiAmbiance: state.openAiAmbiancePanel),
+        // SANS prefill ni autoGenerate — parcours manuel pas-à-pas conservé.
+        state.openAiAmbiancePanel();
 
-        state.addToProject('D609');
-
-        expect(state.showAiAmbiancePanel, isFalse,
-            reason: 'ne jamais superposer une génération par-dessus une '
-                'autre déjà en cours');
+        expect(state.showAiAmbiancePanel, isTrue);
+        expect(state.aiAmbianceAutoGenerate, isFalse,
+            reason: 'le déclenchement manuel depuis la topbar ne doit '
+                'jamais lancer de génération automatique — l\'utilisateur '
+                'choisit lui-même produit/scène puis clique "Générer"');
       },
     );
-
-    test('rien ne se déclenche sans photo chargée', () {
-      final state = AppState();
-      state.addToProject('D609');
-      expect(state.showAiAmbiancePanel, isFalse);
-    });
   });
 
-  group('Avant/Après IA — stockage et lecture du résultat', () {
+  group(
+    'Infrastructure dormante — maybeAutoTriggerAiPreview (non appelée en '
+    'production, conservée pour un futur chantier qualité IA validé séparément)',
+    () {
+      test('la garde anti-boucle reste correcte si invoquée manuellement',
+          () async {
+        final state = AppState();
+        state.roomImage = await _tinyImage();
+        state.roomImageVersion = 1;
+        state.addToProject('D609');
+        expect(state.showAiAmbiancePanel, isFalse,
+            reason: 'confirme qu\'addToProject n\'appelle plus le trigger');
+
+        // Appel manuel direct (comme le ferait un futur chantier qualité
+        // IA, hors périmètre de ce test) — vérifie que le mécanisme lui-
+        // même reste fonctionnel et sûr s'il est un jour reconnecté.
+        state.maybeAutoTriggerAiPreview();
+        expect(state.showAiAmbiancePanel, isTrue);
+
+        state.closeAiAmbiancePanel();
+        state.maybeAutoTriggerAiPreview();
+        expect(state.showAiAmbiancePanel, isFalse,
+            reason: 'garde anti-boucle : pas de re-déclenchement pour le '
+                'même couple (sku, scène)');
+      });
+    },
+  );
+
+  group('Avant/Après IA — stockage et lecture du résultat (déclenchement manuel)', () {
     test(
       'setLastAiComparisonResult conserve photo originale + image IA + traçabilité',
       () async {
@@ -157,9 +155,9 @@ void main() {
         final aiResult = Uint8List.fromList(List.filled(16, 2));
 
         expect(state.lastAiComparisonResult, isNull,
-            reason: 'avant toute génération, l\'écran Avant/Après doit '
-                'afficher le message "Générez d\'abord un aperçu IA '
-                'depuis le Studio."');
+            reason: 'avant toute génération manuelle, l\'écran Avant/Après '
+                'doit afficher "Générez d\'abord un aperçu IA depuis le '
+                'Studio."');
 
         state.setLastAiComparisonResult(
           AiComparisonResult(
@@ -174,18 +172,11 @@ void main() {
 
         final r = state.lastAiComparisonResult;
         expect(r, isNotNull);
-        expect(r!.originalImageBytes, original,
-            reason: 'le "AVANT" doit être la vraie photo envoyée au '
-                'proxy, pas une image reconstruite');
-        expect(r.aiImageBytes, aiResult,
-            reason: 'le "APRÈS" doit être l\'image Gemini réellement '
-                'reçue, jamais un mock');
+        expect(r!.originalImageBytes, original);
+        expect(r.aiImageBytes, aiResult);
         expect(r.sku, 'D609');
-        expect(r.model, 'gemini-3.1-flash-image',
-            reason: 'preuve que le modèle non-lite a bien été utilisé');
-        expect(r.usedProductReference, isTrue,
-            reason: 'preuve que control/D609.png a bien servi de '
-                'référence visuelle produit');
+        expect(r.model, 'gemini-3.1-flash-image');
+        expect(r.usedProductReference, isTrue);
         expect(r.productReferencePath, 'assets/profiles/control/D609.png');
       },
     );

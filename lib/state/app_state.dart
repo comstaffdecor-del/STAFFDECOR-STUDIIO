@@ -286,10 +286,17 @@ class AppState extends ChangeNotifier {
     isCalibrated = false;
     notifyListeners();
     unawaited(autoDetectEdges());
-    // P20-AUTO : nouvelle photo chargée — si un produit est déjà
-    // sélectionné, déclenche l'aperçu IA automatiquement (voir garde
-    // anti-boucle dans maybeAutoTriggerAiPreview).
-    maybeAutoTriggerAiPreview();
+    // ⚠️ DÉCISION PRODUIT (retour utilisateur : "le rendu IA automatique
+    // n'est pas acceptable visuellement — la corniche est trop
+    // artificielle et pas assez professionnelle") — l'appel automatique
+    // à maybeAutoTriggerAiPreview() a été RETIRÉ ici. Gemini/Nano Banana
+    // reste disponible UNIQUEMENT via l'icône manuelle "Aperçu
+    // d'ambiance IA" de la topbar Studio (state.openAiAmbiancePanel,
+    // sans prefill/autoGenerate) : le moteur dynamique déterministe
+    // (RoomPainter/cornice_plinth_painter) redevient le SEUL rendu
+    // affiché automatiquement après import photo. Ne pas réactiver cet
+    // appel sans un chantier qualité IA dédié (scoring multi-génération,
+    // prompt renforcé, contrôle humain) validé séparément.
   }
 
   /// Recalcule [imgDraw] quand la taille du conteneur change (rotation,
@@ -394,10 +401,9 @@ class AppState extends ChangeNotifier {
           unawaited(autoDetectEdges());
         }
       }
-      // P20-AUTO : nouvelle scène démo chargée — même déclenchement
-      // automatique que pour une photo importée (voir
-      // setRoomImageBytes), garde anti-boucle incluse.
-      maybeAutoTriggerAiPreview();
+      // ⚠️ DÉCISION PRODUIT — voir commentaire identique dans
+      // setRoomImageBytes ci-dessus : plus de déclenchement IA
+      // automatique sur chargement de scène démo non plus.
     }
   }
 
@@ -852,11 +858,12 @@ class AppState extends ChangeNotifier {
     );
     notifyListeners();
     save();
-    // P20-AUTO : nouveau produit sélectionné — si une photo/scène est déjà
-    // chargée, déclenche l'aperçu IA automatiquement (garde anti-boucle
-    // dans maybeAutoTriggerAiPreview : ne repart pas si ce même produit a
-    // déjà été généré sur cette même scène).
-    maybeAutoTriggerAiPreview();
+    // ⚠️ DÉCISION PRODUIT — voir commentaire identique dans
+    // setRoomImageBytes : plus de déclenchement IA automatique sur
+    // sélection produit. L'utilisateur voit le rendu dynamique
+    // déterministe (RoomPainter/cornice_plinth_painter) et peut,
+    // s'il le souhaite, ouvrir manuellement le panneau "Aperçu
+    // d'ambiance IA" via l'icône dédiée de la topbar Studio.
   }
 
   /// Quantité nette pour une famille, avec repli sur une estimation
