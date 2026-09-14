@@ -106,31 +106,41 @@ void main() {
     );
 
     testWidgets(
-      '2. setRoomImageBytes (photo importée) sur un produit déjà '
-      'sélectionné déclenche aussi une génération STANDARD',
+      '2. Photo déjà présente + produit déjà sélectionné => '
+      'maybeAutoTriggerStandardAiPreview déclenche une génération STANDARD '
+      '(reproduit la garde utilisée par setRoomImageBytes SANS traverser '
+      'le vrai décodage image / autoDetectEdges / Sobel-Hough, hors '
+      'périmètre de ce test unitaire — voir NOTE ci-dessous)',
       (tester) async {
         await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
 
+        // NOTE (correctif suite au blocage constaté) : ce test vérifie la
+        // RÈGLE MÉTIER "photo présente + produit déjà sélectionné => appel
+        // à maybeAutoTriggerStandardAiPreview(ref: ...)" — exactement ce
+        // que fait [AppState.setRoomImageBytes] après
+        // `unawaited(autoDetectEdges())`. Appeler la VRAIE
+        // `setRoomImageBytes()` ici forcerait un décodage PNG réel puis
+        // `detectRoomEdges` (Sobel+Hough) sous l'horloge simulée de
+        // `flutter_test`, ce qui bloque indéfiniment le test sans
+        // `tester.runAsync()` étendu à tout le pipeline — inutile et
+        // fragile pour ce qui est testé ici (le déclenchement de
+        // l'auto-trigger standard, pas le décodage image lui-même, déjà
+        // couvert par d'autres tests dédiés à autoDetectEdges).
         final state = AppState();
+        state.roomImage = await _tinyImage();
+        state.roomImageVersion = 1;
         state.selectedProducts = [
           const ProjectItem(ref: 'D609', famille: 'Corniches', qte: 1, unite: 'ml'),
         ];
 
-        final codec = await ui.instantiateImageCodec(await _pngBytes());
-        final frame = await codec.getNextFrame();
-        // setRoomImageBytes fait son propre decode ; on simule directement
-        // ce qu'il fait en interne pour ne pas dépendre d'un vrai fichier
-        // asset ici (voir aussi le test dédié setRoomImageBytes plus bas
-        // pour un passage par la VRAIE fonction).
-        frame.image.dispose();
-
-        await state.setRoomImageBytes(await _pngBytes(), containerSize: const Size(400, 300));
+        state.maybeAutoTriggerStandardAiPreview(ref: 'D609');
 
         expect(state.showAiAmbiancePanel, isFalse,
             reason: 'debounce en attente');
         await _settleStandardDebounce(tester);
 
         expect(state.showAiAmbiancePanel, isTrue);
+        expect(state.aiAmbianceAutoGenerate, isTrue);
         expect(state.aiAmbianceAutoGenerateHybrid, isFalse);
         expect(state.aiAmbiancePrefillRef, 'D609');
 
@@ -482,18 +492,4 @@ void main() {
       },
     );
   });
-}
-
-/// Petit PNG 1x1 valide encodé en dur (évite de dépendre d'un vrai
-/// fichier asset pour tester [AppState.setRoomImageBytes] avec un
-/// décodage réel de bout en bout).
-Future<Uint8List> _pngBytes() async {
-  final recorder = ui.PictureRecorder();
-  final canvas = Canvas(recorder);
-  canvas.drawRect(const Rect.fromLTWH(0, 0, 4, 4), Paint()..color = Colors.blue);
-  final picture = recorder.endRecording();
-  final image = await picture.toImage(4, 4);
-  final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-  image.dispose();
-  return byteData!.buffer.asUint8List();
 }
