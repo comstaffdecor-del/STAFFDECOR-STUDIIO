@@ -985,21 +985,42 @@ class AppState extends ChangeNotifier {
   }
 
   void maybeAutoTriggerStandardAiPreview({required String ref}) {
+    if (kDebugMode) {
+      debugPrint('[AI_AUTO_STANDARD] called ref=$ref '
+          'hasRoom=${roomImage != null} '
+          'generating=$aiAmbianceGenerating '
+          'visible=${CatalogueVisibilityGate.instance.presentationVisible(ref)} '
+          'version=$roomImageVersion');
+    }
     if (!kAiPreviewEnabled) return;
-    if (roomImage == null) return;
+    if (roomImage == null) {
+      if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: no room');
+      return;
+    }
 
     // Garde whitelist SKU — même source que le reste du catalogue
     // présentation. `null` = index pas encore chargé : fail-open (on ne
     // bloque pas), cohérent avec [applyPresentationVisibility] et
     // [maybeAutoTriggerHybridAiPreview].
     final visible = CatalogueVisibilityGate.instance.presentationVisible(ref);
-    if (visible == false) return; // SKU explicitement hors whitelist
+    if (visible == false) {
+      if (kDebugMode) {
+        debugPrint('[AI_AUTO_STANDARD] skip: not whitelisted ref=$ref');
+      }
+      return; // SKU explicitement hors whitelist
+    }
 
     final key = '$ref#$roomImageVersion#add';
-    if (_lastStandardAutoTriggerKey == key) return; // déjà généré pour ce couple
+    if (_lastStandardAutoTriggerKey == key) {
+      if (kDebugMode) {
+        debugPrint('[AI_AUTO_STANDARD] skip: already generated key=$key');
+      }
+      return; // déjà généré pour ce couple
+    }
     if (_standardAutoTriggerCount >= kMaxStandardAutoTriggersPerSession) {
       // Quota session atteint — le rendu dynamique reste affiché,
       // l'utilisateur garde l'accès manuel via l'icône topbar.
+      if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: quota reached');
       return;
     }
 
@@ -1008,15 +1029,34 @@ class AppState extends ChangeNotifier {
     _standardAutoTriggerDebounce?.cancel();
     _standardAutoTriggerDebounce = Timer(kStandardAutoTriggerDebounce, () {
       if (!kAiPreviewEnabled) return;
-      if (roomImage == null) return;
-      if (aiAmbianceGenerating) return;
+      if (roomImage == null) {
+        if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: no room');
+        return;
+      }
+      if (aiAmbianceGenerating) {
+        if (kDebugMode) {
+          debugPrint('[AI_AUTO_STANDARD] skip: generating already');
+        }
+        return;
+      }
       final currentKey = '$ref#$roomImageVersion#add';
       if (currentKey != key) return; // photo/version a changé entre-temps
-      if (_lastStandardAutoTriggerKey == currentKey) return;
-      if (_standardAutoTriggerCount >= kMaxStandardAutoTriggersPerSession) return;
+      if (_lastStandardAutoTriggerKey == currentKey) {
+        if (kDebugMode) {
+          debugPrint('[AI_AUTO_STANDARD] skip: already generated key=$currentKey');
+        }
+        return;
+      }
+      if (_standardAutoTriggerCount >= kMaxStandardAutoTriggersPerSession) {
+        if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: quota reached');
+        return;
+      }
 
       _lastStandardAutoTriggerKey = currentKey;
       _standardAutoTriggerCount++;
+      if (kDebugMode) {
+        debugPrint('[AI_AUTO_STANDARD] opening panel ref=$ref key=$currentKey');
+      }
       // autoGenerateHybrid volontairement absent (défaut false) :
       // AiAmbiancePanel utilisera _useCurrentScene() (photo brute) +
       // _generate() -> renderMode='add' (resolveRenderModeForScene),
@@ -1255,11 +1295,27 @@ class AppState extends ChangeNotifier {
 
   /// Ajout/retrait rapide (toggle) d'un produit — utilisé par la vue
   /// catalogue / strip studio pour un clic rapide sans passer par la modal.
+  ///
+  /// P23-STANDARD-AUTO — CORRECTIF : c'est ICI, pas dans [addToProject],
+  /// que passe le VRAI chemin UI du tap sur une tuile du strip Studio
+  /// (`product_strip.dart` : `onTap: () => state.quickToggleProd(p.ref)`).
+  /// [addToProject] appelle déjà [maybeAutoTriggerStandardAiPreview] en
+  /// interne, donc la branche "ajout" ci-dessous en hérite automatiquement
+  /// SANS double appel — ce commentaire documente explicitement ce chemin
+  /// pour éviter de le reperdre de vue (bug constaté : le clic D609 dans
+  /// le Studio ne déclenchait rien car addToProject seul n'était pas le
+  /// point d'entrée réellement utilisé par ce widget).
   void quickToggleProd(String ref) {
     final existing = getProdInProject(ref);
     if (existing != null) {
+      // Retrait : jamais de déclenchement IA ici (retirer un produit ne
+      // doit pas relancer une génération).
       removeProd(ref);
     } else {
+      // Ajout : addToProject(ref) déclenche déjà
+      // maybeAutoTriggerStandardAiPreview(ref: ref) en interne (voir
+      // ci-dessus) — c'est le chemin réel emprunté par le tap utilisateur
+      // dans le strip Studio.
       addToProject(ref);
     }
   }

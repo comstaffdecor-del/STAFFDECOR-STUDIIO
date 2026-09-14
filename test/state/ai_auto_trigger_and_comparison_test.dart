@@ -106,6 +106,73 @@ void main() {
     );
 
     testWidgets(
+      '1b. quickToggleProd(D609) — VRAI chemin UI du tap sur une tuile du '
+      'strip Studio (product_strip.dart: onTap => quickToggleProd), '
+      'distinct de addToProject appelé directement par le test 1 — '
+      'verrouille la régression constatée : le clic réel D609 ne '
+      'déclenchait rien car quickToggleProd n\'était pas couvert',
+      (tester) async {
+        await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
+
+        final state = AppState();
+        state.roomImage = await _tinyImage();
+        state.roomImageVersion = 1;
+
+        // Premier tap sur la tuile : produit absent du projet => ajout.
+        state.quickToggleProd('D609');
+        expect(state.showAiAmbiancePanel, isFalse,
+            reason: 'debounce en attente');
+
+        await _settleStandardDebounce(tester);
+
+        expect(state.showAiAmbiancePanel, isTrue,
+            reason: 'quickToggleProd (chemin réel du tap Studio) doit '
+                'déclencher l\'auto-trigger standard exactement comme '
+                'addToProject, puisqu\'il l\'appelle en interne pour la '
+                'branche ajout');
+        expect(state.aiAmbianceAutoGenerate, isTrue);
+        expect(state.aiAmbianceAutoGenerateHybrid, isFalse);
+        expect(state.aiAmbiancePrefillRef, 'D609');
+
+        state.disposeStandardAutoTriggerDebounceForTesting();
+      },
+    );
+
+    testWidgets(
+      '1c. quickToggleProd sur un produit déjà présent (retrait) ne '
+      'déclenche JAMAIS de génération IA — seul l\'AJOUT doit auto-trigger',
+      (tester) async {
+        await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
+
+        final state = AppState();
+        state.roomImage = await _tinyImage();
+        state.roomImageVersion = 1;
+        state.selectedProducts = [
+          const ProjectItem(ref: 'D609', famille: 'Corniches', qte: 1, unite: 'ml'),
+        ];
+        // Marque comme déjà généré pour ce couple, afin d'isoler la
+        // garantie "retrait ne redéclenche jamais" de la garde
+        // anti-boucle générique (déjà testée ailleurs).
+        state.maybeAutoTriggerStandardAiPreview(ref: 'D609');
+        await _settleStandardDebounce(tester);
+        state.closeAiAmbiancePanel();
+
+        // Deuxième tap : produit déjà présent => retrait (removeProd),
+        // jamais addToProject, jamais d'auto-trigger.
+        state.quickToggleProd('D609');
+        await _settleStandardDebounce(tester);
+
+        expect(state.showAiAmbiancePanel, isFalse,
+            reason: 'retirer un produit ne doit jamais relancer une '
+                'génération IA automatique');
+        expect(state.getProdInProject('D609'), isNull,
+            reason: 'le produit doit bien avoir été retiré du projet');
+
+        state.disposeStandardAutoTriggerDebounceForTesting();
+      },
+    );
+
+    testWidgets(
       '2. Photo déjà présente + produit déjà sélectionné => '
       'maybeAutoTriggerStandardAiPreview déclenche une génération STANDARD '
       '(reproduit la garde utilisée par setRoomImageBytes SANS traverser '
