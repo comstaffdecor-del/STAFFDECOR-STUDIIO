@@ -73,6 +73,27 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
         if (mounted) setState(() {});
       });
     }
+    // Court-circuit "Générer aperçu IA" (bouton contextuel Studio) — le
+    // produit ET la scène sont déjà connus au moment où ce panneau est
+    // ouvert depuis la zone photo (photo importée + SKU sélectionné) :
+    // on saute directement les écrans "choix produit"/"choix scène" et,
+    // si demandé, on lance la génération réelle (proxy Gemini) sans
+    // action supplémentaire de l'utilisateur. N'affecte JAMAIS l'entrée
+    // générique depuis l'icône topbar (prefillRef == null dans ce cas).
+    final state = context.read<AppState>();
+    final prefillRef = state.aiAmbiancePrefillRef;
+    final autoGenerate = state.aiAmbianceAutoGenerate;
+    if (prefillRef != null) {
+      _selectedRef = prefillRef;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await _useCurrentScene();
+        if (!mounted) return;
+        if (autoGenerate && _sceneBytes != null) {
+          await _generate();
+        }
+      });
+    }
   }
 
   List<String> get _visibleRefs {

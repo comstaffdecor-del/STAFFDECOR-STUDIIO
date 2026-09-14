@@ -562,13 +562,31 @@ class AppState extends ChangeNotifier {
   /// explication.
   bool showAiAmbiancePanel = false;
 
-  void openAiAmbiancePanel() {
+  /// Référence produit à pré-sélectionner à l'ouverture du panneau IA —
+  /// utilisé par le bouton "Générer aperçu IA" du Studio (zone photo),
+  /// qui saute directement les écrans "choix produit" / "choix scène"
+  /// puisque la photo ET le produit sont déjà connus à cet instant.
+  String? aiAmbiancePrefillRef;
+
+  /// Si vrai, le panneau IA utilise automatiquement la scène courante du
+  /// Studio et lance la génération réelle (proxy Gemini) sans attendre
+  /// d'action supplémentaire de l'utilisateur — déclenché uniquement
+  /// depuis le bouton contextuel "Générer aperçu IA" du Studio, jamais
+  /// depuis l'icône générique de la topbar (qui garde le parcours pas à
+  /// pas complet, y compris le choix libre du produit/scène).
+  bool aiAmbianceAutoGenerate = false;
+
+  void openAiAmbiancePanel({String? prefillRef, bool autoGenerate = false}) {
+    aiAmbiancePrefillRef = prefillRef;
+    aiAmbianceAutoGenerate = autoGenerate;
     showAiAmbiancePanel = true;
     notifyListeners();
   }
 
   void closeAiAmbiancePanel() {
     showAiAmbiancePanel = false;
+    aiAmbiancePrefillRef = null;
+    aiAmbianceAutoGenerate = false;
     notifyListeners();
   }
 
