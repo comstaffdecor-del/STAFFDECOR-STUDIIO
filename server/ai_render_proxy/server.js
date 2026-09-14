@@ -39,6 +39,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.AI_RENDER_PROXY_PORT || 8091;
@@ -50,6 +51,33 @@ const PRODUCT_CONTROL_DIR = path.join(PROFILES_DIR, 'control');
 
 const MODEL = process.env.MANOBANANA_MODEL || 'gemini-3.1-flash-lite-image';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+
+// ---------------------------------------------------------------
+// Quotas serveur (issue #2) : IP/jour + global/jour, fail-closed en
+// cas d'erreur de lecture du store. Jamais de cle/secret dans ce
+// store - uniquement des compteurs et des hash d'IP (jamais l'IP en
+// clair).
+// ---------------------------------------------------------------
+
+const AI_QUOTA_ENABLED = process.env.AI_QUOTA_ENABLED !== 'false';
+
+const AI_DAILY_IP_LIMIT = Number.parseInt(
+  process.env.AI_DAILY_IP_LIMIT || '10',
+  10,
+);
+
+const AI_DAILY_GLOBAL_LIMIT = Number.parseInt(
+  process.env.AI_DAILY_GLOBAL_LIMIT || '100',
+  10,
+);
+
+const AI_QUOTA_STORE_PATH =
+  process.env.AI_QUOTA_STORE_PATH ||
+  path.join(__dirname, '.ai_quota_store.json');
+
+const AI_QUOTA_IP_HASH_SALT =
+  process.env.AI_QUOTA_IP_HASH_SALT ||
+  'staffdecor-ai-demo-quota-salt';
 
 // ---------------------------------------------------------------
 // Middlewares
@@ -226,6 +254,149 @@ function detectMimeType(buffer, declaredMime) {
 }
 
 // ---------------------------------------------------------------
+// Helpers quota
+// ---------------------------------------------------------------
+
+function quotaDayKey(now = new Date()) {
+  return now.toISOString().slice(0, 10); // UTC YYYY-MM-DD
+}
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim().length > 0) {
+    return forwarded.split(',')[0].trim();
+  }
+
+  const realIp = req.headers['x-real-ip'];
+  if (typeof realIp === 'string' && realIp.trim().length > 0) {
+    return realIp.trim();
+  }
+
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+function hashIp(ip) {
+  return crypto
+    .createHash('sha256')
+    .update(`${AI_QUOTA_IP_HASH_SALT}:${ip}`)
+    .digest('hex')
+    .slice(0, 24);
+}
+
+function emptyQuotaStore() {
+  return {
+    day: quotaDayKey(),
+    globalCount: 0,
+    byIpHash: {},
+  };
+}
+
+function readQuotaStore() {
+  try {
+    if (!fs.existsSync(AI_QUOTA_STORE_PATH)) {
+      return emptyQuotaStore();
+    }
+
+    const raw = fs.readFileSync(AI_QUOTA_STORE_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+
+    if (!parsed || parsed.day !== quotaDayKey()) {
+      return emptyQuotaStore();
+    }
+
+    if (typeof parsed.globalCount !== 'number') {
+      parsed.globalCount = 0;
+    }
+
+    if (!parsed.byIpHash || typeof parsed.byIpHash !== 'object') {
+      parsed.byIpHash = {};
+    }
+
+    return parsed;
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: 'ai_quota_store_read_error',
+        error: String(err?.message || err),
+      }),
+    );
+
+    // fail closed quand quota active
+    throw err;
+  }
+}
+
+function writeQuotaStore(store) {
+  const tmp = `${AI_QUOTA_STORE_PATH}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(store, null, 2));
+  fs.renameSync(tmp, AI_QUOTA_STORE_PATH);
+}
+
+function reserveAiQuota(req, meta = {}) {
+  if (!AI_QUOTA_ENABLED) {
+    return {
+      ok: true,
+      quotaEnabled: false,
+      ipHash: null,
+      globalCount: null,
+      ipCount: null,
+    };
+  }
+
+  const ip = getClientIp(req);
+  const ipHash = hashIp(ip);
+
+  const store = readQuotaStore();
+
+  const ipCount = store.byIpHash[ipHash] || 0;
+  const globalCount = store.globalCount || 0;
+
+  if (AI_DAILY_GLOBAL_LIMIT >= 0 && globalCount >= AI_DAILY_GLOBAL_LIMIT) {
+    return {
+      ok: false,
+      status: 429,
+      code: 'AI_GLOBAL_DAILY_QUOTA_EXCEEDED',
+      message: 'Quota IA global journalier atteint.',
+      ipHash,
+      globalCount,
+      ipCount,
+      globalLimit: AI_DAILY_GLOBAL_LIMIT,
+      ipLimit: AI_DAILY_IP_LIMIT,
+    };
+  }
+
+  if (AI_DAILY_IP_LIMIT >= 0 && ipCount >= AI_DAILY_IP_LIMIT) {
+    return {
+      ok: false,
+      status: 429,
+      code: 'AI_IP_DAILY_QUOTA_EXCEEDED',
+      message: 'Quota IA journalier atteint pour cette adresse.',
+      ipHash,
+      globalCount,
+      ipCount,
+      globalLimit: AI_DAILY_GLOBAL_LIMIT,
+      ipLimit: AI_DAILY_IP_LIMIT,
+    };
+  }
+
+  store.globalCount = globalCount + 1;
+  store.byIpHash[ipHash] = ipCount + 1;
+
+  writeQuotaStore(store);
+
+  return {
+    ok: true,
+    quotaEnabled: true,
+    ipHash,
+    globalCount: store.globalCount,
+    ipCount: store.byIpHash[ipHash],
+    globalLimit: AI_DAILY_GLOBAL_LIMIT,
+    ipLimit: AI_DAILY_IP_LIMIT,
+    ...meta,
+  };
+}
+
+// ---------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------
 
@@ -235,7 +406,7 @@ app.get('/health', (req, res) => {
     service: 'ai_render_proxy',
     provider: 'gemini',
     model: MODEL,
-    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+    quotaEnabled: AI_QUOTA_ENABLED,
   });
 });
 
@@ -250,6 +421,78 @@ app.post('/api/ai-render', async (req, res) => {
     if (!sku || typeof sku !== 'string') {
       return res.status(400).json({ ok: false, provider: 'gemini', error: 'sku manquant ou invalide' });
     }
+
+    const requestId = crypto.randomUUID();
+    const source = req.body?.source || 'unknown';
+    const usedProductReferenceHint = Boolean(req.body?.productReferenceBase64);
+
+    let quota;
+    try {
+      quota = reserveAiQuota(req, {
+        requestId,
+        sku,
+        renderMode,
+        source,
+      });
+    } catch (quotaErr) {
+      console.error(
+        JSON.stringify({
+          event: 'ai_quota_error',
+          requestId,
+          status: 429,
+          error: String(quotaErr?.message || quotaErr),
+        }),
+      );
+
+      return res.status(429).json({
+        ok: false,
+        error: 'AI_QUOTA_UNAVAILABLE',
+        message: 'Quota IA temporairement indisponible.',
+        requestId,
+      });
+    }
+
+    if (!quota.ok) {
+      console.warn(
+        JSON.stringify({
+          event: 'ai_quota_rejected',
+          requestId,
+          status: 429,
+          code: quota.code,
+          ipHash: quota.ipHash,
+          sku,
+          renderMode,
+          source,
+          globalCount: quota.globalCount,
+          ipCount: quota.ipCount,
+          globalLimit: quota.globalLimit,
+          ipLimit: quota.ipLimit,
+        }),
+      );
+
+      return res.status(429).json({
+        ok: false,
+        error: quota.code,
+        message: quota.message,
+        requestId,
+      });
+    }
+
+    console.log(
+      JSON.stringify({
+        event: 'ai_quota_reserved',
+        requestId,
+        ipHash: quota.ipHash,
+        sku,
+        renderMode,
+        source,
+        usedProductReferenceHint,
+        globalCount: quota.globalCount,
+        ipCount: quota.ipCount,
+        globalLimit: quota.globalLimit,
+        ipLimit: quota.ipLimit,
+      }),
+    );
 
     // P21-HYBRIDE - `renderMode` est une WHITELIST STRICTE a 2 valeurs
     // fixes, jamais un texte libre : 'add' (comportement historique
@@ -359,7 +602,25 @@ app.post('/api/ai-render', async (req, res) => {
       // d'erreur Google standard.
       const errMessage = geminiJson?.error?.message || `Gemini API error (HTTP ${geminiResp.status})`;
       const errStatus = geminiJson?.error?.status || 'UNKNOWN';
-      console.error(`[ai-render] Gemini error sku=${sku} httpStatus=${geminiResp.status} status=${errStatus} durationMs=${Date.now() - startedAt}`);
+      console.error(
+        JSON.stringify({
+          event: 'ai_render_error',
+          requestId,
+          sku,
+          renderMode: effectiveRenderMode,
+          source,
+          model: MODEL,
+          status: geminiResp.status,
+          googleStatus: errStatus,
+          durationMs: Date.now() - startedAt,
+          quota: {
+            globalCount: quota.globalCount,
+            ipCount: quota.ipCount,
+            globalLimit: quota.globalLimit,
+            ipLimit: quota.ipLimit,
+          },
+        }),
+      );
       return res.status(geminiResp.status).json({
         ok: false,
         provider: 'gemini',
@@ -385,7 +646,25 @@ app.post('/api/ai-render', async (req, res) => {
     }
 
     if (!outData) {
-      console.error(`[ai-render] Pas d'image dans la reponse Gemini sku=${sku} durationMs=${Date.now() - startedAt}`);
+      console.error(
+        JSON.stringify({
+          event: 'ai_render_error',
+          requestId,
+          sku,
+          renderMode: effectiveRenderMode,
+          source,
+          model: MODEL,
+          status: 502,
+          error: 'no_image_in_response',
+          durationMs: Date.now() - startedAt,
+          quota: {
+            globalCount: quota.globalCount,
+            ipCount: quota.ipCount,
+            globalLimit: quota.globalLimit,
+            ipLimit: quota.ipLimit,
+          },
+        }),
+      );
       return res.status(502).json({
         ok: false,
         provider: 'gemini',
@@ -394,7 +673,26 @@ app.post('/api/ai-render', async (req, res) => {
       });
     }
 
-    console.log(`[ai-render] OK sku=${sku} model=${MODEL} renderMode=${effectiveRenderMode} usedProductReference=${usedProductReference} durationMs=${Date.now() - startedAt}`);
+    console.log(
+      JSON.stringify({
+        event: 'ai_render_success',
+        requestId,
+        sku,
+        renderMode: effectiveRenderMode,
+        source,
+        usedProductReference,
+        productReferencePath: productRef ? path.relative(path.join(__dirname, '..', '..'), productRef.path) : null,
+        model: MODEL,
+        status: 200,
+        durationMs: Date.now() - startedAt,
+        quota: {
+          globalCount: quota.globalCount,
+          ipCount: quota.ipCount,
+          globalLimit: quota.globalLimit,
+          ipLimit: quota.ipLimit,
+        },
+      }),
+    );
     return res.json({
       ok: true,
       provider: 'gemini',
@@ -412,7 +710,14 @@ app.post('/api/ai-render', async (req, res) => {
     // Jamais err complet si il pouvait par malheur contenir la cle (il ne devrait
     // jamais - la cle n'est utilisee que dans un header sortant), mais on reste
     // prudent et on ne logge que err.message.
-    console.error(`[ai-render] Exception: ${err && err.message ? err.message : 'erreur inconnue'}`);
+    console.error(
+      JSON.stringify({
+        event: 'ai_render_error',
+        requestId: typeof requestId !== 'undefined' ? requestId : null,
+        error: String(err && err.message ? err.message : 'erreur inconnue'),
+        status: 500,
+      }),
+    );
     return res.status(500).json({
       ok: false,
       provider: 'gemini',
@@ -422,5 +727,14 @@ app.post('/api/ai-render', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[ai_render_proxy] Ecoute sur le port ${PORT} (model=${MODEL}, hasGeminiKey=${Boolean(process.env.GEMINI_API_KEY)})`);
+  console.log(
+    JSON.stringify({
+      event: 'ai_render_proxy_listening',
+      port: PORT,
+      model: MODEL,
+      quotaEnabled: AI_QUOTA_ENABLED,
+      dailyIpLimit: AI_DAILY_IP_LIMIT,
+      dailyGlobalLimit: AI_DAILY_GLOBAL_LIMIT,
+    }),
+  );
 });
