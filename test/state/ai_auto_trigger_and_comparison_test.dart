@@ -75,12 +75,22 @@ void main() {
     // `{}` = quota vierge pour tous les tests de ce fichier, sauf ceux du
     // group dédié "Quota persisté" qui pré-remplissent explicitement.
     SharedPreferences.setMockInitialValues({});
+    // CORRECTIF (brief "isolation tests auto-IA") : ce fichier contient
+    // plusieurs tests qui exercent volontairement de nombreux appels à
+    // maybeAutoTriggerStandardAiPreview (épuisement du quota du jour,
+    // héritage du compteur persisté entre deux instances AppState) —
+    // les logs [AI_AUTO_STANDARD] associés sont utiles en debug réel
+    // mais polluent inutilement la sortie de `flutter test` ici. Coupés
+    // uniquement pour ce fichier, restaurés dans tearDown (jamais laissé
+    // désactivé par erreur pour les autres suites de tests).
+    AppState.debugAiAutoStandardLogsEnabled = false;
   });
 
   tearDown(() {
     // Un Timer de debounce encore actif entre deux tests peut faire
     // planter `flutter_test` ("Timer still pending") — nettoyage
     // systématique via le hook de test dédié.
+    AppState.debugAiAutoStandardLogsEnabled = true;
   });
 
   group('Auto-trigger STANDARD (maybeAutoTriggerStandardAiPreview) — mode add validé', () {

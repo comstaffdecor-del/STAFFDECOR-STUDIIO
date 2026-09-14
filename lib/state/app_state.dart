@@ -1009,6 +1009,17 @@ class AppState extends ChangeNotifier {
   /// `kMaxStandardAutoTriggersPerDay` pour refléter la sémantique réelle.
   static const int kMaxStandardAutoTriggersPerDay = 10;
 
+  /// TEST-ONLY (jamais lu/modifié en dehors des tests) : permet de
+  /// couper le bruit des logs `[AI_AUTO_STANDARD]` dans les suites de
+  /// tests qui exercent volontairement de nombreux appels à
+  /// [maybeAutoTriggerStandardAiPreview] (ex: épuisement du quota
+  /// jour/session) — ces logs restent utiles en debug réel (`flutter
+  /// run`) mais polluent la sortie de `flutter test` sans apporter
+  /// d'information supplémentaire dans ces cas précis. `true` par
+  /// défaut : ne change RIEN au comportement hors tests.
+  @visibleForTesting
+  static bool debugAiAutoStandardLogsEnabled = true;
+
   /// CORRECTIF (brief "Persist quota SharedPreferences") : un compteur
   /// purement en mémoire est réinitialisé à 0 à chaque F5/rechargement de
   /// la page web — sur le web, [AppState] est reconstruit à chaque
@@ -1119,7 +1130,7 @@ class AppState extends ChangeNotifier {
       _ensureStandardAutoTriggerCountLoaded();
 
   void maybeAutoTriggerStandardAiPreview({required String ref}) {
-    if (kDebugMode) {
+    if (kDebugMode && debugAiAutoStandardLogsEnabled) {
       debugPrint('[AI_AUTO_STANDARD] called ref=$ref '
           'hasRoom=${roomImage != null} '
           'generating=$aiAmbianceGenerating '
@@ -1130,11 +1141,15 @@ class AppState extends ChangeNotifier {
           'count=$_standardAutoTriggerCount/$kMaxStandardAutoTriggersPerDay');
     }
     if (!kAiPreviewEnabled) {
-      if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: disabled');
+      if (kDebugMode && debugAiAutoStandardLogsEnabled) {
+        debugPrint('[AI_AUTO_STANDARD] skip: disabled');
+      }
       return;
     }
     if (roomImage == null) {
-      if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: no room image');
+      if (kDebugMode && debugAiAutoStandardLogsEnabled) {
+        debugPrint('[AI_AUTO_STANDARD] skip: no room image');
+      }
       return;
     }
 
@@ -1144,7 +1159,7 @@ class AppState extends ChangeNotifier {
     // [maybeAutoTriggerHybridAiPreview].
     final visible = CatalogueVisibilityGate.instance.presentationVisible(ref);
     if (visible == false) {
-      if (kDebugMode) {
+      if (kDebugMode && debugAiAutoStandardLogsEnabled) {
         debugPrint('[AI_AUTO_STANDARD] skip: unsupported sku ref=$ref');
       }
       return; // SKU explicitement hors whitelist
@@ -1159,7 +1174,7 @@ class AppState extends ChangeNotifier {
 
     final key = '$ref#$roomImageVersion#add';
     if (_lastStandardAutoTriggerKey == key) {
-      if (kDebugMode) {
+      if (kDebugMode && debugAiAutoStandardLogsEnabled) {
         debugPrint('[AI_AUTO_STANDARD] skip: already generated key=$key');
       }
       return; // déjà généré pour ce couple
@@ -1170,7 +1185,9 @@ class AppState extends ChangeNotifier {
       // évite de programmer un Timer pour rien. Le contrôle AUTORITAIRE
       // (après chargement garanti) est refait dans le callback ci-dessous
       // de toute façon.
-      if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: quota reached');
+      if (kDebugMode && debugAiAutoStandardLogsEnabled) {
+        debugPrint('[AI_AUTO_STANDARD] skip: quota reached');
+      }
       return;
     }
 
@@ -1186,15 +1203,19 @@ class AppState extends ChangeNotifier {
       await _ensureStandardAutoTriggerCountLoaded();
 
       if (!kAiPreviewEnabled) {
-        if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: disabled');
+        if (kDebugMode && debugAiAutoStandardLogsEnabled) {
+          debugPrint('[AI_AUTO_STANDARD] skip: disabled');
+        }
         return;
       }
       if (roomImage == null) {
-        if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: no room image');
+        if (kDebugMode && debugAiAutoStandardLogsEnabled) {
+          debugPrint('[AI_AUTO_STANDARD] skip: no room image');
+        }
         return;
       }
       if (aiAmbianceGenerating) {
-        if (kDebugMode) {
+        if (kDebugMode && debugAiAutoStandardLogsEnabled) {
           debugPrint('[AI_AUTO_STANDARD] skip: generation already running');
         }
         return;
@@ -1202,13 +1223,15 @@ class AppState extends ChangeNotifier {
       final currentKey = '$ref#$roomImageVersion#add';
       if (currentKey != key) return; // photo/version a changé entre-temps
       if (_lastStandardAutoTriggerKey == currentKey) {
-        if (kDebugMode) {
+        if (kDebugMode && debugAiAutoStandardLogsEnabled) {
           debugPrint('[AI_AUTO_STANDARD] skip: already generated key=$currentKey');
         }
         return;
       }
       if (_standardAutoTriggerCount >= kMaxStandardAutoTriggersPerDay) {
-        if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: quota reached');
+        if (kDebugMode && debugAiAutoStandardLogsEnabled) {
+          debugPrint('[AI_AUTO_STANDARD] skip: quota reached');
+        }
         return;
       }
 
@@ -1218,7 +1241,7 @@ class AppState extends ChangeNotifier {
       // réseau vers le proxy Gemini) — voir docstring de
       // [_persistStandardAutoTriggerCount].
       await _persistStandardAutoTriggerCount();
-      if (kDebugMode) {
+      if (kDebugMode && debugAiAutoStandardLogsEnabled) {
         debugPrint('[AI_AUTO_STANDARD] opening panel ref=$ref key=$currentKey '
             'count=$_standardAutoTriggerCount/$kMaxStandardAutoTriggersPerDay');
       }
