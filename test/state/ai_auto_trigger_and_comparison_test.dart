@@ -40,6 +40,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:staff_decor_studio/data/catalogue_visibility.dart';
 import 'package:staff_decor_studio/models/project_item.dart';
@@ -66,6 +67,13 @@ void main() {
 
   setUp(() {
     CatalogueVisibilityGate.instance.resetForTesting();
+    // CORRECTIF (brief "Persist quota SharedPreferences") : le quota
+    // auto-IA STANDARD lit/écrit désormais shared_preferences (clé datée
+    // du jour) — sans ce mock, `SharedPreferences.getInstance()` plante
+    // en environnement de test (pas de vrai stockage disque/navigateur).
+    // `{}` = quota vierge pour tous les tests de ce fichier, sauf ceux du
+    // group dédié "Quota persisté" qui pré-remplissent explicitement.
+    SharedPreferences.setMockInitialValues({});
   });
 
   tearDown(() {
@@ -501,6 +509,99 @@ void main() {
         expect(state.showAiAmbiancePanel, isFalse,
             reason: 'garde anti-boucle du mode brut inchangée');
       });
+    },
+  );
+
+  group(
+    'Quota auto-IA STANDARD persisté (shared_preferences, clé datée du '
+    'jour) — survit à un rechargement de page (nouvelle instance AppState)',
+    () {
+      testWidgets(
+        'Quota déjà atteint (persisté par une session PRÉCÉDENTE simulée) '
+        '=> une NOUVELLE instance AppState (= rechargement de page) '
+        'refuse immédiatement l\'auto-trigger, sans attendre le debounce '
+        'pour le découvrir',
+        (tester) async {
+          await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
+
+          // Simule une session précédente ayant déjà consommé tout le
+          // quota du jour — clé DATÉE (même format que
+          // AppState._standardAutoTriggerPrefsKey), écrite directement
+          // dans shared_preferences AVANT toute création d'AppState,
+          // exactement comme le ferait un vrai rechargement de page web
+          // où AppState est reconstruit à neuf mais le disque persiste.
+          final today = DateTime.now();
+          final key = 'ai_auto_standard_count_'
+              '${today.year.toString().padLeft(4, '0')}-'
+              '${today.month.toString().padLeft(2, '0')}-'
+              '${today.day.toString().padLeft(2, '0')}';
+          SharedPreferences.setMockInitialValues({
+            key: AppState.kMaxStandardAutoTriggersPerSession,
+          });
+
+          final state = AppState(); // nouvelle instance = "nouveau F5"
+          state.roomImage = await _tinyImage();
+          state.roomImageVersion = 1;
+
+          state.maybeAutoTriggerStandardAiPreview(ref: 'D609');
+          await _settleStandardDebounce(tester);
+
+          expect(state.showAiAmbiancePanel, isFalse,
+              reason: 'le quota du jour est déjà épuisé dans '
+                  'shared_preferences — même une AppState fraîchement '
+                  'créée (rechargement de page) doit le respecter, pas '
+                  'juste un compteur en mémoire remis à 0 par erreur');
+
+          state.disposeStandardAutoTriggerDebounceForTesting();
+        },
+      );
+
+      testWidgets(
+        'Une génération auto STANDARD réussie incrémente bien le compteur '
+        'PERSISTÉ (relisible par une AUTRE instance AppState simulant un '
+        'rechargement immédiatement après)',
+        (tester) async {
+          await tester.runAsync(() => CatalogueVisibilityGate.instance.ensureLoaded());
+          SharedPreferences.setMockInitialValues({});
+
+          final state1 = AppState();
+          state1.roomImage = await _tinyImage();
+          state1.roomImageVersion = 1;
+          state1.maybeAutoTriggerStandardAiPreview(ref: 'D609');
+          await _settleStandardDebounce(tester);
+          expect(state1.showAiAmbiancePanel, isTrue);
+          state1.disposeStandardAutoTriggerDebounceForTesting();
+
+          // Nouvelle instance = "rechargement de page" juste après — doit
+          // lire le MÊME compteur persisté par state1, pas repartir de 0.
+          final state2 = AppState();
+          await state2.ensureStandardAutoTriggerQuotaLoadedForTesting();
+
+          // On épuise le reste du quota avec state2 pour vérifier que le
+          // compteur repris est bien >= 1 (déjà consommé par state1),
+          // donc qu'il ne reste QUE kMax-1 générations possibles pour
+          // state2, pas kMax complètes.
+          var successes = 0;
+          for (var i = 0; i < AppState.kMaxStandardAutoTriggersPerSession; i++) {
+            state2.roomImage = await _tinyImage();
+            state2.roomImageVersion = 100 + i; // photo "différente" à chaque tour
+            state2.maybeAutoTriggerStandardAiPreview(ref: 'D720');
+            await _settleStandardDebounce(tester);
+            if (state2.showAiAmbiancePanel) {
+              successes++;
+              state2.closeAiAmbiancePanel();
+            }
+          }
+          state2.disposeStandardAutoTriggerDebounceForTesting();
+
+          expect(successes, AppState.kMaxStandardAutoTriggersPerSession - 1,
+              reason: 'state1 a déjà consommé 1 génération du quota '
+                  'PERSISTÉ du jour — state2 (nouvelle instance) doit '
+                  'hériter de ce compteur et ne disposer que de '
+                  '(kMax - 1) générations restantes, jamais kMax '
+                  'complètes comme si le quota était reparti de 0');
+        },
+      );
     },
   );
 

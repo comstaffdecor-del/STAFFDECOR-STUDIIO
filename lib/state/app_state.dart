@@ -307,8 +307,22 @@ class AppState extends ChangeNotifier {
     // visuellement — voir docstring de
     // [maybeAutoTriggerStandardAiPreview] pour tous les garde-fous
     // (whitelist, anti-boucle, debounce, quota session).
+    //
+    // CORRECTIF (brief "Persist quota + studioSelected") :
+    // `selectedProducts.first.ref` n'est PAS forcément la référence que
+    // l'utilisateur regarde/vient d'activer — un utilisateur qui a déjà
+    // 2 produits en projet (ex: une corniche ET une plinthe, familles
+    // différentes) et qui change de photo verrait l'auto-trigger partir
+    // sur le PREMIER produit de la liste, potentiellement pas celui
+    // affiché/actif dans le strip Studio. [studioSelected] (assigné dans
+    // [addToProject], seule écriture de ce champ) reflète la DERNIÈRE
+    // ref réellement activée par l'utilisateur, quel que soit l'ordre
+    // dans [selectedProducts] — repli sur `.first.ref` uniquement si
+    // [studioSelected] est encore `null` (ex: état restauré depuis
+    // shared_preferences avant toute interaction studio).
     if (selectedProducts.isNotEmpty) {
-      maybeAutoTriggerStandardAiPreview(ref: selectedProducts.first.ref);
+      final activeRef = studioSelected ?? selectedProducts.first.ref;
+      maybeAutoTriggerStandardAiPreview(ref: activeRef);
     }
   }
 
@@ -969,7 +983,81 @@ class AppState extends ChangeNotifier {
   /// JAMAIS le parcours manuel (icône topbar), uniquement l'automatique.
   static const int kMaxStandardAutoTriggersPerSession = 10;
 
+  /// CORRECTIF (brief "Persist quota SharedPreferences") : un compteur
+  /// purement en mémoire est réinitialisé à 0 à chaque F5/rechargement de
+  /// la page web — sur le web, [AppState] est reconstruit à chaque
+  /// rechargement, contrairement à une "vraie session" mobile. Sans
+  /// persistance, un utilisateur (ou un test manuel) qui recharge la
+  /// page peut redéclencher indéfiniment des générations facturées en
+  /// contournant le quota. Le compteur est donc lu/écrit dans
+  /// `shared_preferences` sous une clé DATÉE (`ai_auto_standard_count_
+  /// YYYY-MM-DD`, voir [_standardAutoTriggerPrefsKey]) : le quota se
+  /// remet naturellement à 0 chaque nouveau jour calendaire, sans avoir
+  /// besoin d'un mécanisme de purge séparé.
   int _standardAutoTriggerCount = 0;
+
+  /// Vrai une fois [_standardAutoTriggerCount] effectivement chargé
+  /// depuis `shared_preferences` pour la clé du jour courant — tant que
+  /// c'est faux, la valeur en mémoire (0 par défaut) peut être
+  /// temporairement inexacte ; voir [_ensureStandardAutoTriggerCountLoaded].
+  bool _standardAutoTriggerCountLoaded = false;
+
+  /// Évite les lectures concurrentes de `shared_preferences` si
+  /// [maybeAutoTriggerStandardAiPreview] est appelée plusieurs fois avant
+  /// la fin du premier chargement (ex: plusieurs taps rapides avant même
+  /// l'expiration du debounce).
+  Future<void>? _standardAutoTriggerCountLoading;
+
+  /// Clé `shared_preferences` du quota auto-IA STANDARD pour AUJOURD'HUI
+  /// (heure locale de l'appareil) — voir docstring de
+  /// [_standardAutoTriggerCount].
+  String _standardAutoTriggerPrefsKey([DateTime? now]) {
+    final d = now ?? DateTime.now();
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return 'ai_auto_standard_count_$y-$m-$day';
+  }
+
+  /// Charge (une seule fois par jour calendaire) le compteur persisté
+  /// depuis `shared_preferences` dans [_standardAutoTriggerCount]. Appelé
+  /// en "fire-and-forget" dès le premier appel de
+  /// [maybeAutoTriggerStandardAiPreview] ; le [Timer] de debounce (1,5 s)
+  /// laisse largement le temps à cette lecture asynchrone de se terminer
+  /// avant que le contrôle de quota AUTORITAIRE (dans le callback du
+  /// Timer, voir plus bas) ne s'exécute réellement.
+  Future<void> _ensureStandardAutoTriggerCountLoaded() async {
+    if (_standardAutoTriggerCountLoaded) return;
+    if (_standardAutoTriggerCountLoading != null) {
+      await _standardAutoTriggerCountLoading;
+      return;
+    }
+    final completer = Completer<void>();
+    _standardAutoTriggerCountLoading = completer.future;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _standardAutoTriggerCount = prefs.getInt(_standardAutoTriggerPrefsKey()) ?? 0;
+    } catch (_) {
+      _standardAutoTriggerCount = 0;
+    } finally {
+      _standardAutoTriggerCountLoaded = true;
+      completer.complete();
+    }
+  }
+
+  /// Persiste [_standardAutoTriggerCount] AVANT d'ouvrir le panneau IA
+  /// (donc avant tout appel réseau vers le proxy Gemini) — garantit qu'un
+  /// rechargement de page juste après une génération auto ne "rembourse"
+  /// jamais artificiellement le quota du jour.
+  Future<void> _persistStandardAutoTriggerCount() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_standardAutoTriggerPrefsKey(), _standardAutoTriggerCount);
+    } catch (_) {
+      // stockage indisponible — comportement dégradé mais non bloquant,
+      // identique au reste de la persistance de cette classe (voir [save]).
+    }
+  }
 
   /// Signature (`sku#roomImageVersion#add`) du dernier aperçu IA
   /// STANDARD déjà déclenché AUTOMATIQUEMENT — anti-boucle : tant que ni
@@ -984,17 +1072,43 @@ class AppState extends ChangeNotifier {
     _standardAutoTriggerDebounce = null;
   }
 
+  /// Réinitialise l'état du quota EN MÉMOIRE (pas dans
+  /// `shared_preferences`) pour permettre à un test de repartir d'un
+  /// chargement propre — utile pour tester le comportement de
+  /// [_ensureStandardAutoTriggerCountLoaded] sur une nouvelle instance
+  /// [AppState] simulant un rechargement de page le même jour.
+  @visibleForTesting
+  void resetStandardAutoTriggerQuotaForTesting() {
+    _standardAutoTriggerCount = 0;
+    _standardAutoTriggerCountLoaded = false;
+    _standardAutoTriggerCountLoading = null;
+  }
+
+  /// Attend explicitement la fin du chargement du quota persisté —
+  /// réservé aux tests qui doivent vérifier une valeur de
+  /// [_standardAutoTriggerCount] déjà chargée depuis
+  /// `shared_preferences` sans dépendre du timing du debounce.
+  @visibleForTesting
+  Future<void> ensureStandardAutoTriggerQuotaLoadedForTesting() =>
+      _ensureStandardAutoTriggerCountLoaded();
+
   void maybeAutoTriggerStandardAiPreview({required String ref}) {
     if (kDebugMode) {
       debugPrint('[AI_AUTO_STANDARD] called ref=$ref '
           'hasRoom=${roomImage != null} '
           'generating=$aiAmbianceGenerating '
           'visible=${CatalogueVisibilityGate.instance.presentationVisible(ref)} '
-          'version=$roomImageVersion');
+          'version=$roomImageVersion '
+          'enabled=$kAiPreviewEnabled '
+          'countLoaded=$_standardAutoTriggerCountLoaded '
+          'count=$_standardAutoTriggerCount/$kMaxStandardAutoTriggersPerSession');
     }
-    if (!kAiPreviewEnabled) return;
+    if (!kAiPreviewEnabled) {
+      if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: disabled');
+      return;
+    }
     if (roomImage == null) {
-      if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: no room');
+      if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: no room image');
       return;
     }
 
@@ -1005,10 +1119,17 @@ class AppState extends ChangeNotifier {
     final visible = CatalogueVisibilityGate.instance.presentationVisible(ref);
     if (visible == false) {
       if (kDebugMode) {
-        debugPrint('[AI_AUTO_STANDARD] skip: not whitelisted ref=$ref');
+        debugPrint('[AI_AUTO_STANDARD] skip: unsupported sku ref=$ref');
       }
       return; // SKU explicitement hors whitelist
     }
+
+    // CORRECTIF (brief "Persist quota SharedPreferences") : lance (sans
+    // attendre) le chargement du quota persisté du jour — le debounce de
+    // 1,5 s ci-dessous laisse largement le temps à cette lecture (rapide,
+    // shared_preferences) de se terminer avant le contrôle AUTORITAIRE
+    // fait dans le callback du Timer.
+    unawaited(_ensureStandardAutoTriggerCountLoaded());
 
     final key = '$ref#$roomImageVersion#add';
     if (_lastStandardAutoTriggerKey == key) {
@@ -1017,9 +1138,12 @@ class AppState extends ChangeNotifier {
       }
       return; // déjà généré pour ce couple
     }
-    if (_standardAutoTriggerCount >= kMaxStandardAutoTriggersPerSession) {
-      // Quota session atteint — le rendu dynamique reste affiché,
-      // l'utilisateur garde l'accès manuel via l'icône topbar.
+    if (_standardAutoTriggerCountLoaded &&
+        _standardAutoTriggerCount >= kMaxStandardAutoTriggersPerSession) {
+      // Pré-contrôle rapide (uniquement si le quota est déjà chargé) —
+      // évite de programmer un Timer pour rien. Le contrôle AUTORITAIRE
+      // (après chargement garanti) est refait dans le callback ci-dessous
+      // de toute façon.
       if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: quota reached');
       return;
     }
@@ -1027,15 +1151,25 @@ class AppState extends ChangeNotifier {
     // Debounce : un nouvel appel (changement rapide de SKU) annule
     // systématiquement la tentative précédente encore en attente.
     _standardAutoTriggerDebounce?.cancel();
-    _standardAutoTriggerDebounce = Timer(kStandardAutoTriggerDebounce, () {
-      if (!kAiPreviewEnabled) return;
+    _standardAutoTriggerDebounce = Timer(kStandardAutoTriggerDebounce, () async {
+      // Contrôle AUTORITAIRE du quota : on attend ici la fin du
+      // chargement lancé plus haut (déjà terminé dans l'écrasante
+      // majorité des cas, le debounce ayant laissé le temps) avant de
+      // décider quoi que ce soit — jamais de quota approximatif basé sur
+      // une valeur par défaut (0) pas encore relue depuis le disque.
+      await _ensureStandardAutoTriggerCountLoaded();
+
+      if (!kAiPreviewEnabled) {
+        if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: disabled');
+        return;
+      }
       if (roomImage == null) {
-        if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: no room');
+        if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: no room image');
         return;
       }
       if (aiAmbianceGenerating) {
         if (kDebugMode) {
-          debugPrint('[AI_AUTO_STANDARD] skip: generating already');
+          debugPrint('[AI_AUTO_STANDARD] skip: generation already running');
         }
         return;
       }
@@ -1054,8 +1188,13 @@ class AppState extends ChangeNotifier {
 
       _lastStandardAutoTriggerKey = currentKey;
       _standardAutoTriggerCount++;
+      // Persisté AVANT l'ouverture du panneau (donc avant tout appel
+      // réseau vers le proxy Gemini) — voir docstring de
+      // [_persistStandardAutoTriggerCount].
+      await _persistStandardAutoTriggerCount();
       if (kDebugMode) {
-        debugPrint('[AI_AUTO_STANDARD] opening panel ref=$ref key=$currentKey');
+        debugPrint('[AI_AUTO_STANDARD] opening panel ref=$ref key=$currentKey '
+            'count=$_standardAutoTriggerCount/$kMaxStandardAutoTriggersPerSession');
       }
       // autoGenerateHybrid volontairement absent (défaut false) :
       // AiAmbiancePanel utilisera _useCurrentScene() (photo brute) +
@@ -1246,6 +1385,14 @@ class AppState extends ChangeNotifier {
     selectedProducts.add(
       ProjectItem(ref: ref, famille: prod.famille, qte: qte, unite: prod.unite),
     );
+    // [ref] devient le produit "actif" du strip Studio — c'est la SEULE
+    // écriture de [studioSelected] dans tout le code (champ déclaré mais
+    // jamais assigné auparavant, ce qui rendait tout usage de
+    // `studioSelected ?? ...` illusoire). Centraliser ici garantit que
+    // [studioSelected] reflète toujours la dernière ref réellement
+    // ajoutée/activée par l'utilisateur, quel que soit le point d'entrée
+    // UI (quickToggleProd, product_modal, future évolutions).
+    studioSelected = ref;
     notifyListeners();
     save();
     // P22-HYBRIDE-AUTO — RETIRÉ (voir docstring de
