@@ -294,15 +294,22 @@ class AppState extends ChangeNotifier {
     isCalibrated = false;
     notifyListeners();
     unawaited(autoDetectEdges());
-    // P22-HYBRIDE-AUTO — RETIRÉ après test visuel réel (décision produit,
-    // voir docstring complète de [maybeAutoTriggerHybridAiPreview]) :
-    // Mano/Nano en mode 'refine' sur une capture du rendu dynamique
-    // produit un résultat visuellement dégradé, parce qu'il affine une
-    // pose déjà fausse/imprécise au lieu de la corriger. AUCUN
-    // déclenchement automatique de l'IA ne doit avoir lieu ici — la
-    // fonction reste disponible mais n'est plus appelée nulle part en
-    // production (voir aussi [setRoomImageBytes]/[loadDemoScene]/
-    // [addToProject] pour les 2 autres points retirés).
+    // P22-HYBRIDE-AUTO — RETIRÉ après test visuel réel (voir docstring
+    // complète de [maybeAutoTriggerHybridAiPreview]) : Mano/Nano en
+    // mode 'refine' sur une capture du rendu dynamique produit un
+    // résultat visuellement dégradé. JAMAIS de captureComposedScene()
+    // ici.
+    //
+    // P23-STANDARD-AUTO — nouvelle photo chargée : si un produit est
+    // déjà sélectionné (cas d'un changement de photo en cours de
+    // projet), déclenche automatiquement l'aperçu IA en mode STANDARD
+    // (photo brute + renderMode='add'), seul rendu validé
+    // visuellement — voir docstring de
+    // [maybeAutoTriggerStandardAiPreview] pour tous les garde-fous
+    // (whitelist, anti-boucle, debounce, quota session).
+    if (selectedProducts.isNotEmpty) {
+      maybeAutoTriggerStandardAiPreview(ref: selectedProducts.first.ref);
+    }
   }
 
   /// Recalcule [imgDraw] quand la taille du conteneur change (rotation,
@@ -410,6 +417,13 @@ class AppState extends ChangeNotifier {
       // P22-HYBRIDE-AUTO — RETIRÉ (voir setRoomImageBytes ci-dessus et
       // docstring de [maybeAutoTriggerHybridAiPreview]) : rejet visuel
       // confirmé par test réel, aucun déclenchement automatique ici.
+      //
+      // P23-STANDARD-AUTO — brief "Correction finale du flow produit"
+      // ne liste QUE [setRoomImageBytes] et [addToProject] comme points
+      // d'entrée du nouveau mécanisme standard — volontairement PAS
+      // reconnecté ici (scène démo) pour rester strictement dans le
+      // périmètre explicitement validé. À reconnecter explicitement si
+      // le besoin est confirmé pour les scènes démo.
     }
   }
 
@@ -885,6 +899,132 @@ class AppState extends ChangeNotifier {
     return bytes;
   }
 
+  /// P23-STANDARD-AUTO — brief "Correction finale du flow produit : le
+  /// rendu IA validé est le MODE STANDARD".
+  ///
+  /// SEUL mécanisme d'auto-déclenchement IA appelé en production (voir
+  /// [setRoomImageBytes] et [addToProject]). Contrairement à
+  /// [maybeAutoTriggerHybridAiPreview] (REJETÉ, voir sa docstring), ce
+  /// mécanisme n'utilise JAMAIS [captureComposedScene] : il envoie
+  /// TOUJOURS la photo BRUTE courante ([roomImage]) au proxy Nano/Mano,
+  /// avec `renderMode: 'add'` (Gemini ajoute lui-même la corniche
+  /// `control/<sku>.png` depuis zéro) — c'est le SEUL rendu validé
+  /// visuellement à ce jour.
+  ///
+  /// Flow :
+  ///   1. l'utilisateur importe une photo, ou sélectionne/ajoute un
+  ///      produit sur une photo déjà chargée ;
+  ///   2. après un court [debounce] (évite de facturer une génération
+  ///      par SKU parcouru rapidement, ex: scroll produit) ;
+  ///   3. le panneau IA s'ouvre automatiquement et lance directement la
+  ///      génération réelle sur la photo brute + `renderMode: 'add'` —
+  ///      aucun bouton "Générer" à cliquer ;
+  ///   4. le résultat s'affiche avec le badge "MODE STANDARD — corniche
+  ///      ajoutée depuis photo brute" ([AiAmbiancePanel], voir
+  ///      [aiAmbianceAutoGenerate]==true && [aiAmbianceAutoGenerateHybrid]
+  ///      ==false) ;
+  ///   5. en cas d'échec proxy/Gemini, le rendu dynamique déterministe
+  ///      (RoomPainter) reste affiché tel quel — jamais de crash, voir
+  ///      l'écran fallback existant de [AiAmbiancePanel].
+  ///
+  /// [ref] — la référence QUI VIENT D'ÊTRE sélectionnée par
+  /// l'utilisateur (passée explicitement par l'appelant), JAMAIS
+  /// `selectedProducts.first.ref` : un utilisateur qui a déjà 2 produits
+  /// dans des familles différentes puis en change un doit voir l'IA
+  /// réagir au produit qu'il vient de toucher, pas au premier de la
+  /// liste (qui peut être un tout autre SKU choisi il y a longtemps).
+  ///
+  /// Garde-fous (TOUTES les conditions doivent être réunies) :
+  ///  1. [kAiPreviewEnabled] doit être vrai ;
+  ///  2. une photo doit être chargée ([roomImage] non null) ;
+  ///  3. [ref] doit être whitelisté (`assets/profiles/index.json`, voir
+  ///     [CatalogueVisibilityGate]) — jamais de `clientPrompt` libre, le
+  ///     serveur reconstruit tout depuis `sku` + gabarit fixe ;
+  ///  4. aucune génération ne doit déjà être en cours
+  ///     ([aiAmbianceGenerating]) — anti-chevauchement ;
+  ///  5. le couple (`ref`, [roomImageVersion], 'add') ne doit pas être
+  ///     strictement identique au dernier couple déjà déclenché — cache
+  ///     anti-boucle par clé `roomImageVersion#sku#add`
+  ///     ([_lastStandardAutoTriggerKey]) ;
+  ///  6. un quota maximum de générations automatiques par session
+  ///     ([_standardAutoTriggerCount] < [kMaxStandardAutoTriggersPerSession])
+  ///     ne doit pas être dépassé — anti-coût minimal : au-delà, l'IA
+  ///     automatique s'arrête silencieusement (le rendu dynamique reste
+  ///     affiché), l'utilisateur garde toujours l'accès MANUEL via
+  ///     l'icône topbar.
+  ///
+  /// [debounce] : un changement rapproché de SKU (ex: l'utilisateur
+  /// clique D520 puis D545 puis D609 en moins de 2 secondes) annule
+  /// systématiquement la tentative précédente encore en attente — SEUL
+  /// le dernier SKU sélectionné après [kStandardAutoTriggerDebounce]
+  /// sans nouveau changement part effectivement en génération. Implanté
+  /// via un simple `Timer` annulé/relancé à chaque appel (voir
+  /// [_standardAutoTriggerDebounce]).
+  static const Duration kStandardAutoTriggerDebounce = Duration(milliseconds: 1500);
+
+  /// Nombre maximum de générations IA STANDARD auto-déclenchées par
+  /// session applicative (reset uniquement à la recréation d'[AppState],
+  /// ex: rechargement complet de la page) — anti-coût minimal viable,
+  /// voir docstring de [maybeAutoTriggerStandardAiPreview]. Ne bloque
+  /// JAMAIS le parcours manuel (icône topbar), uniquement l'automatique.
+  static const int kMaxStandardAutoTriggersPerSession = 10;
+
+  int _standardAutoTriggerCount = 0;
+
+  /// Signature (`sku#roomImageVersion#add`) du dernier aperçu IA
+  /// STANDARD déjà déclenché AUTOMATIQUEMENT — anti-boucle : tant que ni
+  /// le SKU ni la photo n'ont changé, on ne redéclenche jamais.
+  String? _lastStandardAutoTriggerKey;
+
+  Timer? _standardAutoTriggerDebounce;
+
+  @visibleForTesting
+  void disposeStandardAutoTriggerDebounceForTesting() {
+    _standardAutoTriggerDebounce?.cancel();
+    _standardAutoTriggerDebounce = null;
+  }
+
+  void maybeAutoTriggerStandardAiPreview({required String ref}) {
+    if (!kAiPreviewEnabled) return;
+    if (roomImage == null) return;
+
+    // Garde whitelist SKU — même source que le reste du catalogue
+    // présentation. `null` = index pas encore chargé : fail-open (on ne
+    // bloque pas), cohérent avec [applyPresentationVisibility] et
+    // [maybeAutoTriggerHybridAiPreview].
+    final visible = CatalogueVisibilityGate.instance.presentationVisible(ref);
+    if (visible == false) return; // SKU explicitement hors whitelist
+
+    final key = '$ref#$roomImageVersion#add';
+    if (_lastStandardAutoTriggerKey == key) return; // déjà généré pour ce couple
+    if (_standardAutoTriggerCount >= kMaxStandardAutoTriggersPerSession) {
+      // Quota session atteint — le rendu dynamique reste affiché,
+      // l'utilisateur garde l'accès manuel via l'icône topbar.
+      return;
+    }
+
+    // Debounce : un nouvel appel (changement rapide de SKU) annule
+    // systématiquement la tentative précédente encore en attente.
+    _standardAutoTriggerDebounce?.cancel();
+    _standardAutoTriggerDebounce = Timer(kStandardAutoTriggerDebounce, () {
+      if (!kAiPreviewEnabled) return;
+      if (roomImage == null) return;
+      if (aiAmbianceGenerating) return;
+      final currentKey = '$ref#$roomImageVersion#add';
+      if (currentKey != key) return; // photo/version a changé entre-temps
+      if (_lastStandardAutoTriggerKey == currentKey) return;
+      if (_standardAutoTriggerCount >= kMaxStandardAutoTriggersPerSession) return;
+
+      _lastStandardAutoTriggerKey = currentKey;
+      _standardAutoTriggerCount++;
+      // autoGenerateHybrid volontairement absent (défaut false) :
+      // AiAmbiancePanel utilisera _useCurrentScene() (photo brute) +
+      // _generate() -> renderMode='add' (resolveRenderModeForScene),
+      // jamais captureComposedScene().
+      openAiAmbiancePanel(prefillRef: ref, autoGenerate: true);
+    });
+  }
+
   /// Dernier aperçu IA généré avec succès — stocké ici (et non plus
   /// gardé uniquement en état local éphémère de [AiAmbiancePanel]) pour
   /// que l'écran Avant/Après (Comparateur) puisse afficher photo
@@ -1068,9 +1208,19 @@ class AppState extends ChangeNotifier {
     );
     notifyListeners();
     save();
-    // P22-HYBRIDE-AUTO — RETIRÉ (voir setRoomImageBytes ci-dessus et
-    // docstring de [maybeAutoTriggerHybridAiPreview]) : rejet visuel
-    // confirmé par test réel, aucun déclenchement automatique ici.
+    // P22-HYBRIDE-AUTO — RETIRÉ (voir docstring de
+    // [maybeAutoTriggerHybridAiPreview]) : rejet visuel confirmé par
+    // test réel, jamais de captureComposedScene() ici.
+    //
+    // P23-STANDARD-AUTO — [ref] est la référence QUI VIENT D'ÊTRE
+    // ajoutée par l'utilisateur (paramètre de cette fonction), JAMAIS
+    // `selectedProducts.first.ref` : voir docstring de
+    // [maybeAutoTriggerStandardAiPreview] pour la justification et
+    // tous les garde-fous (whitelist, anti-boucle, debounce, quota
+    // session) — ne déclenche que si une photo est déjà chargée.
+    if (roomImage != null) {
+      maybeAutoTriggerStandardAiPreview(ref: ref);
+    }
   }
 
   /// Quantité nette pour une famille, avec repli sur une estimation
