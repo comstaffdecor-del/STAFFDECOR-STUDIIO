@@ -48,6 +48,19 @@ Future<AiPreviewResult> Function({
   required String renderMode,
 })? debugGenerateAiAmbiancePreviewOverride;
 
+/// P21-HYBRIDE (correction revue, brief "sécurisation test hybride") —
+/// fonction PURE extraite pour rendre la règle de résolution du
+/// `renderMode` testable unitairement, sans passer par un test widget
+/// lourd (pompes `pumpAndSettle` autour d'un appel réseau simulé,
+/// instable et lent). Règle inchangée : 'refine' uniquement quand la
+/// scène provient de [_useComposedScene] (rendu dynamique déjà
+/// composé) ; 'add' dans tous les autres cas (comportement historique
+/// : photo brute, scène démo, import direct).
+@visibleForTesting
+String resolveRenderModeForScene({required bool isHybridScene}) {
+  return isHybridScene ? 'refine' : 'add';
+}
+
 const _demoScenesForAi = {
   'haussmann': 'Haussmannien',
   'moderne': 'Contemporain',
@@ -256,11 +269,10 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     final appState = context.read<AppState>();
     appState.setAiAmbianceGenerating(true);
 
-    // P21-HYBRIDE — 'refine' uniquement si la scène provient de
-    // [_useComposedScene] (rendu dynamique déjà composé) ; 'add' dans
-    // tous les autres cas (comportement historique inchangé : photo
-    // brute, scène démo, import direct).
-    final renderMode = _isHybridScene ? 'refine' : 'add';
+    // P21-HYBRIDE — voir docstring de [resolveRenderModeForScene]
+    // (fonction pure, testée unitairement dans
+    // test/widget/ai_ambiance_panel_render_mode_test.dart).
+    final renderMode = resolveRenderModeForScene(isHybridScene: _isHybridScene);
 
     final AiPreviewResult result;
     try {
