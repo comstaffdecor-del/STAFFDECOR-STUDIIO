@@ -35,6 +35,7 @@
 //  - le stockage Avant/Après continue de fonctionner.
 library;
 
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -344,7 +345,7 @@ void main() {
     );
 
     testWidgets(
-      '8. Quota session : au-delà de kMaxStandardAutoTriggersPerSession '
+      '8. Quota jour calendaire : au-delà de kMaxStandardAutoTriggersPerDay '
       'générations automatiques, plus aucun auto-trigger (le parcours '
       'manuel reste toujours disponible)',
       (tester) async {
@@ -353,7 +354,7 @@ void main() {
         final state = AppState();
         state.roomImage = await _tinyImage();
 
-        for (var i = 0; i < AppState.kMaxStandardAutoTriggersPerSession; i++) {
+        for (var i = 0; i < AppState.kMaxStandardAutoTriggersPerDay; i++) {
           state.roomImageVersion = i + 1; // photo "différente" à chaque tour
           state.maybeAutoTriggerStandardAiPreview(ref: 'D609');
           await _settleStandardDebounce(tester);
@@ -364,7 +365,7 @@ void main() {
 
         // Quota désormais épuisé — une nouvelle tentative (nouvelle photo,
         // donc pas bloquée par l'anti-boucle) ne doit PAS déclencher.
-        state.roomImageVersion = AppState.kMaxStandardAutoTriggersPerSession + 1;
+        state.roomImageVersion = AppState.kMaxStandardAutoTriggersPerDay + 1;
         state.maybeAutoTriggerStandardAiPreview(ref: 'D609');
         await _settleStandardDebounce(tester);
 
@@ -536,7 +537,7 @@ void main() {
               '${today.month.toString().padLeft(2, '0')}-'
               '${today.day.toString().padLeft(2, '0')}';
           SharedPreferences.setMockInitialValues({
-            key: AppState.kMaxStandardAutoTriggersPerSession,
+            key: AppState.kMaxStandardAutoTriggersPerDay,
           });
 
           final state = AppState(); // nouvelle instance = "nouveau F5"
@@ -582,7 +583,7 @@ void main() {
           // donc qu'il ne reste QUE kMax-1 générations possibles pour
           // state2, pas kMax complètes.
           var successes = 0;
-          for (var i = 0; i < AppState.kMaxStandardAutoTriggersPerSession; i++) {
+          for (var i = 0; i < AppState.kMaxStandardAutoTriggersPerDay; i++) {
             state2.roomImage = await _tinyImage();
             state2.roomImageVersion = 100 + i; // photo "différente" à chaque tour
             state2.maybeAutoTriggerStandardAiPreview(ref: 'D720');
@@ -594,7 +595,7 @@ void main() {
           }
           state2.disposeStandardAutoTriggerDebounceForTesting();
 
-          expect(successes, AppState.kMaxStandardAutoTriggersPerSession - 1,
+          expect(successes, AppState.kMaxStandardAutoTriggersPerDay - 1,
               reason: 'state1 a déjà consommé 1 génération du quota '
                   'PERSISTÉ du jour — state2 (nouvelle instance) doit '
                   'hériter de ce compteur et ne disposer que de '
@@ -660,4 +661,78 @@ void main() {
       },
     );
   });
+
+  group(
+    'Verrou statique - le lien setRoomImageBytes -> '
+    'maybeAutoTriggerStandardAiPreview ne doit JAMAIS disparaitre '
+    'silencieusement',
+    () {
+      // CORRECTIF (brief "test statique demande") : les tests
+      // comportementaux ci-dessus (groupe "Auto-trigger STANDARD")
+      // verifient l'EFFET de l'appel (panneau IA qui s'ouvre apres le
+      // debounce), mais un futur refactor de [AppState.setRoomImageBytes]
+      // pourrait retirer l'appel a [AppState.maybeAutoTriggerStandardAiPreview]
+      // sans qu'aucun test comportemental existant ne le detecte
+      // directement (ex: si le refactor deplace ce declenchement dans
+      // une autre methode appelee par ailleurs, ou le supprime carrement
+      // pendant qu'un autre test passe encore pour de mauvaises
+      // raisons). Ce test lit le SOURCE de `app_state.dart` comme texte
+      // brut et verifie litteralement que le corps de la methode
+      // `setRoomImageBytes` contient bien l'appel - un filet de securite
+      // "statique" independant du comportement runtime, volontairement
+      // tres simple pour rester robuste aux refactors mineurs (renommage
+      // de variables locales, reordonnancement de lignes, etc.), tout en
+      // detectant a coup sur la disparition pure et simple de l'appel.
+      test(
+        'le corps de setRoomImageBytes() dans lib/state/app_state.dart '
+        'contient toujours un appel a maybeAutoTriggerStandardAiPreview(',
+        () {
+          final file = File(
+            '${Directory.current.path}/lib/state/app_state.dart',
+          );
+          expect(file.existsSync(), isTrue,
+              reason: 'lib/state/app_state.dart doit exister a cet '
+                  'emplacement relatif a la racine du projet Flutter');
+
+          final source = file.readAsStringSync();
+
+          // Isole le corps de setRoomImageBytes en reperant sa signature,
+          // puis la signature de la methode suivante (setRoomImageFile)
+          // qui delimite naturellement la fin du corps - evite un vrai
+          // parsing Dart, volontairement simple et donc robuste.
+          final startMarker = 'Future<void> setRoomImageBytes(';
+          final startIndex = source.indexOf(startMarker);
+          expect(startIndex, isNot(-1),
+              reason: 'la methode setRoomImageBytes doit exister dans '
+                  'app_state.dart - si elle a ete renommee, ce test doit '
+                  'etre mis a jour EN CONNAISSANCE DE CAUSE, pas parce '
+                  'que le lien vers maybeAutoTriggerStandardAiPreview a '
+                  'disparu silencieusement');
+
+          // Fin du corps : le prochain point d'entree de methode publique
+          // apres le debut de setRoomImageBytes. On cherche une signature
+          // de methode suivante connue et stable (recomputeImgDraw) pour
+          // bornage - si elle aussi disparait, on retombe simplement sur
+          // la fin du fichier (pas de faux negatif possible).
+          final nextMethodMarker = 'void recomputeImgDraw(';
+          final nextMethodIndex = source.indexOf(nextMethodMarker, startIndex);
+          final endIndex = nextMethodIndex == -1 ? source.length : nextMethodIndex;
+
+          final body = source.substring(startIndex, endIndex);
+
+          expect(
+            body.contains('maybeAutoTriggerStandardAiPreview('),
+            isTrue,
+            reason: 'REGRESSION CRITIQUE : setRoomImageBytes() ne contient '
+                'plus aucun appel a maybeAutoTriggerStandardAiPreview(). '
+                'Le SEUL mode IA valide visuellement (MODE STANDARD) ne '
+                'se declenchera plus automatiquement lors du chargement '
+                'd\'une photo alors qu\'un produit est deja selectionne. '
+                'Si ce retrait est INTENTIONNEL, mettre a jour ce test '
+                'en connaissance de cause plutot que de le supprimer.',
+          );
+        },
+      );
+    },
+  );
 }

@@ -315,13 +315,25 @@ class AppState extends ChangeNotifier {
     // différentes) et qui change de photo verrait l'auto-trigger partir
     // sur le PREMIER produit de la liste, potentiellement pas celui
     // affiché/actif dans le strip Studio. [studioSelected] (assigné dans
-    // [addToProject], seule écriture de ce champ) reflète la DERNIÈRE
-    // ref réellement activée par l'utilisateur, quel que soit l'ordre
-    // dans [selectedProducts] — repli sur `.first.ref` uniquement si
-    // [studioSelected] est encore `null` (ex: état restauré depuis
-    // shared_preferences avant toute interaction studio).
+    // [addToProject], seule écriture de ce champ, ET remis à `null` par
+    // [removeProd] quand la ref retirée était la sélection active)
+    // reflète la DERNIÈRE ref réellement activée par l'utilisateur.
+    //
+    // BLINDAGE SUPPLÉMENTAIRE (brief "regression réelle : studioSelected
+    // jamais remis à null dans removeProd") : même si [removeProd] reset
+    // désormais [studioSelected] correctement, on revérifie ICI son
+    // appartenance à [selectedProducts] par défense en profondeur —
+    // ex: restauration d'état ([restore]) qui ne recharge pas
+    // explicitement [studioSelected], ou toute future voie de retrait
+    // qui oublierait ce reset. Sans cette double vérification, un
+    // `studioSelected` obsolète pointant vers un produit ABSENT du
+    // projet déclencherait une génération IA AUTOMATIQUE — donc
+    // FACTURÉE — sur un SKU que l'utilisateur ne veut plus voir.
     if (selectedProducts.isNotEmpty) {
-      final activeRef = studioSelected ?? selectedProducts.first.ref;
+      final selectedIsStillActive = studioSelected != null &&
+          getProdInProject(studioSelected!) != null;
+      final activeRef =
+          selectedIsStillActive ? studioSelected! : selectedProducts.first.ref;
       maybeAutoTriggerStandardAiPreview(ref: activeRef);
     }
   }
@@ -960,8 +972,9 @@ class AppState extends ChangeNotifier {
   ///     strictement identique au dernier couple déjà déclenché — cache
   ///     anti-boucle par clé `roomImageVersion#sku#add`
   ///     ([_lastStandardAutoTriggerKey]) ;
-  ///  6. un quota maximum de générations automatiques par session
-  ///     ([_standardAutoTriggerCount] < [kMaxStandardAutoTriggersPerSession])
+  ///  6. un quota maximum de générations automatiques par JOUR
+  ///     CALENDAIRE, persisté ([_standardAutoTriggerCount] <
+  ///     [kMaxStandardAutoTriggersPerDay])
   ///     ne doit pas être dépassé — anti-coût minimal : au-delà, l'IA
   ///     automatique s'arrête silencieusement (le rendu dynamique reste
   ///     affiché), l'utilisateur garde toujours l'accès MANUEL via
@@ -976,12 +989,25 @@ class AppState extends ChangeNotifier {
   /// [_standardAutoTriggerDebounce]).
   static const Duration kStandardAutoTriggerDebounce = Duration(milliseconds: 1500);
 
-  /// Nombre maximum de générations IA STANDARD auto-déclenchées par
-  /// session applicative (reset uniquement à la recréation d'[AppState],
-  /// ex: rechargement complet de la page) — anti-coût minimal viable,
-  /// voir docstring de [maybeAutoTriggerStandardAiPreview]. Ne bloque
-  /// JAMAIS le parcours manuel (icône topbar), uniquement l'automatique.
-  static const int kMaxStandardAutoTriggersPerSession = 10;
+  /// Nombre maximum de générations IA STANDARD auto-déclenchées par JOUR
+  /// CALENDAIRE (et non plus par "session applicative" — voir CORRECTIF
+  /// ci-dessous). Persisté dans `shared_preferences` sous une clé DATÉE
+  /// ([_standardAutoTriggerPrefsKey]) : le quota se remet naturellement
+  /// à 0 au changement de jour calendaire, indépendamment du nombre de
+  /// fois où [AppState] est recréé (ex: rechargements successifs de la
+  /// page web le même jour ne "remboursent" jamais le quota). Anti-coût
+  /// minimal viable, voir docstring de [maybeAutoTriggerStandardAiPreview].
+  /// Ne bloque JAMAIS le parcours manuel (icône topbar), uniquement
+  /// l'automatique.
+  ///
+  /// RENOMMAGE (brief "rename quota PerDay") : cette constante s'appelait
+  /// à l'origine `kMaxStandardAutoTriggersPerSession`, nom devenu
+  /// trompeur dès l'introduction de la persistance `shared_preferences`
+  /// par clé datée (voir [_standardAutoTriggerCount]) — le quota n'a
+  /// jamais été "par session applicative" une fois cette persistance en
+  /// place, mais bien "par jour calendaire". Renommé en
+  /// `kMaxStandardAutoTriggersPerDay` pour refléter la sémantique réelle.
+  static const int kMaxStandardAutoTriggersPerDay = 10;
 
   /// CORRECTIF (brief "Persist quota SharedPreferences") : un compteur
   /// purement en mémoire est réinitialisé à 0 à chaque F5/rechargement de
@@ -1101,7 +1127,7 @@ class AppState extends ChangeNotifier {
           'version=$roomImageVersion '
           'enabled=$kAiPreviewEnabled '
           'countLoaded=$_standardAutoTriggerCountLoaded '
-          'count=$_standardAutoTriggerCount/$kMaxStandardAutoTriggersPerSession');
+          'count=$_standardAutoTriggerCount/$kMaxStandardAutoTriggersPerDay');
     }
     if (!kAiPreviewEnabled) {
       if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: disabled');
@@ -1139,7 +1165,7 @@ class AppState extends ChangeNotifier {
       return; // déjà généré pour ce couple
     }
     if (_standardAutoTriggerCountLoaded &&
-        _standardAutoTriggerCount >= kMaxStandardAutoTriggersPerSession) {
+        _standardAutoTriggerCount >= kMaxStandardAutoTriggersPerDay) {
       // Pré-contrôle rapide (uniquement si le quota est déjà chargé) —
       // évite de programmer un Timer pour rien. Le contrôle AUTORITAIRE
       // (après chargement garanti) est refait dans le callback ci-dessous
@@ -1181,7 +1207,7 @@ class AppState extends ChangeNotifier {
         }
         return;
       }
-      if (_standardAutoTriggerCount >= kMaxStandardAutoTriggersPerSession) {
+      if (_standardAutoTriggerCount >= kMaxStandardAutoTriggersPerDay) {
         if (kDebugMode) debugPrint('[AI_AUTO_STANDARD] skip: quota reached');
         return;
       }
@@ -1194,7 +1220,7 @@ class AppState extends ChangeNotifier {
       await _persistStandardAutoTriggerCount();
       if (kDebugMode) {
         debugPrint('[AI_AUTO_STANDARD] opening panel ref=$ref key=$currentKey '
-            'count=$_standardAutoTriggerCount/$kMaxStandardAutoTriggersPerSession');
+            'count=$_standardAutoTriggerCount/$kMaxStandardAutoTriggersPerDay');
       }
       // autoGenerateHybrid volontairement absent (défaut false) :
       // AiAmbiancePanel utilisera _useCurrentScene() (photo brute) +
@@ -1303,9 +1329,24 @@ class AppState extends ChangeNotifier {
   }
 
   /// Retire un produit du projet (et sa position de snap).
+  ///
+  /// CORRECTIF (brief "removeProd doit reset studioSelected") : sans ce
+  /// reset, [studioSelected] pouvait continuer à pointer vers une ref
+  /// qui n'est PLUS dans [selectedProducts] après un retrait (ex:
+  /// quickToggleProd(D609) en retrait). Un import de photo juste après
+  /// (`setRoomImageBytes`) lirait alors `studioSelected` (toujours
+  /// "D609") comme référence active et déclencherait une génération IA
+  /// AUTOMATIQUE — donc FACTURÉE — sur un produit que l'utilisateur
+  /// vient explicitement de retirer du projet. Voir aussi le
+  /// blindage supplémentaire dans [setRoomImageBytes] (double
+  /// protection : ce reset ICI, + une revérification d'appartenance à
+  /// [selectedProducts] au moment de lire `studioSelected`).
   void removeProd(String ref) {
     selectedProducts = selectedProducts.where((p) => p.ref != ref).toList();
     prodPositions.remove(ref);
+    if (studioSelected == ref) {
+      studioSelected = null;
+    }
     notifyListeners();
     save();
   }
