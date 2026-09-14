@@ -25,6 +25,7 @@ import 'package:flutter/widgets.dart' show Size;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/catalogue_data.dart';
+import '../data/ia_ambiance_preview.dart' show kAiPreviewEnabled;
 import '../core/chiffrage.dart';
 import '../core/perspective/edge_detect.dart';
 import '../models/contact_info.dart';
@@ -96,6 +97,15 @@ class AppState extends ChangeNotifier {
   /// Image de la pièce (photo importée ou scène démo) décodée pour le
   /// [CustomPainter]. Null tant qu'aucune photo/démo n'est chargée.
   ui.Image? roomImage;
+
+  /// Compteur incrémenté à CHAQUE nouvelle image de pièce chargée (import
+  /// photo ou scène démo) — sert de signature simple et fiable pour
+  /// détecter un changement de scène, bien plus robuste qu'un hash sur
+  /// [roomImage] (qui peut être un objet Dart réutilisé/identique en
+  /// mémoire). Utilisé exclusivement par [shouldAutoTriggerAiPreview]
+  /// (P20-AUTO) pour la protection anti-boucle du déclenchement
+  /// automatique de l'aperçu IA — ne pilote aucun rendu.
+  int roomImageVersion = 0;
 
   /// Vrai si la scène active est une scène démo (pas une vraie photo).
   bool isDemoRoom = false;
@@ -225,6 +235,7 @@ class AppState extends ChangeNotifier {
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
     roomImage = frame.image;
+    roomImageVersion++;
     isDemoRoom = demo;
     _lastPhotoZoneSize = containerSize;
     imgDraw = computeImgDraw(
@@ -244,6 +255,10 @@ class AppState extends ChangeNotifier {
     isCalibrated = false;
     notifyListeners();
     unawaited(autoDetectEdges());
+    // P20-AUTO : nouvelle photo chargée — si un produit est déjà
+    // sélectionné, déclenche l'aperçu IA automatiquement (voir garde
+    // anti-boucle dans maybeAutoTriggerAiPreview).
+    maybeAutoTriggerAiPreview();
   }
 
   /// Recalcule [imgDraw] quand la taille du conteneur change (rotation,
@@ -305,6 +320,7 @@ class AppState extends ChangeNotifier {
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
       roomImage = frame.image;
+      roomImageVersion++;
       _lastPhotoZoneSize = size;
       imgDraw = computeImgDraw(
         roomImage!.width.toDouble(),
@@ -347,6 +363,10 @@ class AppState extends ChangeNotifier {
           unawaited(autoDetectEdges());
         }
       }
+      // P20-AUTO : nouvelle scène démo chargée — même déclenchement
+      // automatique que pour une photo importée (voir
+      // setRoomImageBytes), garde anti-boucle incluse.
+      maybeAutoTriggerAiPreview();
     }
   }
 
@@ -563,18 +583,39 @@ class AppState extends ChangeNotifier {
   bool showAiAmbiancePanel = false;
 
   /// Référence produit à pré-sélectionner à l'ouverture du panneau IA —
-  /// utilisé par le bouton "Générer aperçu IA" du Studio (zone photo),
-  /// qui saute directement les écrans "choix produit" / "choix scène"
-  /// puisque la photo ET le produit sont déjà connus à cet instant.
+  /// utilisé par le déclenchement automatique (P20-AUTO) ET par l'icône
+  /// générique de la topbar (prefillRef == null dans ce dernier cas),
+  /// pour sauter les écrans "choix produit" / "choix scène" quand la
+  /// photo ET le produit sont déjà connus.
   String? aiAmbiancePrefillRef;
 
   /// Si vrai, le panneau IA utilise automatiquement la scène courante du
   /// Studio et lance la génération réelle (proxy Gemini) sans attendre
-  /// d'action supplémentaire de l'utilisateur — déclenché uniquement
-  /// depuis le bouton contextuel "Générer aperçu IA" du Studio, jamais
-  /// depuis l'icône générique de la topbar (qui garde le parcours pas à
-  /// pas complet, y compris le choix libre du produit/scène).
+  /// d'action supplémentaire de l'utilisateur — réservé au déclenchement
+  /// automatique (P20-AUTO), jamais à l'icône générique de la topbar
+  /// (qui garde le parcours pas à pas complet, y compris le choix libre
+  /// du produit/scène).
   bool aiAmbianceAutoGenerate = false;
+
+  /// Vrai pendant qu'une génération IA (déclenchée automatiquement ou
+  /// manuellement) est en cours — mis à jour par [AiAmbiancePanel] via
+  /// [setAiAmbianceGenerating]. Sert de garde anti-boucle : tant qu'une
+  /// génération est en vol, [maybeAutoTriggerAiPreview] ne déclenche
+  /// jamais une seconde génération par-dessus.
+  bool aiAmbianceGenerating = false;
+
+  void setAiAmbianceGenerating(bool value) {
+    aiAmbianceGenerating = value;
+    // Pas de notifyListeners ici : purement un flag de garde interne,
+    // ne pilote aucun affichage (le panneau gère son propre spinner).
+  }
+
+  /// Signature (sku + version de la scène courante) du dernier aperçu IA
+  /// déjà déclenché AUTOMATIQUEMENT — protection anti-boucle P20-AUTO :
+  /// tant que ni le produit sélectionné ni la photo/scène n'ont changé,
+  /// on ne redéclenche jamais la génération, même si `notifyListeners`
+  /// est appelé N fois entre-temps (métrés, calibration, etc.).
+  String? _lastAiAutoTriggerKey;
 
   void openAiAmbiancePanel({String? prefillRef, bool autoGenerate = false}) {
     aiAmbiancePrefillRef = prefillRef;
@@ -588,6 +629,47 @@ class AppState extends ChangeNotifier {
     aiAmbiancePrefillRef = null;
     aiAmbianceAutoGenerate = false;
     notifyListeners();
+  }
+
+  /// P20-AUTO — Déclenchement AUTOMATIQUE de l'aperçu d'ambiance IA, sans
+  /// aucun bouton utilisateur : appelé en interne dès qu'une photo/scène
+  /// est chargée ET qu'un produit est sélectionné dans le Studio (voir
+  /// ([setRoomImageBytes], [loadDemoScene], [addToProject]).
+  ///
+  /// Remplace le bouton flottant "Générer aperçu IA" retiré du Studio
+  /// (retour produit : "l'utilisateur ne doit pas avoir à comprendre
+  /// deux moteurs ou deux étapes") : le rendu dynamique déterministe
+  /// (RoomPainter/cornice_plinth_painter, INCHANGÉ) reste affiché en
+  /// continu dans le Studio ; ce déclencheur ouvre EN PLUS, en tâche de
+  /// fond, le panneau [AiAmbiancePanel] existant (pré-rempli, génération
+  /// auto) qui appelle le proxy réel `/api/ai-render` → Gemini.
+  ///
+  /// Garde anti-boucle (toutes les conditions ci-dessous doivent être
+  /// réunies, sinon retour immédiat sans effet) :
+  ///  1. [kAiPreviewEnabled] doit être vrai (sinon fonction non
+  ///     configurée sur cet environnement) ;
+  ///  2. une photo ou une scène démo doit être chargée ([roomImage]) ;
+  ///  3. au moins un produit doit être sélectionné ([selectedProducts]) ;
+  ///  4. aucune génération ne doit déjà être en cours
+  ///     ([aiAmbianceGenerating]) ;
+  ///  5. le couple (ref du 1er produit, [roomImageVersion]) ne doit PAS
+  ///     être strictement identique au dernier couple déjà déclenché
+  ///     ([_lastAiAutoTriggerKey]) — mémorise donc à la fois le dernier
+  ///     SKU généré ET la scène associée, jamais de re-génération en
+  ///     boucle tant que rien ne change côté utilisateur.
+  void maybeAutoTriggerAiPreview() {
+    if (!kAiPreviewEnabled) return;
+    if (roomImage == null) return;
+    if (selectedProducts.isEmpty) return;
+    if (aiAmbianceGenerating) return;
+    if (showAiAmbiancePanel) return; // ne coupe pas un panneau déjà ouvert
+
+    final ref = selectedProducts.first.ref;
+    final key = '$ref#$roomImageVersion';
+    if (_lastAiAutoTriggerKey == key) return; // déjà généré pour ce couple
+
+    _lastAiAutoTriggerKey = key;
+    openAiAmbiancePanel(prefillRef: ref, autoGenerate: true);
   }
 
   /// Vrai si [productModalQte] est une estimation par défaut (aucun métré
@@ -722,6 +804,11 @@ class AppState extends ChangeNotifier {
     );
     notifyListeners();
     save();
+    // P20-AUTO : nouveau produit sélectionné — si une photo/scène est déjà
+    // chargée, déclenche l'aperçu IA automatiquement (garde anti-boucle
+    // dans maybeAutoTriggerAiPreview : ne repart pas si ce même produit a
+    // déjà été généré sur cette même scène).
+    maybeAutoTriggerAiPreview();
   }
 
   /// Quantité nette pour une famille, avec repli sur une estimation

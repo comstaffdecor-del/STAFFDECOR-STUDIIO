@@ -507,77 +507,7 @@ class _PhotoZone extends StatelessWidget {
           // l'utilisateur : "le drag and drop ne fonctionne pas").
           if (state.showCalibHandles && (hasPhoto || state.isDemoRoom))
             Positioned.fill(child: CalibHandlesOverlay(canvasSize: size, imgDraw: localImgDraw)),
-          // ⚠️ PONT IMPORT PHOTO → APERÇU IA (retour utilisateur : "sur
-          // le lien url, çà donne toujours çà sur l'import photo !!!") —
-          // jusqu'ici, le rendu affiché après import photo + sélection
-          // d'un produit était TOUJOURS le moteur dynamique déterministe
-          // (RoomPainter/cornice_plinth_painter), jamais le rendu Nano
-          // Banana/Gemini réel (déjà validé et fonctionnel, mais isolé
-          // dans le panneau "Aperçu d'ambiance IA" accessible uniquement
-          // via la petite icône baguette de la topbar, à plusieurs clics
-          // du parcours d'import). Ce bouton contextuel, visible
-          // directement sur la photo dès qu'un produit est sélectionné,
-          // ouvre ce MÊME panneau IA existant mais pré-rempli (photo +
-          // SKU courants) et lance la génération réelle immédiatement —
-          // sans dupliquer ni modifier le proxy, RoomPainter ou
-          // cornice_plinth_painter (le rendu dynamique reste inchangé en
-          // dessous, seul un accès direct à l'IA est ajouté par-dessus).
-          if ((hasPhoto || state.isDemoRoom) &&
-              state.selectedProducts.isNotEmpty &&
-              !state.showCalibHandles)
-            Positioned(
-              right: 10,
-              bottom: 10,
-              child: _GenerateAiPreviewButton(
-                ref: state.selectedProducts.first.ref,
-              ),
-            ),
         ],
-      ),
-    );
-  }
-}
-
-/// Bouton contextuel "Générer aperçu IA" — voir commentaire ci-dessus.
-/// Envoie directement la photo courante + le SKU sélectionné au panneau
-/// [AiAmbiancePanel] (donc au proxy `/api/ai-render` → Gemini) en un
-/// seul geste, sans passer par les écrans intermédiaires "choix
-/// produit"/"choix scène" déjà satisfaits par le contexte du Studio.
-class _GenerateAiPreviewButton extends StatelessWidget {
-  final String ref;
-  const _GenerateAiPreviewButton({required this.ref});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: () => context.read<AppState>().openAiAmbiancePanel(
-              prefillRef: ref,
-              autoGenerate: true,
-            ),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.gold,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: const [
-              BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 3)),
-            ],
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(FontAwesomeIcons.wandMagicSparkles, size: 13, color: AppColors.bg),
-              SizedBox(width: 7),
-              Text(
-                'Générer aperçu IA',
-                style: TextStyle(color: AppColors.bg, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

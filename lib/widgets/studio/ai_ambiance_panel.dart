@@ -184,13 +184,24 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     final prod = getProdByRef(ref);
 
     setState(() => _screenState = _AiScreenState.generating);
+    // P20-AUTO : marque une génération en cours au niveau AppState —
+    // c'est CETTE garde (et non un état local au panneau, détruit à la
+    // fermeture) que consulte maybeAutoTriggerAiPreview pour ne jamais
+    // superposer deux générations pour la même scène/produit.
+    final appState = context.read<AppState>();
+    appState.setAiAmbianceGenerating(true);
 
-    final result = await generateAiAmbiancePreview(
-      sceneImageBytes: scene,
-      ref: ref,
-      nom: prod?.nom ?? ref,
-      famille: prod?.famille ?? '',
-    );
+    final AiPreviewResult result;
+    try {
+      result = await generateAiAmbiancePreview(
+        sceneImageBytes: scene,
+        ref: ref,
+        nom: prod?.nom ?? ref,
+        famille: prod?.famille ?? '',
+      );
+    } finally {
+      appState.setAiAmbianceGenerating(false);
+    }
 
     if (!mounted) return;
     setState(() {
