@@ -40,6 +40,24 @@ class CatBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
 
+    // ⚠️ CORRECTION overflow (brief "product_strip.dart:45") — `CatBar`
+    // est monté par `studio_screen.dart` dans un `Expanded(child: CatBar())`
+    // qui impose une contrainte de hauteur STRICTE (tight) égale à
+    // l'espace restant après la zone photo (`photoZoneSize.height =
+    // constraints.maxHeight * 0.62`). Or les deux enfants de ce `Column`
+    // avaient chacun une hauteur FIXE non négociable (40 + 92 = 132px) :
+    // dès que l'espace alloué par l'`Expanded` parent tombait sous 132px
+    // (cas confirmé : écran paysage 812×375, il ne restait que 120.5px),
+    // le `Column` débordait de 12px — reproductible précisément à
+    // `product_strip.dart:45:14`. Fix minimal : la barre d'onglets garde
+    // sa hauteur fixe (40px, contenu court et déjà scrollable
+    // horizontalement), mais le strip produits passe en `Expanded` pour
+    // absorber TOUT l'espace restant réellement disponible — jamais plus,
+    // jamais moins — au lieu d'exiger un bloc fixe de 92px. Le
+    // `ListView.builder` interne de `_ProductStrip` s'adapte nativement à
+    // une hauteur réduite (vignettes simplement plus compactes), donc
+    // aucune perte de fonctionnalité, plus aucun overflow possible quelle
+    // que soit l'orientation/hauteur d'écran.
     return Container(
       color: AppColors.bg2,
       child: Column(
@@ -69,8 +87,7 @@ class CatBar extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(
-            height: 92,
+          Expanded(
             child: _ProductStrip(famille: state.catTabStudio),
           ),
         ],

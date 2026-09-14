@@ -347,75 +347,110 @@ class _StudioTopbar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(
+          // ⚠️ CORRECTION overflow (brief "product_strip.dart:45 + bug
+          // annexe topbar") — le titre était dans un Expanded RIGIDE
+          // partageant la Row avec 8-9 `_ToolBtn` de largeur fixe (36px +
+          // marges). Dès que leur somme approchait/dépassait la largeur
+          // écran (cas courant : iPhone 375px SANS même compter le 9e
+          // bouton "redétecter arêtes" qui n'apparaît qu'avec une photo
+          // chargée), il ne restait plus que quelques pixels — voire une
+          // largeur négative — pour le texte "Nouveau projet", qui
+          // wrappait alors sur plusieurs lignes et débordait
+          // verticalement (observé : jusqu'à 173px de dépassement,
+          // reproductible même sur un écran haut comme 375×812). Fix :
+          // `Flexible` (jamais aucun débordement possible, le texte est
+          // tronqué proprement par ellipsis sur 1 ligne plutôt que de
+          // wrapper) pour le titre, et les boutons-outils rendus
+          // scrollables horizontalement (`SingleChildScrollView`) dans
+          // l'espace restant — jamais compressés/écrasés, jamais en
+          // overflow, quel que soit le nombre de boutons ou la largeur
+          // d'écran.
+          Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   'Nouveau projet',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w600),
                 ),
-                const Text('Studio photo', style: TextStyle(color: AppColors.text3, fontSize: 10.5)),
+                const Text(
+                  'Studio photo',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.text3, fontSize: 10.5),
+                ),
               ],
             ),
           ),
-          _ToolBtn(icon: FontAwesomeIcons.camera, tip: 'Importer photo', onTap: onImport),
-          _ToolBtn(
-            icon: FontAwesomeIcons.crosshairs,
-            tip: 'Repères de perspective',
-            active: state.showCalibHandles,
-            onTap: state.toggleShowCalibHandles,
-          ),
-          if (state.roomImage != null)
-            _ToolBtn(
-              icon: FontAwesomeIcons.wandMagicSparkles,
-              tip: 'Redétecter les arêtes (plafond/sol/murs)',
-              active: state.calibAutoDetected,
-              onTap: state.edgeDetecting ? null : state.autoDetectEdges,
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ToolBtn(icon: FontAwesomeIcons.camera, tip: 'Importer photo', onTap: onImport),
+                  _ToolBtn(
+                    icon: FontAwesomeIcons.crosshairs,
+                    tip: 'Repères de perspective',
+                    active: state.showCalibHandles,
+                    onTap: state.toggleShowCalibHandles,
+                  ),
+                  if (state.roomImage != null)
+                    _ToolBtn(
+                      icon: FontAwesomeIcons.wandMagicSparkles,
+                      tip: 'Redétecter les arêtes (plafond/sol/murs)',
+                      active: state.calibAutoDetected,
+                      onTap: state.edgeDetecting ? null : state.autoDetectEdges,
+                    ),
+                  _ToolBtn(
+                    icon: FontAwesomeIcons.eye,
+                    tip: 'Afficher/masquer produits',
+                    active: state.showProductOverlay,
+                    onTap: state.toggleProductOverlay,
+                  ),
+                  _ToolBtn(icon: FontAwesomeIcons.rulerCombined, tip: 'Métrés', onTap: onMetres),
+                  // P15-IA-DEMO (Volet B) — "Reconnaissance automatique" (démo).
+                  // Le bouton reste toujours visible/cliquable, que le module soit
+                  // activé ou non ([kIaSuggestionEnabled]) : s'il est désactivé, le
+                  // panneau affiche directement le message d'incertitude permanent
+                  // + le repli catalogue (jamais un bouton mort sans explication).
+                  _ToolBtn(
+                    icon: FontAwesomeIcons.wandMagicSparkles,
+                    tip: 'Reconnaissance automatique (démo)',
+                    onTap: onIaSuggestion,
+                  ),
+                  // P17-VISUEL — "Aperçu d'ambiance IA" (Gemini image / Nano
+                  // Banana). Le bouton reste toujours visible/cliquable : le
+                  // panneau lui-même affiche un bouton "Générer" grisé +
+                  // "fonction bientôt disponible" si kAiPreviewEnabled est faux
+                  // ou qu'aucune clé Gemini n'est configurée (cas de cette
+                  // passe, voir lib/data/ia_ambiance_preview.dart).
+                  _ToolBtn(
+                    icon: FontAwesomeIcons.wandSparkles,
+                    tip: 'Aperçu d\'ambiance IA',
+                    onTap: onAiAmbiance,
+                  ),
+                  // ⚠️ CORRECTION retour utilisateur ("les boutons d'enregistrement...
+                  // des projets... ne fonctionnent pas") — aucun bouton "Enregistrer"
+                  // n'existait auparavant dans toute l'application. Ouvre le modal de
+                  // nommage du projet (voir [SaveProjectModal]), qui l'ajoute à la
+                  // liste "Mes projets" affichée sur l'écran d'accueil.
+                  _ToolBtn(
+                    icon: FontAwesomeIcons.floppyDisk,
+                    tip: 'Enregistrer le projet',
+                    onTap: state.openSaveProjectModal,
+                  ),
+                  _ToolBtn(
+                    icon: FontAwesomeIcons.fileInvoiceDollar,
+                    tip: 'Devis',
+                    onTap: () => state.goTo('devis'),
+                  ),
+                ],
+              ),
             ),
-          _ToolBtn(
-            icon: FontAwesomeIcons.eye,
-            tip: 'Afficher/masquer produits',
-            active: state.showProductOverlay,
-            onTap: state.toggleProductOverlay,
-          ),
-          _ToolBtn(icon: FontAwesomeIcons.rulerCombined, tip: 'Métrés', onTap: onMetres),
-          // P15-IA-DEMO (Volet B) — "Reconnaissance automatique" (démo).
-          // Le bouton reste toujours visible/cliquable, que le module soit
-          // activé ou non ([kIaSuggestionEnabled]) : s'il est désactivé, le
-          // panneau affiche directement le message d'incertitude permanent
-          // + le repli catalogue (jamais un bouton mort sans explication).
-          _ToolBtn(
-            icon: FontAwesomeIcons.wandMagicSparkles,
-            tip: 'Reconnaissance automatique (démo)',
-            onTap: onIaSuggestion,
-          ),
-          // P17-VISUEL — "Aperçu d'ambiance IA" (Gemini image / Nano
-          // Banana). Le bouton reste toujours visible/cliquable : le
-          // panneau lui-même affiche un bouton "Générer" grisé +
-          // "fonction bientôt disponible" si kAiPreviewEnabled est faux
-          // ou qu'aucune clé Gemini n'est configurée (cas de cette
-          // passe, voir lib/data/ia_ambiance_preview.dart).
-          _ToolBtn(
-            icon: FontAwesomeIcons.wandSparkles,
-            tip: 'Aperçu d\'ambiance IA',
-            onTap: onAiAmbiance,
-          ),
-          // ⚠️ CORRECTION retour utilisateur ("les boutons d'enregistrement...
-          // des projets... ne fonctionnent pas") — aucun bouton "Enregistrer"
-          // n'existait auparavant dans toute l'application. Ouvre le modal de
-          // nommage du projet (voir [SaveProjectModal]), qui l'ajoute à la
-          // liste "Mes projets" affichée sur l'écran d'accueil.
-          _ToolBtn(
-            icon: FontAwesomeIcons.floppyDisk,
-            tip: 'Enregistrer le projet',
-            onTap: state.openSaveProjectModal,
-          ),
-          _ToolBtn(
-            icon: FontAwesomeIcons.fileInvoiceDollar,
-            tip: 'Devis',
-            onTap: () => state.goTo('devis'),
           ),
         ],
       ),
