@@ -215,12 +215,20 @@ String _guessMimeType(Uint8List bytes) {
 ///    sans déplacer/redimensionner/réinventer la corniche.
 /// Ce champ n'est PAS un texte libre — seules ces deux valeurs fixes
 /// sont acceptées, le serveur retombe sur 'add' pour toute autre valeur.
+/// [httpClient] — point d'injection UNIQUEMENT pour les tests (voir
+/// `test/data/ia_ambiance_preview_render_mode_test.dart`, qui utilise
+/// `package:http/testing.dart` → `MockClient` pour vérifier le
+/// `renderMode` réellement envoyé dans le corps JSON, SANS jamais
+/// appeler le vrai réseau/proxy/Gemini). Null par défaut : le
+/// comportement de production (client HTTP réel via `http.post`)
+/// reste strictement inchangé pour tout appelant existant.
 Future<AiPreviewResult> generateAiAmbiancePreview({
   required Uint8List sceneImageBytes,
   required String ref,
   required String nom,
   required String famille,
   String renderMode = 'add',
+  http.Client? httpClient,
 }) async {
   if (!kAiPreviewEnabled) {
     return AiPreviewResult.fail(kAiPreviewErrorDisabled);
@@ -236,9 +244,10 @@ Future<AiPreviewResult> generateAiAmbiancePreview({
 
   http.Response resp;
   try {
-    resp = await http
-        .post(uri, headers: const {'Content-Type': 'application/json'}, body: body)
-        .timeout(const Duration(seconds: 45));
+    final future = httpClient != null
+        ? httpClient.post(uri, headers: const {'Content-Type': 'application/json'}, body: body)
+        : http.post(uri, headers: const {'Content-Type': 'application/json'}, body: body);
+    resp = await future.timeout(const Duration(seconds: 45));
   } catch (_) {
     // Timeout, DNS, connexion refusée, etc. — jamais de détail réseau
     // brut affiché à l'utilisateur final.
