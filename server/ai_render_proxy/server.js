@@ -61,15 +61,48 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MO
 
 const AI_QUOTA_ENABLED = process.env.AI_QUOTA_ENABLED !== 'false';
 
-const AI_DAILY_IP_LIMIT = Number.parseInt(
-  process.env.AI_DAILY_IP_LIMIT || '10',
-  10,
-);
+/**
+ * Log JSON minimal utilisable AVANT la declaration du logger principal
+ * (utilise ici uniquement pour signaler une config d'env invalide au
+ * demarrage, avant que le reste du fichier soit charge).
+ */
+function bootLogJson(payload) {
+  console.log(JSON.stringify(payload));
+}
 
-const AI_DAILY_GLOBAL_LIMIT = Number.parseInt(
-  process.env.AI_DAILY_GLOBAL_LIMIT || '100',
-  10,
-);
+/**
+ * Parse une variable d'env en entier positif, avec fallback EXPLICITE
+ * (et logge) vers defaultValue si la valeur est absente, vide, non
+ * numerique, non entiere ou negative. Empeche un cas silencieux du
+ * type AI_DAILY_GLOBAL_LIMIT=abc -> Number(...) -> NaN -> toute
+ * comparaison avec NaN est toujours false -> quota jamais applique
+ * sans qu'aucune erreur ne soit visible.
+ */
+function parsePositiveIntegerEnv(name, defaultValue) {
+  const raw = process.env[name];
+
+  if (raw === undefined || raw === '') {
+    return defaultValue;
+  }
+
+  const value = Number(raw);
+
+  if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
+    bootLogJson({
+      event: 'ai_quota_config_invalid',
+      name,
+      rawValue: raw,
+      fallbackValue: defaultValue,
+    });
+    return defaultValue;
+  }
+
+  return value;
+}
+
+const AI_DAILY_IP_LIMIT = parsePositiveIntegerEnv('AI_DAILY_IP_LIMIT', 10);
+
+const AI_DAILY_GLOBAL_LIMIT = parsePositiveIntegerEnv('AI_DAILY_GLOBAL_LIMIT', 100);
 
 const AI_QUOTA_STORE_PATH =
   process.env.AI_QUOTA_STORE_PATH ||
@@ -412,6 +445,11 @@ app.get('/health', (req, res) => {
 
 app.post('/api/ai-render', async (req, res) => {
   const startedAt = Date.now();
+  // Declare AVANT le try : doit rester accessible dans le catch meme si
+  // une erreur survient avant la ligne qui l'initialisait auparavant
+  // (evite un ReferenceError dans le bloc catch en cas d'echec tres tot
+  // dans le handler).
+  let requestId = crypto.randomUUID();
   try {
     const { imageBase64, mimeType, sku, prompt: clientPrompt, renderMode } = req.body || {};
 
@@ -422,7 +460,6 @@ app.post('/api/ai-render', async (req, res) => {
       return res.status(400).json({ ok: false, provider: 'gemini', error: 'sku manquant ou invalide' });
     }
 
-    const requestId = crypto.randomUUID();
     const source = req.body?.source || 'unknown';
     const usedProductReferenceHint = Boolean(req.body?.productReferenceBase64);
 
@@ -713,7 +750,7 @@ app.post('/api/ai-render', async (req, res) => {
     console.error(
       JSON.stringify({
         event: 'ai_render_error',
-        requestId: typeof requestId !== 'undefined' ? requestId : null,
+        requestId,
         error: String(err && err.message ? err.message : 'erreur inconnue'),
         status: 500,
       }),
