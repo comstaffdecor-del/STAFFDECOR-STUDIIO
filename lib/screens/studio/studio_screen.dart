@@ -3,7 +3,11 @@
 /// perspective disjoints de l'ancienne version (Bug #5).
 library;
 
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -53,9 +57,39 @@ class StudioScreen extends StatefulWidget {
 class _StudioScreenState extends State<StudioScreen> {
   final _picker = ImagePicker();
 
+  // P21-HYBRIDE — clé de capture de la zone photo TELLE QU'AFFICHÉE
+  // (photo + corniche déjà placée par RoomPainter), enregistrée dans
+  // AppState (voir [AppState.registerComposedSceneCapture]) pour que
+  // AiAmbiancePanel puisse récupérer cette image composée SANS jamais
+  // toucher au moteur de rendu lui-même — même pattern RepaintBoundary
+  // + toImage() déjà utilisé par comparateur_screen.dart pour le
+  // téléchargement Avant/Après.
+  final GlobalKey _photoZoneCaptureKey = GlobalKey();
+
+  Future<Uint8List?> _captureComposedScene() async {
+    try {
+      final boundary = _photoZoneCaptureKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final image = await boundary.toImage(pixelRatio: 2.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return null;
+      return byteData.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    // Enregistre le capteur dès le premier frame — désenregistré dans
+    // dispose() pour ne jamais laisser un callback pointant vers un
+    // widget démonté (voir AppState.registerComposedSceneCapture).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AppState>().registerComposedSceneCapture(_captureComposedScene);
+    });
     // ⚠️ CORRECTION P15-PRES-BIS — un utilisateur qui navigue directement
     // vers Studio SANS jamais visiter Catalogue au préalable ne
     // déclenchait jamais le chargement de assets/profiles/index.json
@@ -69,6 +103,15 @@ class _StudioScreenState extends State<StudioScreen> {
         if (mounted) setState(() {});
       });
     }
+  }
+
+  @override
+  void dispose() {
+    // ⚠️ Désenregistre le capteur pour ne jamais laisser AppState
+    // pointer vers un widget démonté (voir registerComposedSceneCapture).
+    // context.read (pas watch) : lecture ponctuelle, safe dans dispose().
+    context.read<AppState>().registerComposedSceneCapture(null);
+    super.dispose();
   }
 
   Future<void> _importPhoto() async {
@@ -167,6 +210,7 @@ class _StudioScreenState extends State<StudioScreen> {
                           localImgDraw: localImgDraw,
                           onImport: _importPhoto,
                           onDemo: _useDemoRoom,
+                          captureKey: _photoZoneCaptureKey,
                         ),
                       ),
                       const Expanded(child: CatBar()),
@@ -326,11 +370,19 @@ class _PhotoZone extends StatelessWidget {
   final ImgDraw? localImgDraw;
   final VoidCallback onImport;
   final VoidCallback onDemo;
+  // P21-HYBRIDE — clé RepaintBoundary posée directement autour du
+  // CustomPaint (RoomPainter), AVANT la transformation InteractiveViewer
+  // (zoom/pan utilisateur) et AVANT les overlays UI (badges, vignette
+  // motif, sélecteur scène démo) — la capture reflète donc exactement
+  // le rendu du moteur dynamique déterministe, jamais le zoom courant
+  // ni les éléments d'interface superposés.
+  final GlobalKey captureKey;
   const _PhotoZone({
     required this.size,
     required this.localImgDraw,
     required this.onImport,
     required this.onDemo,
+    required this.captureKey,
   });
 
   @override
@@ -358,19 +410,22 @@ class _PhotoZone extends StatelessWidget {
               scaleEnabled: !state.showCalibHandles,
               minScale: 1.0,
               maxScale: 4.0,
-              child: ListenableBuilder(
-                listenable: ProductTextureCache.instance,
-                builder: (context, _) => CustomPaint(
-                  painter: RoomPainter(
-                    roomImage: state.roomImage,
-                    imgDraw: localImgDraw,
-                    calib: state.perspCalib ?? PerspCalib.defaultCalib,
-                    selectedProducts: state.selectedProducts,
-                    prodPositions: state.prodPositions,
-                    withProducts: state.showProductOverlay,
-                    metresHauteur: state.metresHauteur,
+              child: RepaintBoundary(
+                key: captureKey,
+                child: ListenableBuilder(
+                  listenable: ProductTextureCache.instance,
+                  builder: (context, _) => CustomPaint(
+                    painter: RoomPainter(
+                      roomImage: state.roomImage,
+                      imgDraw: localImgDraw,
+                      calib: state.perspCalib ?? PerspCalib.defaultCalib,
+                      selectedProducts: state.selectedProducts,
+                      prodPositions: state.prodPositions,
+                      withProducts: state.showProductOverlay,
+                      metresHauteur: state.metresHauteur,
+                    ),
+                    size: size,
                   ),
-                  size: size,
                 ),
               ),
             ),

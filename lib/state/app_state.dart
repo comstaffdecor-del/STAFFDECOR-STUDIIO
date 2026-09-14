@@ -56,6 +56,11 @@ class AiComparisonResult {
   final String? model;
   final bool? usedProductReference;
   final String? productReferencePath;
+  // P21-HYBRIDE — 'add' (photo brute → IA ajoute la corniche) ou
+  // 'refine' (scène déjà composée par le moteur dynamique → IA
+  // n'améliore que le réalisme). Traçabilité uniquement, lue telle
+  // quelle depuis la réponse du proxy.
+  final String? renderMode;
 
   const AiComparisonResult({
     required this.originalImageBytes,
@@ -64,6 +69,7 @@ class AiComparisonResult {
     this.model,
     this.usedProductReference,
     this.productReferencePath,
+    this.renderMode,
   });
 }
 
@@ -724,6 +730,40 @@ class AppState extends ChangeNotifier {
   void setLastAiComparisonResult(AiComparisonResult result) {
     lastAiComparisonResult = result;
     notifyListeners();
+  }
+
+  /// P21-HYBRIDE — capture de la scène TELLE QU'AFFICHÉE dans le Studio
+  /// (photo + corniche déjà placée par le moteur dynamique déterministe
+  /// RoomPainter), enregistrée par [_StudioScreenState] via
+  /// [registerComposedSceneCapture] dès que le widget `_PhotoZone` est
+  /// monté (RepaintBoundary autour du CustomPaint existant — AUCUNE
+  /// modification du moteur RoomPainter lui-même).
+  ///
+  /// [AiAmbiancePanel] appelle cette fonction (au lieu de relire
+  /// `roomImage.toByteData` comme pour la scène brute) uniquement pour
+  /// la nouvelle option "Scène avec produit déjà posé" du mode hybride
+  /// (renderMode='refine') — jamais pour le flux existant (renderMode=
+  /// 'add', scène brute inchangée).
+  ///
+  /// Null tant que le Studio n'a pas encore été construit à l'écran
+  /// (ex: panneau IA ouvert avant tout rendu) — l'appelant doit gérer ce
+  /// cas comme un échec de capture, jamais un crash.
+  Future<Uint8List?> Function()? _composedSceneCapture;
+
+  void registerComposedSceneCapture(Future<Uint8List?> Function()? capture) {
+    _composedSceneCapture = capture;
+    // Pas de notifyListeners — pure référence technique, ne pilote aucun
+    // affichage.
+  }
+
+  Future<Uint8List?> captureComposedScene() async {
+    final capture = _composedSceneCapture;
+    if (capture == null) return null;
+    try {
+      return await capture();
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Vrai si [productModalQte] est une estimation par défaut (aucun métré

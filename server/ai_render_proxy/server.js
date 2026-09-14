@@ -113,6 +113,44 @@ function loadProductDimensions(sku) {
  * degrade, documente comme moins fiable - voir usedProductReference dans
  * la reponse JSON).
  */
+/**
+ * P21-HYBRIDE - Gabarit fixe pour le mode "refine" (rendu hybride).
+ *
+ * Contexte : contrairement au mode "add" (buildPrompt ci-dessous), qui
+ * demande a Gemini d'AJOUTER une corniche a partir d'une photo brute
+ * (l'IA doit alors deviner seule la position, la ligne, l'echelle -
+ * source d'incoherences visuelles constatees en test reel), ce mode
+ * recoit en FIRST image une image DEJA COMPOSEE par le moteur de rendu
+ * deterministe (RoomPainter/cornice_plinth_painter, cote client) : la
+ * corniche ${sku} y est deja placee geometriquement (bonne ligne
+ * plafond/mur, bonne perspective, bon positionnement), mais avec un
+ * rendu visuellement trop artificiel/plat pour etre montre tel quel.
+ *
+ * Le role de Gemini ici n'est PAS de replacer/reinventer la corniche -
+ * seulement d'en ameliorer le realisme photographique (matiere platre,
+ * ombres, integration lumineuse). Gabarit fixe, aucune variable libre
+ * cote client (meme principe que buildPrompt : sku + cotes lues sur
+ * disque uniquement).
+ */
+function buildRefinePrompt(sku, retombeeCm, avanceeCm) {
+  return (
+    `Edit the FIRST image. It already shows a white plaster crown moulding / cornice ${sku} ` +
+    `correctly placed along the wall-ceiling junction by a geometric rendering engine.\n` +
+    `Use the SECOND image only as a material/texture reference for ${sku} (plaster relief, profile detail).\n` +
+    `Improve ONLY the photographic realism of the already-placed cornice: plaster material texture, ` +
+    `contact shadows, ambient light integration, and how it blends with the room lighting.\n` +
+    `Do NOT move the cornice. Do NOT resize it. Do NOT change its position, angle, length, wall drop ` +
+    `(approx ${retombeeCm} cm) or ceiling projection (approx ${avanceeCm} cm).\n` +
+    `Do NOT redesign, invent, or reinterpret the cornice shape - keep its exact silhouette and placement ` +
+    `from the FIRST image unchanged.\n` +
+    `Do not change the room, furniture, walls, floor, windows, perspective, camera angle or lighting color.\n` +
+    `Do not crop the image.\n` +
+    `The only meaningful change should be a more realistic, natural, photographic rendering of the ` +
+    `${sku} cornice that is already in place.\n` +
+    `Return the edited room image.`
+  );
+}
+
 function buildPrompt(sku, retombeeCm, avanceeCm, hasProductRef) {
   if (hasProductRef) {
     return (
@@ -204,7 +242,7 @@ app.get('/health', (req, res) => {
 app.post('/api/ai-render', async (req, res) => {
   const startedAt = Date.now();
   try {
-    const { imageBase64, mimeType, sku, prompt: clientPrompt } = req.body || {};
+    const { imageBase64, mimeType, sku, prompt: clientPrompt, renderMode } = req.body || {};
 
     if (!imageBase64 || typeof imageBase64 !== 'string') {
       return res.status(400).json({ ok: false, provider: 'gemini', error: 'imageBase64 manquant ou invalide' });
@@ -212,6 +250,16 @@ app.post('/api/ai-render', async (req, res) => {
     if (!sku || typeof sku !== 'string') {
       return res.status(400).json({ ok: false, provider: 'gemini', error: 'sku manquant ou invalide' });
     }
+
+    // P21-HYBRIDE - `renderMode` est une WHITELIST STRICTE a 2 valeurs
+    // fixes, jamais un texte libre : 'add' (comportement historique
+    // inchange, defaut) ou 'refine' (nouveau mode hybride, voir
+    // buildRefinePrompt ci-dessus). Toute valeur hors de cette liste
+    // retombe silencieusement sur 'add' - jamais de 400 bloquant pour ne
+    // pas casser le flux existant si un ancien client n'envoie pas ce
+    // champ. Ce n'est PAS un prompt arbitraire (voir clientPrompt,
+    // toujours ignore ci-dessous) : seul le CHOIX du gabarit fixe varie.
+    const effectiveRenderMode = renderMode === 'refine' ? 'refine' : 'add';
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -245,11 +293,15 @@ app.post('/api/ai-render', async (req, res) => {
     const productRef = loadProductReferenceImage(sku);
     const usedProductReference = Boolean(productRef);
 
-    // Le prompt cote serveur est TOUJOURS reconstruit a partir du gabarit fixe.
-    // clientPrompt (si fourni) n'est pas utilise pour l'appel reel - evite qu'un
-    // client injecte un texte arbitraire vers l'API payante. negativePrompt
-    // (si present dans req.body) est ignore par design (voir en-tete du fichier).
-    const finalPrompt = buildPrompt(sku, retombeeCm, avanceeCm, usedProductReference);
+    // Le prompt cote serveur est TOUJOURS reconstruit a partir d'un gabarit
+    // FIXE parmi 2 possibles (voir effectiveRenderMode ci-dessus) - jamais
+    // depuis un texte libre client. clientPrompt (si fourni) n'est pas
+    // utilise pour l'appel reel - evite qu'un client injecte un texte
+    // arbitraire vers l'API payante. negativePrompt (si present dans
+    // req.body) est ignore par design (voir en-tete du fichier).
+    const finalPrompt = effectiveRenderMode === 'refine'
+      ? buildRefinePrompt(sku, retombeeCm, avanceeCm)
+      : buildPrompt(sku, retombeeCm, avanceeCm, usedProductReference);
     void clientPrompt; // explicitement non utilise
 
     const inputBuffer = Buffer.from(imageBase64, 'base64');
@@ -342,13 +394,14 @@ app.post('/api/ai-render', async (req, res) => {
       });
     }
 
-    console.log(`[ai-render] OK sku=${sku} model=${MODEL} usedProductReference=${usedProductReference} durationMs=${Date.now() - startedAt}`);
+    console.log(`[ai-render] OK sku=${sku} model=${MODEL} renderMode=${effectiveRenderMode} usedProductReference=${usedProductReference} durationMs=${Date.now() - startedAt}`);
     return res.json({
       ok: true,
       provider: 'gemini',
       mode: 'real',
       model: MODEL,
       sku,
+      renderMode: effectiveRenderMode,
       imageBase64: outData,
       mimeType: outMime || 'image/jpeg',
       usedProductReference,

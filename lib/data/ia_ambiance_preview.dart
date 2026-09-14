@@ -94,6 +94,12 @@ class AiPreviewResult {
   final String? sku;
   final bool? usedProductReference;
   final String? productReferencePath;
+  // P21-HYBRIDE — mode de rendu effectivement appliqué côté serveur
+  // ('add' = corniche ajoutée depuis une photo brute, comportement
+  // historique ; 'refine' = réalisme amélioré sur une corniche déjà
+  // posée par le moteur dynamique). Simple champ de traçabilité, lu
+  // tel quel dans la réponse JSON du proxy, jamais recalculé ici.
+  final String? renderMode;
   const AiPreviewResult._({
     required this.success,
     this.imageBytes,
@@ -102,6 +108,7 @@ class AiPreviewResult {
     this.sku,
     this.usedProductReference,
     this.productReferencePath,
+    this.renderMode,
   });
 
   factory AiPreviewResult.ok(
@@ -110,6 +117,7 @@ class AiPreviewResult {
     String? sku,
     bool? usedProductReference,
     String? productReferencePath,
+    String? renderMode,
   }) =>
       AiPreviewResult._(
         success: true,
@@ -118,6 +126,7 @@ class AiPreviewResult {
         sku: sku,
         usedProductReference: usedProductReference,
         productReferencePath: productReferencePath,
+        renderMode: renderMode,
       );
 
   factory AiPreviewResult.fail(String message) =>
@@ -194,11 +203,24 @@ String _guessMimeType(Uint8List bytes) {
 /// [AiPreviewResult.fail] avec un message utilisateur générique (le
 /// détail technique reste uniquement dans les logs serveur, jamais
 /// exposé au client).
+/// [renderMode] — P21-HYBRIDE, whitelist stricte côté serveur (voir
+/// `server.js` → `effectiveRenderMode`) :
+///  - 'add' (défaut, inchangé) : [sceneImageBytes] est une photo BRUTE de
+///    la pièce, Gemini doit AJOUTER la corniche $ref (comportement
+///    historique P19-MANOBANANA-QAD) ;
+///  - 'refine' (nouveau, P21-HYBRIDE) : [sceneImageBytes] est déjà un
+///    rendu COMPOSÉ par le moteur dynamique déterministe (RoomPainter),
+///    corniche déjà placée géométriquement — Gemini doit UNIQUEMENT
+///    améliorer le réalisme photographique (matière, ombres, lumière),
+///    sans déplacer/redimensionner/réinventer la corniche.
+/// Ce champ n'est PAS un texte libre — seules ces deux valeurs fixes
+/// sont acceptées, le serveur retombe sur 'add' pour toute autre valeur.
 Future<AiPreviewResult> generateAiAmbiancePreview({
   required Uint8List sceneImageBytes,
   required String ref,
   required String nom,
   required String famille,
+  String renderMode = 'add',
 }) async {
   if (!kAiPreviewEnabled) {
     return AiPreviewResult.fail(kAiPreviewErrorDisabled);
@@ -209,6 +231,7 @@ Future<AiPreviewResult> generateAiAmbiancePreview({
     'imageBase64': base64Encode(sceneImageBytes),
     'mimeType': _guessMimeType(sceneImageBytes),
     'sku': ref,
+    'renderMode': renderMode,
   });
 
   http.Response resp;
@@ -254,6 +277,7 @@ Future<AiPreviewResult> generateAiAmbiancePreview({
       sku: json['sku'] as String?,
       usedProductReference: json['usedProductReference'] as bool?,
       productReferencePath: json['productReferencePath'] as String?,
+      renderMode: json['renderMode'] as String?,
     );
   } catch (_) {
     return AiPreviewResult.fail(kAiPreviewErrorGenerationFailed);

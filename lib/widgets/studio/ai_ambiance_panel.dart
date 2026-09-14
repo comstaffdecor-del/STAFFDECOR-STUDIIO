@@ -54,6 +54,13 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
   String? _selectedRef;
   Uint8List? _sceneBytes;
   String? _sceneLabel;
+  // P21-HYBRIDE — vrai uniquement quand [_sceneBytes] provient de
+  // [_useComposedScene] (capture RepaintBoundary du rendu déjà composé
+  // par le moteur dynamique, corniche déjà placée géométriquement) —
+  // pilote le `renderMode` envoyé au proxy dans [_generate] : 'refine'
+  // au lieu de 'add'. Remis à false par toute autre sélection de scène
+  // (_useCurrentScene / _uploadScene / _useDemoScene / _reset).
+  bool _isHybridScene = false;
   Uint8List? _resultBytes;
   // true si _resultBytes provient du mock local (dart:ui, sans réseau),
   // false si une vraie génération via le proxy manobanana a produit le
@@ -124,11 +131,43 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
       setState(() {
         _sceneBytes = byteData.buffer.asUint8List();
         _sceneLabel = 'Scène actuelle du Studio';
+        _isHybridScene = false;
         _screenState = _AiScreenState.ready;
       });
     } catch (_) {
       _showNoSceneMessage();
     }
+  }
+
+  /// P21-HYBRIDE — capture la scène TELLE QU'AFFICHÉE dans le Studio,
+  /// c'est-à-dire déjà composée par le moteur dynamique déterministe
+  /// (RoomPainter/cornice_plinth_painter) : la corniche sélectionnée y
+  /// est déjà placée géométriquement (bonne ligne plafond/mur, bonne
+  /// perspective, bon positionnement), contrairement à [_useCurrentScene]
+  /// qui ré-encode la photo BRUTE (sans produit). Utilise
+  /// [AppState.captureComposedScene] (RepaintBoundary posé dans
+  /// `studio_screen.dart`, jamais une réimplémentation du rendu ici).
+  /// En cas d'échec de capture (Studio jamais construit, etc.), retombe
+  /// explicitement sur le message d'absence de scène — jamais un
+  /// silence qui laisserait l'utilisateur bloqué sur l'écran précédent.
+  Future<void> _useComposedScene() async {
+    final state = context.read<AppState>();
+    if (state.roomImage == null || state.selectedProducts.isEmpty) {
+      _showNoSceneMessage();
+      return;
+    }
+    final bytes = await state.captureComposedScene();
+    if (!mounted) return;
+    if (bytes == null) {
+      _showNoSceneMessage();
+      return;
+    }
+    setState(() {
+      _sceneBytes = bytes;
+      _sceneLabel = 'Scène avec produit déjà posé (rendu dynamique)';
+      _isHybridScene = true;
+      _screenState = _AiScreenState.ready;
+    });
   }
 
   Future<void> _useDemoScene(String key, String label) async {
@@ -137,6 +176,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
       setState(() {
         _sceneBytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
         _sceneLabel = 'Scène démo — $label';
+        _isHybridScene = false;
         _screenState = _AiScreenState.ready;
       });
     } catch (_) {
@@ -153,6 +193,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
       setState(() {
         _sceneBytes = bytes;
         _sceneLabel = 'Photo importée';
+        _isHybridScene = false;
         _screenState = _AiScreenState.ready;
       });
     } catch (_) {
@@ -191,6 +232,12 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     final appState = context.read<AppState>();
     appState.setAiAmbianceGenerating(true);
 
+    // P21-HYBRIDE — 'refine' uniquement si la scène provient de
+    // [_useComposedScene] (rendu dynamique déjà composé) ; 'add' dans
+    // tous les autres cas (comportement historique inchangé : photo
+    // brute, scène démo, import direct).
+    final renderMode = _isHybridScene ? 'refine' : 'add';
+
     final AiPreviewResult result;
     try {
       result = await generateAiAmbiancePreview(
@@ -198,6 +245,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
         ref: ref,
         nom: prod?.nom ?? ref,
         famille: prod?.famille ?? '',
+        renderMode: renderMode,
       );
     } finally {
       appState.setAiAmbianceGenerating(false);
@@ -229,6 +277,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
           model: result.model,
           usedProductReference: result.usedProductReference,
           productReferencePath: result.productReferencePath,
+          renderMode: result.renderMode,
         ),
       );
     }
@@ -276,6 +325,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
       _selectedRef = null;
       _sceneBytes = null;
       _sceneLabel = null;
+      _isHybridScene = false;
       _resultBytes = null;
       _resultIsMock = false;
       _screenState = _AiScreenState.pickProduct;
@@ -456,6 +506,32 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        // P21-HYBRIDE — nouvelle option : au lieu d'envoyer la photo
+        // BRUTE (l'IA doit alors deviner seule position/échelle/ligne de
+        // la corniche, source d'incohérences visuelles), on envoie la
+        // scène DÉJÀ COMPOSÉE par le moteur dynamique (corniche déjà
+        // placée géométriquement). L'IA n'a plus qu'à en améliorer le
+        // réalisme (voir renderMode='refine' dans [_generate]).
+        // Grisée si aucune photo/produit n'est encore chargé dans le
+        // Studio — jamais un bouton mort sans explication.
+        SizedBox(
+          width: double.infinity,
+          child: BtnOutline(
+            label: 'Scène avec produit déjà posé (rendu dynamique)',
+            icon: FontAwesomeIcons.layerGroup,
+            onTap: (state.roomImage != null && state.selectedProducts.isNotEmpty)
+                ? _useComposedScene
+                : null,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Recommandé : le moteur dynamique place la corniche, l\'IA '
+          'améliore uniquement le réalisme (matière, ombres, lumière) — '
+          'sans en changer la position.',
+          style: TextStyle(color: AppColors.text3, fontSize: 10.5),
+        ),
         const SizedBox(height: 10),
         const Text('ou une scène démo :', style: TextStyle(color: AppColors.text3, fontSize: 11)),
         const SizedBox(height: 8),
@@ -631,6 +707,35 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // P21-HYBRIDE — badge de traçabilité (jamais pour le mock local,
+        // qui n'appelle jamais le proxy) : confirme visuellement, y
+        // compris pendant les tests, quel mode a réellement été utilisé
+        // par le serveur pour cette génération.
+        if (!isMock)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.gold.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  _isHybridScene
+                      ? 'MODE HYBRIDE — réalisme sur corniche déjà posée'
+                      : 'MODE STANDARD — corniche ajoutée depuis photo brute',
+                  style: const TextStyle(
+                    color: AppColors.gold,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (isMock)
           Container(
             margin: const EdgeInsets.only(bottom: 8),
