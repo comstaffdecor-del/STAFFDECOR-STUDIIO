@@ -46,11 +46,18 @@ import 'package:http/http.dart' as http;
 
 /// URL PUBLIQUE du proxy serveur (jamais la clé elle-même — le proxy la
 /// détient côté serveur dans son propre `.env`, jamais exposée ici).
-/// ⚠️ Cette URL dépend du sandbox de développement courant : si le
-/// sandbox est recréé, régénérer l'URL publique du port 8091 et la
-/// remplacer ici (seul point à mettre à jour, aucune clé concernée).
-const String kAiRenderProxyBaseUrl =
-    'https://8091-iv0to5t5muaul2o2div2d-c81df28e.sandbox.novita.ai';
+/// SÉCURITÉ (voir issue #2) : cette URL n'est PLUS codée en dur dans le
+/// dépôt (dépôt public — toute valeur en dur ici serait visible par
+/// n'importe qui). Elle doit être injectée à la compilation via
+/// `--dart-define=AI_RENDER_PROXY_BASE_URL=<url>` dans les
+/// environnements de démo contrôlés uniquement. Un build normal/public
+/// sans ce define laisse la valeur vide → l'aperçu IA est alors
+/// proprement désactivé (voir garde dans [generateAiAmbiancePreview]),
+/// jamais d'appel réseau vers une URL vide ou par défaut.
+const String kAiRenderProxyBaseUrl = String.fromEnvironment(
+  'AI_RENDER_PROXY_BASE_URL',
+  defaultValue: '',
+);
 
 /// POINT UNIQUE DE RÉVERSIBILITÉ. Passé à `true` après confirmation
 /// d'une génération réelle réussie (clé + quota + réseau + réponse
@@ -231,6 +238,18 @@ Future<AiPreviewResult> generateAiAmbiancePreview({
   http.Client? httpClient,
 }) async {
   if (!kAiPreviewEnabled) {
+    return AiPreviewResult.fail(kAiPreviewErrorDisabled);
+  }
+
+  // SÉCURITÉ (voir issue #2) : URL proxy non configurée pour cet
+  // environnement (build sans --dart-define=AI_RENDER_PROXY_BASE_URL) —
+  // échec propre, jamais d'appel réseau vers une URL vide. Ne s'applique
+  // qu'au chemin de PRODUCTION (pas de [httpClient] injecté) : les tests
+  // qui fournissent un `MockClient` via [httpClient] restent inchangés,
+  // ils n'appellent jamais le vrai réseau/proxy quelle que soit la
+  // valeur de [kAiRenderProxyBaseUrl] (voir docstring [httpClient]
+  // ci-dessus).
+  if (httpClient == null && kAiRenderProxyBaseUrl.isEmpty) {
     return AiPreviewResult.fail(kAiPreviewErrorDisabled);
   }
 
