@@ -127,10 +127,39 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     final state = context.read<AppState>();
     final prefillRef = state.aiAmbiancePrefillRef;
     final autoGenerate = state.aiAmbianceAutoGenerate;
+    // P22-HYBRIDE-AUTO (brief "nouvelle règle produit") — ce panneau
+    // peut être ouvert AUTOMATIQUEMENT par
+    // [AppState.maybeAutoTriggerHybridAiPreview] (via
+    // `state.openAiAmbiancePanel(..., autoGenerateHybrid: true)`,
+    // affiché par `studio_screen.dart` exactement comme une ouverture
+    // manuelle) : dans ce cas précis, la scène à utiliser n'est PAS la
+    // photo brute courante ([_useCurrentScene]) mais la scène DÉJÀ
+    // COMPOSÉE par le moteur dynamique, pré-capturée par AppState au
+    // moment du déclenchement ([consumePendingHybridAutoScene]) —
+    // jamais recapturée ici, pour utiliser exactement le même
+    // instantané que celui qui a servi à décider la clé anti-boucle.
+    final autoGenerateHybrid = state.aiAmbianceAutoGenerateHybrid;
     if (prefillRef != null) {
       _selectedRef = prefillRef;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
+        if (autoGenerateHybrid) {
+          final composedBytes = state.consumePendingHybridAutoScene();
+          if (composedBytes == null) {
+            // Capture indisponible entre-temps (Studio démonté, etc.) —
+            // jamais de génération sur une scène absente/périmée.
+            return;
+          }
+          setState(() {
+            _sceneBytes = composedBytes;
+            _sceneLabel = 'Scène avec produit déjà posé (rendu dynamique)';
+            _isHybridScene = true;
+            _screenState = _AiScreenState.ready;
+          });
+          if (!mounted) return;
+          await _generate();
+          return;
+        }
         await _useCurrentScene();
         if (!mounted) return;
         if (autoGenerate && _sceneBytes != null) {

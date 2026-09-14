@@ -20,11 +20,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/widgets.dart' show Size;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/catalogue_data.dart';
+import '../data/catalogue_visibility.dart' show CatalogueVisibilityGate;
 import '../data/ia_ambiance_preview.dart' show kAiPreviewEnabled;
 import '../core/chiffrage.dart';
 import '../core/perspective/edge_detect.dart';
@@ -292,17 +294,16 @@ class AppState extends ChangeNotifier {
     isCalibrated = false;
     notifyListeners();
     unawaited(autoDetectEdges());
-    // ⚠️ DÉCISION PRODUIT (retour utilisateur : "le rendu IA automatique
-    // n'est pas acceptable visuellement — la corniche est trop
-    // artificielle et pas assez professionnelle") — l'appel automatique
-    // à maybeAutoTriggerAiPreview() a été RETIRÉ ici. Gemini/Nano Banana
-    // reste disponible UNIQUEMENT via l'icône manuelle "Aperçu
-    // d'ambiance IA" de la topbar Studio (state.openAiAmbiancePanel,
-    // sans prefill/autoGenerate) : le moteur dynamique déterministe
-    // (RoomPainter/cornice_plinth_painter) redevient le SEUL rendu
-    // affiché automatiquement après import photo. Ne pas réactiver cet
-    // appel sans un chantier qualité IA dédié (scoring multi-génération,
-    // prompt renforcé, contrôle humain) validé séparément.
+    // P22-HYBRIDE-AUTO (brief "nouvelle règle produit") — nouvelle photo
+    // chargée : si un produit est déjà sélectionné, le moteur dynamique
+    // vient de le (re)poser sur cette nouvelle photo (rendu affiché
+    // immédiatement, INCHANGÉ) ; on tente EN PLUS, automatiquement et en
+    // arrière-plan, l'amélioration de réalisme Nano/Mano sur CETTE scène
+    // déjà composée (jamais sur la photo brute — voir docstring de
+    // [maybeAutoTriggerHybridAiPreview] pour tous les garde-fous). Ne
+    // PAS confondre avec l'ancien [maybeAutoTriggerAiPreview] (mode
+    // "add" brut, resté désactivé, voir sa docstring).
+    maybeAutoTriggerHybridAiPreview();
   }
 
   /// Recalcule [imgDraw] quand la taille du conteneur change (rotation,
@@ -407,9 +408,10 @@ class AppState extends ChangeNotifier {
           unawaited(autoDetectEdges());
         }
       }
-      // ⚠️ DÉCISION PRODUIT — voir commentaire identique dans
-      // setRoomImageBytes ci-dessus : plus de déclenchement IA
-      // automatique sur chargement de scène démo non plus.
+      // P22-HYBRIDE-AUTO — même déclenchement automatique HYBRIDE que
+      // pour une photo importée (voir setRoomImageBytes ci-dessus),
+      // garde-fous et anti-boucle inclus.
+      maybeAutoTriggerHybridAiPreview();
     }
   }
 
@@ -635,10 +637,21 @@ class AppState extends ChangeNotifier {
   /// Si vrai, le panneau IA utilise automatiquement la scène courante du
   /// Studio et lance la génération réelle (proxy Gemini) sans attendre
   /// d'action supplémentaire de l'utilisateur — réservé au déclenchement
-  /// automatique (P20-AUTO), jamais à l'icône générique de la topbar
-  /// (qui garde le parcours pas à pas complet, y compris le choix libre
-  /// du produit/scène).
+  /// automatique (P20-AUTO/P22-HYBRIDE-AUTO), jamais à l'icône générique
+  /// de la topbar (qui garde le parcours pas à pas complet, y compris le
+  /// choix libre du produit/scène).
   bool aiAmbianceAutoGenerate = false;
+
+  /// P22-HYBRIDE-AUTO — vrai UNIQUEMENT quand le déclenchement
+  /// automatique provient de [maybeAutoTriggerHybridAiPreview] (rendu
+  /// dynamique déjà composé, renderMode='refine') — jamais pour l'ancien
+  /// mécanisme brut [maybeAutoTriggerAiPreview] (non appelé en
+  /// production, voir sa docstring) ni pour l'icône manuelle de la
+  /// topbar. [AiAmbiancePanel] lit ce champ pour savoir qu'il doit
+  /// consommer [consumePendingHybridAutoScene] et forcer
+  /// `renderMode: 'refine'`, au lieu du parcours manuel habituel (photo
+  /// brute + choix libre 'add'/'refine' par l'utilisateur).
+  bool aiAmbianceAutoGenerateHybrid = false;
 
   /// Vrai pendant qu'une génération IA (déclenchée automatiquement ou
   /// manuellement) est en cours — mis à jour par [AiAmbiancePanel] via
@@ -660,9 +673,14 @@ class AppState extends ChangeNotifier {
   /// est appelé N fois entre-temps (métrés, calibration, etc.).
   String? _lastAiAutoTriggerKey;
 
-  void openAiAmbiancePanel({String? prefillRef, bool autoGenerate = false}) {
+  void openAiAmbiancePanel({
+    String? prefillRef,
+    bool autoGenerate = false,
+    bool autoGenerateHybrid = false,
+  }) {
     aiAmbiancePrefillRef = prefillRef;
     aiAmbianceAutoGenerate = autoGenerate;
+    aiAmbianceAutoGenerateHybrid = autoGenerateHybrid;
     showAiAmbiancePanel = true;
     notifyListeners();
   }
@@ -671,35 +689,35 @@ class AppState extends ChangeNotifier {
     showAiAmbiancePanel = false;
     aiAmbiancePrefillRef = null;
     aiAmbianceAutoGenerate = false;
+    aiAmbianceAutoGenerateHybrid = false;
+    // Une scène pré-capturée non consommée (ex: panneau fermé avant que
+    // _generate() n'ait eu l'occasion de l'utiliser) ne doit jamais
+    // fuiter vers une prochaine ouverture manuelle du panneau.
+    _pendingHybridAutoScene = null;
     notifyListeners();
   }
 
-  /// P20-AUTO — Déclenchement AUTOMATIQUE de l'aperçu d'ambiance IA, sans
-  /// aucun bouton utilisateur : appelé en interne dès qu'une photo/scène
-  /// est chargée ET qu'un produit est sélectionné dans le Studio (voir
-  /// ([setRoomImageBytes], [loadDemoScene], [addToProject]).
+  /// P20-AUTO (INFRASTRUCTURE DORMANTE — voir [maybeAutoTriggerHybridAiPreview]
+  /// pour le mécanisme RÉELLEMENT utilisé en production, brief "nouvelle
+  /// règle produit" ci-dessous).
   ///
-  /// Remplace le bouton flottant "Générer aperçu IA" retiré du Studio
-  /// (retour produit : "l'utilisateur ne doit pas avoir à comprendre
-  /// deux moteurs ou deux étapes") : le rendu dynamique déterministe
-  /// (RoomPainter/cornice_plinth_painter, INCHANGÉ) reste affiché en
-  /// continu dans le Studio ; ce déclencheur ouvre EN PLUS, en tâche de
-  /// fond, le panneau [AiAmbiancePanel] existant (pré-rempli, génération
-  /// auto) qui appelle le proxy réel `/api/ai-render` → Gemini.
+  /// ⚠️ DÉCISION PRODUIT (mise à jour) : le déclenchement automatique
+  /// "brut" ci-dessous — qui ouvrait le panneau IA en pré-remplissant
+  /// [aiAmbianceAutoGenerate]=true SANS jamais passer par le rendu
+  /// dynamique composé, c'est-à-dire en laissant Gemini "inventer"
+  /// entièrement la pose de la corniche depuis la photo brute
+  /// (renderMode='add' implicite côté [AiAmbiancePanel._generate]) — a
+  /// été jugé trop instable visuellement et RETIRÉ de la production (3
+  /// appels supprimés dans [setRoomImageBytes], [loadDemoScene],
+  /// [addToProject], voir commit "Retire le declenchement IA
+  /// automatique"). Ce n'était PAS un rejet de l'automatisation en
+  /// elle-même, mais du mode "Gemini fait tout depuis la photo brute"
+  /// sans contrôle géométrique.
   ///
-  /// Garde anti-boucle (toutes les conditions ci-dessous doivent être
-  /// réunies, sinon retour immédiat sans effet) :
-  ///  1. [kAiPreviewEnabled] doit être vrai (sinon fonction non
-  ///     configurée sur cet environnement) ;
-  ///  2. une photo ou une scène démo doit être chargée ([roomImage]) ;
-  ///  3. au moins un produit doit être sélectionné ([selectedProducts]) ;
-  ///  4. aucune génération ne doit déjà être en cours
-  ///     ([aiAmbianceGenerating]) ;
-  ///  5. le couple (ref du 1er produit, [roomImageVersion]) ne doit PAS
-  ///     être strictement identique au dernier couple déjà déclenché
-  ///     ([_lastAiAutoTriggerKey]) — mémorise donc à la fois le dernier
-  ///     SKU généré ET la scène associée, jamais de re-génération en
-  ///     boucle tant que rien ne change côté utilisateur.
+  /// La fonction reste ici, INCHANGÉE et non appelée nulle part dans
+  /// lib/ (sauf tests de non-régression), comme trace de cette
+  /// architecture antérieure — ne PAS la réappeler en production : voir
+  /// [maybeAutoTriggerHybridAiPreview] pour le successeur validé.
   void maybeAutoTriggerAiPreview() {
     if (!kAiPreviewEnabled) return;
     if (roomImage == null) return;
@@ -713,6 +731,133 @@ class AppState extends ChangeNotifier {
 
     _lastAiAutoTriggerKey = key;
     openAiAmbiancePanel(prefillRef: ref, autoGenerate: true);
+  }
+
+  /// P22-HYBRIDE-AUTO — brief "nouvelle règle produit" : restaure un
+  /// déclenchement AUTOMATIQUE de l'aperçu IA, mais UNIQUEMENT en mode
+  /// hybride/refine (jamais le mode "add" brut retiré ci-dessus).
+  ///
+  /// Flow attendu :
+  ///   1. l'utilisateur importe une photo ;
+  ///   2. l'utilisateur choisit un produit (SKU whitelisté) ;
+  ///   3. le moteur dynamique déterministe (RoomPainter/
+  ///      cornice_plinth_painter, JAMAIS modifié ici) pose le produit
+  ///      immédiatement, comme aujourd'hui ;
+  ///   4. DÈS QUE la capture de cette scène composée est disponible
+  ///      ([captureComposedScene]), l'app envoie AUTOMATIQUEMENT ce
+  ///      rendu (pas la photo brute) au proxy Nano/Mano avec
+  ///      `renderMode: 'refine'` ;
+  ///   5. l'image IA s'affiche quand elle est prête, en tâche de fond —
+  ///      sans bouton "Générer", sans que l'utilisateur ait à choisir
+  ///      entre "add"/"refine"/"scène composée".
+  ///
+  /// Garde-fous (TOUTES les conditions doivent être réunies, sinon
+  /// retour immédiat sans effet — jamais de génération "best effort") :
+  ///  1. [kAiPreviewEnabled] doit être vrai ;
+  ///  2. une photo/scène doit être chargée ([roomImage] non null) ;
+  ///  3. au moins un produit doit être sélectionné
+  ///     ([selectedProducts]) ;
+  ///  4. le SKU du produit doit être whitelisté (présent dans
+  ///     `assets/profiles/index.json`, voir [CatalogueVisibilityGate])
+  ///     — mêmes 43 refs qualifiées que le reste du catalogue
+  ///     présentation, jamais un SKU hors gate ;
+  ///  5. aucune génération ne doit déjà être en cours
+  ///     ([aiAmbianceGenerating]) — anti-chevauchement ;
+  ///  6. le couple (SKU, [roomImageVersion], 'refine') ne doit PAS être
+  ///     strictement identique au dernier couple déjà déclenché
+  ///     ([_lastHybridAutoTriggerKey]) — anti-boucle : changer de photo
+  ///     OU de produit relance une génération, le reste (métrés,
+  ///     calibration manuelle, notifyListeners répétés) jamais ;
+  ///  7. la capture de la scène composée
+  ///     ([captureComposedScene]) doit RÉUSSIR (bytes non nuls) — si le
+  ///     Studio n'est pas encore monté ou que la capture échoue, on
+  ///     abandonne silencieusement CETTE tentative (la clé anti-boucle
+  ///     n'est marquée qu'après un succès, donc une prochaine
+  ///     notification pourra retenter).
+  ///
+  /// En cas d'échec de génération côté proxy/Gemini (429, réseau,
+  /// timeout...), le rendu dynamique déterministe reste affiché tel
+  /// quel dans le Studio dès la fermeture du panneau : [AiAmbiancePanel]
+  /// gère déjà cet échec avec son propre écran fallback ("Réessayer" /
+  /// fermer), jamais un crash ni un état bloquant — voir [_generate]
+  /// dans `ai_ambiance_panel.dart`.
+  String? _lastHybridAutoTriggerKey;
+
+  /// Vrai UNIQUEMENT pendant qu'une capture de scène composée est en
+  /// cours de résolution pour le déclenchement automatique hybride —
+  /// distinct de [aiAmbianceGenerating] (qui couvre l'appel réseau lui-
+  /// même) : évite de lancer deux captures concurrentes si
+  /// `notifyListeners` est appelé plusieurs fois pendant l'attente de
+  /// [captureComposedScene].
+  bool _hybridAutoCaptureInFlight = false;
+
+  void maybeAutoTriggerHybridAiPreview() {
+    if (!kAiPreviewEnabled) return;
+    if (roomImage == null) return;
+    if (selectedProducts.isEmpty) return;
+    if (aiAmbianceGenerating) return;
+    if (_hybridAutoCaptureInFlight) return;
+
+    final ref = selectedProducts.first.ref;
+
+    // Garde whitelist SKU — même source que le reste du catalogue
+    // présentation (assets/profiles/index.json). `null` = index pas
+    // encore chargé : on ne bloque PAS dans ce cas précis (fail-open,
+    // cohérent avec [applyPresentationVisibility]) mais on attend que
+    // l'appelant renotifie une fois l'index chargé plutôt que de
+    // marquer la clé anti-boucle prématurément.
+    final visible = CatalogueVisibilityGate.instance.presentationVisible(ref);
+    if (visible == false) return; // SKU explicitement hors whitelist
+
+    final key = '$ref#$roomImageVersion#refine';
+    if (_lastHybridAutoTriggerKey == key) return; // déjà généré pour ce couple
+
+    _hybridAutoCaptureInFlight = true;
+    // La capture (RepaintBoundary → toImage → crop sur imgDraw, voir
+    // studio_screen.dart) n'est disponible qu'APRÈS que le premier
+    // frame du Studio ait posé le produit — on laisse donc passer un
+    // frame avant de tenter la capture, pour laisser RoomPainter
+    // dessiner la corniche fraîchement sélectionnée avant d'en prendre
+    // un instantané (sinon on capturerait la scène SANS le produit).
+    SchedulerBinding.instance.addPostFrameCallback((_) async {
+      Uint8List? composedBytes;
+      try {
+        composedBytes = await captureComposedScene();
+      } finally {
+        _hybridAutoCaptureInFlight = false;
+      }
+      if (composedBytes == null) return; // Studio pas encore monté / échec capture
+      if (aiAmbianceGenerating) return; // une génération a démarré entre-temps
+      // Re-vérifie que rien n'a changé pendant l'attente de la capture
+      // (photo remplacée, produit changé) avant de marquer la clé et de
+      // déclencher — sinon on capturerait/enverrait une scène périmée.
+      if (selectedProducts.isEmpty || selectedProducts.first.ref != ref) return;
+      final currentKey = '$ref#$roomImageVersion#refine';
+      if (currentKey != key) return; // scène/produit a changé entre-temps
+      if (_lastHybridAutoTriggerKey == currentKey) return;
+
+      _lastHybridAutoTriggerKey = currentKey;
+      _pendingHybridAutoScene = composedBytes;
+      openAiAmbiancePanel(prefillRef: ref, autoGenerate: true, autoGenerateHybrid: true);
+    });
+  }
+
+  /// Bytes de la scène composée déjà capturée par
+  /// [maybeAutoTriggerHybridAiPreview], consommés une seule fois par
+  /// [AiAmbiancePanel] (voir [consumePendingHybridAutoScene]) — évite de
+  /// recapturer une deuxième fois la même scène (potentiellement
+  /// différente si le layout a changé entre-temps) juste après l'avoir
+  /// déjà obtenue ici pour évaluer la clé anti-boucle.
+  Uint8List? _pendingHybridAutoScene;
+
+  /// Consomme (et efface) la scène composée pré-capturée par le
+  /// déclenchement automatique hybride — `null` si aucun déclenchement
+  /// automatique n'est en cours (ex: ouverture manuelle classique de
+  /// l'icône topbar).
+  Uint8List? consumePendingHybridAutoScene() {
+    final bytes = _pendingHybridAutoScene;
+    _pendingHybridAutoScene = null;
+    return bytes;
   }
 
   /// Dernier aperçu IA généré avec succès — stocké ici (et non plus
@@ -898,12 +1043,11 @@ class AppState extends ChangeNotifier {
     );
     notifyListeners();
     save();
-    // ⚠️ DÉCISION PRODUIT — voir commentaire identique dans
-    // setRoomImageBytes : plus de déclenchement IA automatique sur
-    // sélection produit. L'utilisateur voit le rendu dynamique
-    // déterministe (RoomPainter/cornice_plinth_painter) et peut,
-    // s'il le souhaite, ouvrir manuellement le panneau "Aperçu
-    // d'ambiance IA" via l'icône dédiée de la topbar Studio.
+    // P22-HYBRIDE-AUTO — nouveau produit sélectionné : même
+    // déclenchement automatique HYBRIDE que ci-dessus (voir
+    // setRoomImageBytes), déclenché seulement si une photo/scène est
+    // déjà chargée (garde dans maybeAutoTriggerHybridAiPreview).
+    maybeAutoTriggerHybridAiPreview();
   }
 
   /// Quantité nette pour une famille, avec repli sur une estimation
