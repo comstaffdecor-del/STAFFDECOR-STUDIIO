@@ -45,6 +45,8 @@ const PORT = process.env.AI_RENDER_PROXY_PORT || 8091;
 
 // Repertoire des profils produits (source de verite pour les cotes visuelles)
 const PROFILES_DIR = path.join(__dirname, '..', '..', 'assets', 'profiles');
+// Repertoire des images de reference visuelle produit (control/<sku>.png)
+const PRODUCT_CONTROL_DIR = path.join(PROFILES_DIR, 'control');
 
 const MODEL = process.env.MANOBANANA_MODEL || 'gemini-3.1-flash-lite-image';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
@@ -95,25 +97,79 @@ function loadProductDimensions(sku) {
  * Construit le texte de prompt (gabarit fixe, variables = sku + cotes).
  * AUCUN bloc negatif n'est jamais ajoute ici, meme si negativePrompt
  * est present dans le payload entrant - il est ignore par design.
+ *
+ * Version 2 (durcie, anglaise) - validee empiriquement le 14/09 sur
+ * moderne.jpg + assets/profiles/control/D609.png (2 images en entree) :
+ * seule cette combinaison (prompt directif + image de reference produit
+ * en 2eme position) produit une corniche visiblement ajoutee. Le gabarit
+ * francais precedent (1 seule image, pas de reference visuelle) degenerait
+ * systematiquement en quasi-copie/resize de l'image source, y compris avec
+ * le modele non-lite.
+ *
+ * hasProductRef=true : mentionne la SECOND image (reference visuelle du
+ * produit) - utilise seulement quand assets/profiles/control/<sku>.png
+ * existe reellement et est effectivement envoye a Gemini.
+ * hasProductRef=false : fallback sans reference visuelle (comportement
+ * degrade, documente comme moins fiable - voir usedProductReference dans
+ * la reponse JSON).
  */
-function buildPrompt(sku, retombeeCm, avanceeCm) {
+function buildPrompt(sku, retombeeCm, avanceeCm, hasProductRef) {
+  if (hasProductRef) {
+    return (
+      `Edit the FIRST image, which is the room photo.\n` +
+      `Add a clearly visible white plaster crown moulding / cornice ${sku} along the entire wall-ceiling junction.\n` +
+      `Use the SECOND image as the product reference for the shape and relief of ${sku}.\n` +
+      `The cornice must be visibly added to the room, not merely preserve the original image.\n` +
+      `It must have approximately ${retombeeCm} cm wall drop and ${avanceeCm} cm ceiling projection, with realistic shadows and molded relief.\n` +
+      `Preserve the room, furniture, lighting, people, perspective, camera angle, and all existing objects.\n` +
+      `Do not redesign the room.\n` +
+      `Do not change the furniture.\n` +
+      `Do not crop the image unnecessarily.\n` +
+      `The only meaningful change should be the added ${sku} plaster cornice at the wall-ceiling junction.\n` +
+      `If the original image has no cornice, add one clearly.\n` +
+      `Return the edited room image.`
+    );
+  }
+  // Fallback sans reference visuelle produit (moins fiable - voir docstring).
   return (
-    `Édite cette photo d'intérieur en conservant exactement la pièce d'origine. ` +
-    `Ajoute uniquement une corniche décorative Staff Décor ${sku} le long de la jonction mur/plafond visible.\n\n` +
-    `La corniche est un vrai profil de staff en plâtre mouluré, avec un volume architectural marqué : ` +
-    `environ ${retombeeCm} cm de retombée sur le mur et ${avanceeCm} cm d'avancée sous le plafond, ` +
-    `soit une corniche imposante qui occupe une part nettement visible de la hauteur du mur, ` +
-    `comme une corniche de rénovation intérieure haut de gamme. Le profil présente des formes moulurées, ` +
-    `des courbes douces, des creux et des arêtes, avec des ombres portées naturelles cohérentes avec ` +
-    `l'éclairage réel de la pièce.\n\n` +
-    `La corniche est peinte exactement du même blanc mat que le plafond existant de cette pièce, ` +
-    `ton sur ton avec lui, en peinture plâtre mate.\n\n` +
-    `La corniche est intégrée dans la perspective réelle de la prise de vue, suit les lignes de fuite ` +
-    `et se pose précisément à la jonction entre les murs et le plafond, en continu sur tous les angles visibles.\n\n` +
-    `Tout le reste de l'image demeure strictement identique à l'original : mobilier, fenêtres, rideaux, ` +
-    `luminaires, sol, murs, plafond, couleurs, décoration, ambiance lumineuse et cadrage. ` +
-    `Conserve les dimensions et le format exacts de l'image source.`
+    `Edit this room photo.\n` +
+    `Add a clearly visible white plaster crown moulding / cornice ${sku} along the entire wall-ceiling junction.\n` +
+    `The cornice must be visibly added to the room, not merely preserve the original image.\n` +
+    `It must have approximately ${retombeeCm} cm wall drop and ${avanceeCm} cm ceiling projection, with realistic shadows and molded relief.\n` +
+    `Preserve the room, furniture, lighting, people, perspective, camera angle, and all existing objects.\n` +
+    `Do not redesign the room.\n` +
+    `Do not change the furniture.\n` +
+    `Do not crop the image unnecessarily.\n` +
+    `The only meaningful change should be the added ${sku} plaster cornice at the wall-ceiling junction.\n` +
+    `If the original image has no cornice, add one clearly.\n` +
+    `Return the edited room image.`
   );
+}
+
+/**
+ * Tente de charger l'image de reference visuelle du produit
+ * (assets/profiles/control/<sku>.png). Retourne null si absente,
+ * ne leve jamais d'exception (fallback documente, pas de crash).
+ */
+function loadProductReferenceImage(sku) {
+  if (!sku || typeof sku !== 'string' || !/^[A-Za-z0-9_-]+$/.test(sku)) {
+    return null;
+  }
+  const filePath = path.join(PRODUCT_CONTROL_DIR, `${sku}.png`);
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  try {
+    const buffer = fs.readFileSync(filePath);
+    return {
+      base64: buffer.toString('base64'),
+      mimeType: detectMimeType(buffer, 'image/png'),
+      path: filePath,
+    };
+  } catch (readErr) {
+    console.error(`[ai-render] Erreur lecture reference produit sku=${sku}: ${readErr.message}`);
+    return null;
+  }
 }
 
 /**
@@ -182,22 +238,42 @@ app.post('/api/ai-render', async (req, res) => {
       });
     }
 
+    // --- Reference visuelle produit (2eme image envoyee a Gemini) ---
+    // Chargee automatiquement depuis assets/profiles/control/<sku>.png si
+    // le fichier existe. Absence = fallback documente (voir buildPrompt),
+    // jamais un crash. Pour D609, le fichier existe -> usedProductReference=true.
+    const productRef = loadProductReferenceImage(sku);
+    const usedProductReference = Boolean(productRef);
+
     // Le prompt cote serveur est TOUJOURS reconstruit a partir du gabarit fixe.
     // clientPrompt (si fourni) n'est pas utilise pour l'appel reel - evite qu'un
     // client injecte un texte arbitraire vers l'API payante. negativePrompt
     // (si present dans req.body) est ignore par design (voir en-tete du fichier).
-    const finalPrompt = buildPrompt(sku, retombeeCm, avanceeCm);
+    const finalPrompt = buildPrompt(sku, retombeeCm, avanceeCm, usedProductReference);
     void clientPrompt; // explicitement non utilise
 
     const inputBuffer = Buffer.from(imageBase64, 'base64');
     const realMimeType = detectMimeType(inputBuffer, mimeType);
 
+    // Ordre des parts : texte, PUIS FIRST image (room photo), PUIS SECOND
+    // image (reference produit) si disponible - cet ordre correspond
+    // exactement a celui du test manuel valide le 14/09 (moderne.jpg +
+    // control/D609.png, gemini-3.1-flash-image) qui a produit une corniche
+    // visiblement ajoutee, contrairement au mode 1-image qui degenerait en
+    // quasi-copie/resize.
+    const geminiParts = [
+      { text: finalPrompt },
+      { inline_data: { mime_type: realMimeType, data: imageBase64 } },
+    ];
+    if (productRef) {
+      geminiParts.push({
+        inline_data: { mime_type: productRef.mimeType, data: productRef.base64 },
+      });
+    }
+
     const geminiBody = {
       contents: [{
-        parts: [
-          { text: finalPrompt },
-          { inline_data: { mime_type: realMimeType, data: imageBase64 } },
-        ],
+        parts: geminiParts,
       }],
       generationConfig: {
         responseModalities: ['IMAGE'],
@@ -266,14 +342,17 @@ app.post('/api/ai-render', async (req, res) => {
       });
     }
 
-    console.log(`[ai-render] OK sku=${sku} model=${MODEL} durationMs=${Date.now() - startedAt}`);
+    console.log(`[ai-render] OK sku=${sku} model=${MODEL} usedProductReference=${usedProductReference} durationMs=${Date.now() - startedAt}`);
     return res.json({
       ok: true,
       provider: 'gemini',
       mode: 'real',
       model: MODEL,
+      sku,
       imageBase64: outData,
       mimeType: outMime || 'image/jpeg',
+      usedProductReference,
+      productReferencePath: productRef ? path.relative(path.join(__dirname, '..', '..'), productRef.path) : null,
     });
 
   } catch (err) {
