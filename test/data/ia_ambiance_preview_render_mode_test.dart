@@ -100,4 +100,51 @@ void main() {
       },
     );
   });
+
+  // SÉCURITÉ (issue #2) — verrou de non-régression sur
+  // kAiRenderProxyBaseUrl = String.fromEnvironment('AI_RENDER_PROXY_BASE_URL',
+  // defaultValue: ''). Ce test tourne SANS --dart-define (comme tout
+  // `flutter test` par défaut, exactement comme un build public/normal)
+  // et SANS httpClient injecté (donc sur le VRAI chemin de production,
+  // contrairement aux tests ci-dessus). Il doit casser si quelqu'un
+  // remplace un jour `defaultValue: ''` par une URL non vide : la garde
+  // ne se déclencherait plus, un vrai appel réseau serait tenté (délai/
+  // timeout au lieu d'un échec immédiat), et les assertions ci-dessous
+  // échoueraient.
+  group('Sécurité — build public sans AI_RENDER_PROXY_BASE_URL', () {
+    test(
+      'sans AI_RENDER_PROXY_BASE_URL (dart-define) et sans httpClient '
+      'injecté, l\'IA échoue proprement, sans appel réseau',
+      () async {
+        expect(
+          kAiRenderProxyBaseUrl,
+          isEmpty,
+          reason: 'ce test suppose un build/test SANS '
+              '--dart-define=AI_RENDER_PROXY_BASE_URL=... (comportement '
+              'par défaut) — si ce n\'est plus le cas, le reste du test '
+              'n\'a plus de sens et doit être revu.',
+        );
+
+        final result = await generateAiAmbiancePreview(
+          sceneImageBytes: Uint8List.fromList([1, 2, 3]),
+          ref: 'D609',
+          nom: 'D609',
+          famille: 'Corniches',
+          renderMode: 'add',
+          // httpClient volontairement OMIS : on vérifie le VRAI chemin
+          // de production, pas le chemin de test mocké ci-dessus.
+        );
+
+        expect(result.success, isFalse,
+            reason: 'sans URL proxy configurée, la génération ne doit '
+                'jamais réussir ni tenter le moindre appel réseau.');
+        expect(result.errorMessage, kAiPreviewErrorDisabled,
+            reason: 'le message d\'échec doit être celui, générique et '
+                'stable, de "fonction non configurée sur cet '
+                'environnement" — jamais un message technique réseau '
+                '(timeout, DNS...) qui indiquerait qu\'un appel réseau '
+                'a été tenté.');
+      },
+    );
+  });
 }
