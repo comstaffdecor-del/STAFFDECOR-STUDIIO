@@ -712,13 +712,38 @@ void main() {
           // Fin du corps : le prochain point d'entree de methode publique
           // apres le debut de setRoomImageBytes. On cherche une signature
           // de methode suivante connue et stable (recomputeImgDraw) pour
-          // bornage - si elle aussi disparait, on retombe simplement sur
-          // la fin du fichier (pas de faux negatif possible).
+          // bornage.
+          //
+          // CORRECTIF (brief "durcir le test statique") : un fallback
+          // silencieux sur `source.length` quand ce marqueur de fin
+          // disparaitrait (ex: renommage/suppression de
+          // recomputeImgDraw) ferait analyser TOUT le reste du fichier,
+          // y compris la definition de maybeAutoTriggerStandardAiPreview
+          // elle-meme (situee plus bas) - le test passerait alors A TORT
+          // meme si l'appel a reellement disparu de l'interieur de
+          // setRoomImageBytes. On transforme donc ce cas en echec
+          // explicite plutot qu'en fallback permissif : si la borne de
+          // fin est introuvable, le test doit etre mis a jour EN
+          // CONNAISSANCE DE CAUSE, jamais laisser un faux positif passer
+          // inapercu.
           final nextMethodMarker = 'void recomputeImgDraw(';
           final nextMethodIndex = source.indexOf(nextMethodMarker, startIndex);
-          final endIndex = nextMethodIndex == -1 ? source.length : nextMethodIndex;
 
-          final body = source.substring(startIndex, endIndex);
+          expect(
+            nextMethodIndex,
+            isNot(-1),
+            reason:
+                'Borne de fin introuvable pour isoler setRoomImageBytes '
+                '(marqueur recherche : "$nextMethodMarker"). Le test doit '
+                'etre mis a jour explicitement avec un nouveau marqueur de '
+                'fin, sinon il risquerait de scanner tout le reste du '
+                'fichier (y compris la definition de '
+                'maybeAutoTriggerStandardAiPreview elle-meme, situee plus '
+                'bas) et de passer A TORT meme si l\'appel a reellement '
+                'disparu du corps de setRoomImageBytes.',
+          );
+
+          final body = source.substring(startIndex, nextMethodIndex);
 
           expect(
             body.contains('maybeAutoTriggerStandardAiPreview('),
