@@ -77,14 +77,48 @@ const String kAiPreviewDisclaimer =
     'pas le rendu technique du produit.';
 
 /// Résultat d'une tentative de génération d'aperçu IA.
+///
+/// [model], [sku], [usedProductReference] et [productReferencePath] sont de
+/// simples champs de PREUVE/TRAÇABILITÉ — lus tels quels dans la réponse
+/// JSON déjà renvoyée par le proxy (`server/ai_render_proxy/server.js`,
+/// NON modifié ici), jamais recalculés côté client. Permettent de
+/// confirmer, y compris à l'écran (voir écran Avant/Après), que le bon
+/// profil produit a bien servi de référence visuelle à la génération
+/// (ex: sku=D609, usedProductReference=true,
+/// productReferencePath=assets/profiles/control/D609.png).
 class AiPreviewResult {
   final bool success;
   final Uint8List? imageBytes;
   final String? errorMessage;
-  const AiPreviewResult._({required this.success, this.imageBytes, this.errorMessage});
+  final String? model;
+  final String? sku;
+  final bool? usedProductReference;
+  final String? productReferencePath;
+  const AiPreviewResult._({
+    required this.success,
+    this.imageBytes,
+    this.errorMessage,
+    this.model,
+    this.sku,
+    this.usedProductReference,
+    this.productReferencePath,
+  });
 
-  factory AiPreviewResult.ok(Uint8List bytes) =>
-      AiPreviewResult._(success: true, imageBytes: bytes);
+  factory AiPreviewResult.ok(
+    Uint8List bytes, {
+    String? model,
+    String? sku,
+    bool? usedProductReference,
+    String? productReferencePath,
+  }) =>
+      AiPreviewResult._(
+        success: true,
+        imageBytes: bytes,
+        model: model,
+        sku: sku,
+        usedProductReference: usedProductReference,
+        productReferencePath: productReferencePath,
+      );
 
   factory AiPreviewResult.fail(String message) =>
       AiPreviewResult._(success: false, errorMessage: message);
@@ -209,7 +243,18 @@ Future<AiPreviewResult> generateAiAmbiancePreview({
 
   try {
     final bytes = base64Decode(imageBase64);
-    return AiPreviewResult.ok(bytes);
+    // Champs de preuve/traçabilité — déjà présents dans la réponse JSON
+    // du proxy (server.js, non modifié), simplement lus ici pour
+    // vérification (ex: sku=D609, usedProductReference=true,
+    // productReferencePath=assets/profiles/control/D609.png) et pour
+    // affichage sur l'écran Avant/Après.
+    return AiPreviewResult.ok(
+      bytes,
+      model: json['model'] as String?,
+      sku: json['sku'] as String?,
+      usedProductReference: json['usedProductReference'] as bool?,
+      productReferencePath: json['productReferencePath'] as String?,
+    );
   } catch (_) {
     return AiPreviewResult.fail(kAiPreviewErrorGenerationFailed);
   }

@@ -214,6 +214,24 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
         _screenState = _AiScreenState.fallback;
       }
     });
+
+    // Stocke le résultat réussi dans AppState (jamais pour le mock local,
+    // voir _generateLocalMock) pour que l'écran Avant/Après (Comparateur)
+    // puisse afficher photo originale vs image IA sans relancer Gemini.
+    // `scene` est la MÊME photo/scène qui vient d'être envoyée au proxy
+    // ci-dessus — c'est bien le "AVANT" correspondant à ce "APRÈS".
+    if (result.success && result.imageBytes != null) {
+      appState.setLastAiComparisonResult(
+        AiComparisonResult(
+          originalImageBytes: scene,
+          aiImageBytes: result.imageBytes!,
+          sku: ref,
+          model: result.model,
+          usedProductReference: result.usedProductReference,
+          productReferencePath: result.productReferencePath,
+        ),
+      );
+    }
   }
 
   /// Effet local de démo (dart:ui, AUCUN appel réseau) — proposé quand la

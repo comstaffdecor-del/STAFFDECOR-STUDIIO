@@ -36,6 +36,37 @@ import '../models/saved_project.dart';
 const _prefsKey = 'sds_state';
 const _projectsPrefsKey = 'sds_saved_projects';
 
+/// Résultat d'un aperçu IA réussi, conservé en mémoire (jamais persisté
+/// sur disque — [Uint8List] volatile, cohérent avec [AppState.roomImage])
+/// pour permettre à l'écran Avant/Après d'afficher la vraie photo
+/// originale à côté de l'image IA générée, sans relancer Gemini. Tous
+/// les champs de traçabilité ([model], [sku], [usedProductReference],
+/// [productReferencePath]) proviennent tels quels de la réponse du
+/// proxy `/api/ai-render` (voir [AiPreviewResult] dans
+/// `ia_ambiance_preview.dart`), jamais recalculés côté client.
+class AiComparisonResult {
+  /// Photo/scène EXACTE envoyée au proxy pour cette génération (avant
+  /// ajout de la corniche/moulure IA) — le "AVANT" du comparatif.
+  final Uint8List originalImageBytes;
+
+  /// Image générée par Gemini (avec le produit intégré) — le "APRÈS".
+  final Uint8List aiImageBytes;
+
+  final String sku;
+  final String? model;
+  final bool? usedProductReference;
+  final String? productReferencePath;
+
+  const AiComparisonResult({
+    required this.originalImageBytes,
+    required this.aiImageBytes,
+    required this.sku,
+    this.model,
+    this.usedProductReference,
+    this.productReferencePath,
+  });
+}
+
 /// Calcule le rectangle d'affichage "contain" d'une image source dans un
 /// conteneur donné (letterboxing centré) — port fidèle de la logique
 /// `fitImageContain` de l'ancienne version (studio.js).
@@ -670,6 +701,23 @@ class AppState extends ChangeNotifier {
 
     _lastAiAutoTriggerKey = key;
     openAiAmbiancePanel(prefillRef: ref, autoGenerate: true);
+  }
+
+  /// Dernier aperçu IA généré avec succès — stocké ici (et non plus
+  /// gardé uniquement en état local éphémère de [AiAmbiancePanel]) pour
+  /// que l'écran Avant/Après (Comparateur) puisse afficher photo
+  /// originale vs image IA générée SANS relancer Gemini. Voir
+  /// [setLastAiComparisonResult].
+  AiComparisonResult? lastAiComparisonResult;
+
+  /// Enregistre le résultat d'une génération IA réussie — appelé
+  /// uniquement par [AiAmbiancePanel] après une réponse `ok` du proxy
+  /// `/api/ai-render`, jamais recalculé/deviné ici. [originalImageBytes]
+  /// est la MÊME photo/scène envoyée au proxy (avant génération), pour
+  /// un vrai comparatif avant/après cohérent.
+  void setLastAiComparisonResult(AiComparisonResult result) {
+    lastAiComparisonResult = result;
+    notifyListeners();
   }
 
   /// Vrai si [productModalQte] est une estimation par défaut (aucun métré
