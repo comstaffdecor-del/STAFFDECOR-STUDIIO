@@ -88,9 +88,7 @@ const String kAiPreviewFallbackMessage = kAiPreviewErrorGenerationFailed;
 
 /// Mention non-contractuelle permanente, non masquable, affichée sous
 /// TOUTE image générée (résultat réel ou mock local).
-const String kAiPreviewDisclaimer =
-    'Aperçu d\'ambiance non contractuel — ne représente pas le rendu '
-    'technique du produit.';
+const String kAiPreviewDisclaimer = 'Aperçu d\'ambiance non contractuel.';
 
 /// Résultat d'une tentative de génération d'aperçu IA.
 ///

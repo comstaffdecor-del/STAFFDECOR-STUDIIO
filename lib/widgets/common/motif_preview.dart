@@ -141,7 +141,7 @@ class _MotifChip extends StatelessWidget {
             ),
             const SizedBox(height: 3),
             Text(
-              'Relief réel · $ref',
+              'Produit sélectionné · $ref',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: AppColors.gold, fontSize: 8.5, fontWeight: FontWeight.w600),

@@ -23,10 +23,7 @@ library;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-const String kAiMockDisclaimer =
-    'Aperçu illustratif LOCAL (démo, en mode démonstration locale) — '
-    'simple superposition d\'image, ne représente pas le rendu technique '
-    'du produit.';
+const String kAiMockDisclaimer = 'Aperçu illustratif local — démonstration.';
 
 /// Compose localement une image "scène + surimpression produit +
 /// filtre de teinte + filigrane DÉMO", sans aucun appel réseau.

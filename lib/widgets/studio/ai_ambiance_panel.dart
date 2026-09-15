@@ -91,14 +91,6 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
   // (_useCurrentScene / _uploadScene / _useDemoScene / _reset).
   bool _isHybridScene = false;
   Uint8List? _resultBytes;
-  // P21-HYBRIDE (correction revue) — mode RÉELLEMENT appliqué par le
-  // SERVEUR pour la dernière génération réussie (`result.renderMode`,
-  // lu tel quel depuis la réponse JSON du proxy). C'EST cette valeur,
-  // et non [_isHybridScene] (qui n'est qu'une intention côté client,
-  // envoyée AVANT l'appel), qui pilote l'affichage du badge dans
-  // [_buildResult] — jamais ce qu'on CROIT avoir demandé, toujours ce
-  // qui a VRAIMENT tourné côté serveur.
-  String? _resultRenderMode;
   // true si _resultBytes provient du mock local (dart:ui, sans réseau),
   // false si une vraie génération via le proxy manobanana a produit le
   // résultat. Distinction OBLIGATOIRE pour ne jamais faire passer un mock
@@ -332,11 +324,6 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
       if (result.success && result.imageBytes != null) {
         _resultBytes = result.imageBytes;
         _resultIsMock = false;
-        // P21-HYBRIDE (correction revue) — traçabilité RÉELLE : ce que
-        // le serveur a effectivement appliqué (result.renderMode),
-        // jamais [_isHybridScene] qui n'est que l'intention envoyée
-        // avant l'appel réseau.
-        _resultRenderMode = result.renderMode;
         _screenState = _AiScreenState.result;
       } else {
         _lastErrorMessage = result.errorMessage ?? kAiPreviewErrorGenerationFailed;
@@ -409,7 +396,6 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
       _isHybridScene = false;
       _resultBytes = null;
       _resultIsMock = false;
-      _resultRenderMode = null;
       _screenState = _AiScreenState.pickProduct;
     });
   }
@@ -444,8 +430,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Aperçu d\'ambiance destiné à visualiser le produit dans un '
-              'décor — jamais un rendu technique. Non contractuel.',
+              'Aperçu d\'ambiance non contractuel.',
               style: TextStyle(color: AppColors.text3, fontSize: 11.5),
             ),
             const SizedBox(height: 16),
@@ -788,14 +773,9 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // P21-HYBRIDE (correction revue) — badge de traçabilité basé
-        // EXCLUSIVEMENT sur [_resultRenderMode] (= result.renderMode,
-        // ce que le SERVEUR a réellement appliqué), jamais sur
-        // [_isHybridScene] (l'intention côté client avant l'appel) —
-        // sinon le badge pourrait afficher "HYBRIDE" alors même que le
-        // serveur aurait silencieusement retombé sur 'add' (valeur
-        // invalide/absente). Jamais affiché pour le mock local, qui
-        // n'appelle jamais le proxy et n'a donc aucun renderMode réel.
+        // Badge "Aperçu prêt" affiché uniquement pour un résultat réel
+        // (jamais pour le mock local, qui a son propre badge "DÉMO
+        // LOCALE" ci-dessous).
         if (!isMock)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -808,11 +788,9 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
                 ),
-                child: Text(
-                  _resultRenderMode == 'refine'
-                      ? 'MODE HYBRIDE — réalisme sur corniche déjà posée'
-                      : 'MODE STANDARD — corniche ajoutée depuis photo brute',
-                  style: const TextStyle(
+                child: const Text(
+                  'Aperçu prêt',
+                  style: TextStyle(
                     color: AppColors.gold,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,

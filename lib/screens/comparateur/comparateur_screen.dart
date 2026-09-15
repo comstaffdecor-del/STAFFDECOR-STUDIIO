@@ -177,7 +177,7 @@ class _ComparateurScreenState extends State<ComparateurScreen> {
             children: [
               Expanded(
                 child: _CompModeToggle(
-                  label: 'Rendu technique',
+                  label: 'Vue de pose',
                   icon: FontAwesomeIcons.rulerCombined,
                   active: !_showAiComparison,
                   onTap: () => setState(() => _showAiComparison = false),
