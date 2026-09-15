@@ -210,6 +210,7 @@ function buildRefinePrompt(sku, retombeeCm, avanceeCm) {
     `${sku} cornice that is already in place.\n` +
     `${WINDOW_PRESERVATION_BLOCK}\n` +
     `${GEOMETRY_PRESERVATION_BLOCK}\n` +
+    `${CORNICE_ATTACHMENT_BLOCK}\n` +
     `Return the edited room image.`
   );
 }
@@ -252,6 +253,38 @@ const STL_REFERENCE_ONLY_BLOCK =
   `Ne pas reproduire l'aspect technique brut du STL.\n` +
   `Transformer le produit en moulure decorative blanche/blanc casse, posee naturellement dans la piece.`;
 
+/**
+ * P23-CORNICE-ATTACHMENT - Retour client : les corniches ne collent pas
+ * assez au mur/plafond (impression d'objet pose a distance / flottant /
+ * sticker). Bloc dedie, texte EXACT fourni par le brief (EN+FR), + une
+ * clause de coherence avec WINDOW_PRESERVATION_BLOCK (la corniche doit
+ * s'arreter proprement devant une ouverture, pas juste "toucher partout").
+ * Ce bloc s'ajoute aux contraintes existantes, il ne les remplace pas.
+ */
+const CORNICE_ATTACHMENT_BLOCK =
+  `The cornice must be installed exactly at the wall-ceiling junction.\n` +
+  `It must physically touch both the wall and the ceiling with no visible gap.\n` +
+  `The back of the cornice must be flush against the wall and ceiling surfaces.\n` +
+  `Do not place the cornice floating below the ceiling or detached from the wall.\n` +
+  `Do not render it as a sticker, a suspended object, a shelf, a beam, or a separate 3D object.\n` +
+  `The cornice must follow the real ceiling line and wall perspective precisely.\n` +
+  `Add subtle contact shadows where the cornice meets the wall and ceiling.\n` +
+  `The lower edge must sit naturally on the wall, and the upper edge must meet the ceiling.\n` +
+  `It must look professionally installed, integrated into the architecture.\n` +
+  `If a window or opening interrupts the wall-ceiling junction, the cornice must stop cleanly before it ` +
+  `and resume only where architecturally plausible.\n` +
+  `La corniche doit etre posee exactement a la jonction mur/plafond.\n` +
+  `Elle doit toucher physiquement le mur et le plafond, sans espace visible.\n` +
+  `L'arriere de la corniche doit etre plaque contre les surfaces du mur et du plafond.\n` +
+  `Ne pas placer la corniche flottante sous le plafond ou detachee du mur.\n` +
+  `Ne pas la rendre comme un autocollant, un objet suspendu, une etagere, une poutre ou un objet 3D separe.\n` +
+  `La corniche doit suivre precisement la ligne reelle du plafond et la perspective du mur.\n` +
+  `Ajouter de legeres ombres de contact la ou la corniche touche le mur et le plafond.\n` +
+  `Le bord inferieur doit reposer naturellement sur le mur, et le bord superieur doit rejoindre le plafond.\n` +
+  `Elle doit donner l'impression d'une pose professionnelle, integree a l'architecture.\n` +
+  `Si une fenetre ou une ouverture interrompt la jonction mur/plafond, la corniche doit s'arreter proprement ` +
+  `avant l'ouverture et ne reprendre que si c'est architecturalement plausible.`;
+
 function buildPrompt(sku, retombeeCm, avanceeCm, hasProductRef) {
   // P22-FENETRES-STL - rendu attendu : naturel mais strict (blanc/blanc
   // casse, adapte a la lumiere reelle de la piece, ombres douces,
@@ -278,6 +311,7 @@ function buildPrompt(sku, retombeeCm, avanceeCm, hasProductRef) {
       `Do not crop the image unnecessarily.\n` +
       `${WINDOW_PRESERVATION_BLOCK}\n` +
       `${GEOMETRY_PRESERVATION_BLOCK}\n` +
+      `${CORNICE_ATTACHMENT_BLOCK}\n` +
       `${renderQualityBlock}\n` +
       `The only meaningful change should be the added ${sku} plaster cornice at the wall-ceiling junction.\n` +
       `If the original image has no cornice, add one clearly.\n` +
@@ -296,6 +330,7 @@ function buildPrompt(sku, retombeeCm, avanceeCm, hasProductRef) {
     `Do not crop the image unnecessarily.\n` +
     `${WINDOW_PRESERVATION_BLOCK}\n` +
     `${GEOMETRY_PRESERVATION_BLOCK}\n` +
+    `${CORNICE_ATTACHMENT_BLOCK}\n` +
     `${renderQualityBlock}\n` +
     `The only meaningful change should be the added ${sku} plaster cornice at the wall-ceiling junction.\n` +
     `If the original image has no cornice, add one clearly.\n` +
