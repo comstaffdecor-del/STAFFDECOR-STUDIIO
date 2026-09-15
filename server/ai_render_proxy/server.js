@@ -1127,7 +1127,7 @@ function validateQuotePayload(body) {
   if (!body || typeof body !== 'object') {
     return 'Payload invalide';
   }
-  const { name, email, phone, message, items, totalEstimate } = body;
+  const { name, email, phone, message, items, totalEstimate, sceneLabel } = body;
 
   if (!name || typeof name !== 'string' || !name.trim()) {
     return 'Nom manquant';
@@ -1152,17 +1152,23 @@ function validateQuotePayload(body) {
   if (totalEstimate !== undefined && totalEstimate !== null && typeof totalEstimate !== 'number') {
     return 'Estimation invalide';
   }
+  if (sceneLabel !== undefined && sceneLabel !== null && typeof sceneLabel !== 'string') {
+    return 'Scène invalide';
+  }
   return null;
 }
 
 /**
  * Construit le corps du mail (texte brut) selon le gabarit du brief :
- * Nom / Email / Telephone / Message / Produits / Estimation / Request ID.
+ * Nom / Email / Telephone / Message / Produits / Scene ou photo utilisee
+ * (si disponible) / Estimation / Date-heure / Request ID.
  */
-function buildQuoteEmailBody({ name, email, phone, message, items, totalEstimate, requestId }) {
+function buildQuoteEmailBody({ name, email, phone, message, items, totalEstimate, sceneLabel, requestId }) {
   const itemsLines = (items || [])
     .map((it) => `  - ${it.ref} — ${it.name} : ${it.quantity ?? '?'} ${it.unit || ''}`.trim())
     .join('\n');
+
+  const sentAt = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' });
 
   return (
     `Nouvelle demande de devis — Staff Décor Studio\n\n` +
@@ -1171,7 +1177,9 @@ function buildQuoteEmailBody({ name, email, phone, message, items, totalEstimate
     `Téléphone : ${phone || 'Non renseigné'}\n` +
     `Message :\n${message || 'Aucun message'}\n\n` +
     `Produits :\n${itemsLines || '  (aucun produit listé)'}\n\n` +
+    `Scène / photo utilisée : ${sceneLabel || 'Non renseignée'}\n\n` +
     `Estimation : ${totalEstimate !== undefined && totalEstimate !== null ? `${totalEstimate} €` : 'Non calculée'}\n\n` +
+    `Date/heure : ${sentAt}\n` +
     `Request ID : ${requestId}`
   );
 }
@@ -1221,7 +1229,7 @@ app.post('/api/quote/send', async (req, res) => {
       return res.status(503).json({ ok: false, error: 'QUOTE_SEND_FAILED' });
     }
 
-    const { name, email, phone, message, items, totalEstimate } = req.body;
+    const { name, email, phone, message, items, totalEstimate, sceneLabel } = req.body;
 
     const mailOptions = {
       from: `"${QUOTE_MAIL_FROM_NAME}" <${QUOTE_MAIL_FROM}>`,
@@ -1229,7 +1237,7 @@ app.post('/api/quote/send', async (req, res) => {
       bcc: QUOTE_MAIL_BCC || undefined,
       replyTo: email,
       subject: 'Nouvelle demande de devis — Staff Décor Studio',
-      text: buildQuoteEmailBody({ name, email, phone, message, items, totalEstimate, requestId }),
+      text: buildQuoteEmailBody({ name, email, phone, message, items, totalEstimate, sceneLabel, requestId }),
     };
 
     await transporter.sendMail(mailOptions);

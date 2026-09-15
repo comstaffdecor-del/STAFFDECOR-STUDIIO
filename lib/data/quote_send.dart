@@ -77,7 +77,7 @@ const String kQuoteSendSuccessMessage =
 /// Message affiché en cas d'échec — volontairement générique, jamais de
 /// détail technique (voir docstring du fichier).
 const String kQuoteSendErrorMessage =
-    "L'envoi n'a pas pu aboutir. Merci de réessayer.";
+    "L'envoi de votre demande a échoué. Merci de réessayer.";
 
 /// Envoie la demande de devis au proxy serveur, qui se charge de
 /// l'envoi réel par Gmail SMTP. [httpClient] — point d'injection
@@ -91,6 +91,13 @@ Future<QuoteSendResult> sendQuoteRequest({
   required String message,
   required List<QuoteItem> items,
   required double totalEstimate,
+  // Scène ou photo utilisée par le client au moment de la demande (ex:
+  // "Scène démo — Haussmannien", "Photo importée par le client",
+  // "Scène actuelle du Studio") — transmise telle quelle au corps du
+  // mail (brief "correction de consigne" Gmail, champ "scène ou photo
+  // utilisée si disponible"). `null`/vide si aucune scène n'a encore
+  // été chargée dans le Studio au moment de l'envoi.
+  String? sceneLabel,
   http.Client? httpClient,
 }) async {
   // SÉCURITÉ (même garde que l'aperçu IA) : URL proxy non configurée
@@ -109,6 +116,7 @@ Future<QuoteSendResult> sendQuoteRequest({
     'message': message,
     'items': items.map((i) => i.toJson()).toList(),
     'totalEstimate': totalEstimate,
+    if (sceneLabel != null && sceneLabel.isNotEmpty) 'sceneLabel': sceneLabel,
   });
 
   http.Response resp;

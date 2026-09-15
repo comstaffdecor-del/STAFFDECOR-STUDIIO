@@ -303,9 +303,35 @@ class _DevisLocked extends StatelessWidget {
 ///   - repos  : "Envoyer ma demande de devis"
 ///   - envoi  : "Envoi de votre demande…"
 ///   - succès : "Votre demande de devis a bien été envoyée."
-///   - erreur : "L'envoi n'a pas pu aboutir. Merci de réessayer."
+///   - erreur : "L'envoi de votre demande a échoué. Merci de réessayer."
 /// Jamais de message technique (statut HTTP, erreur SMTP, etc.) —
 /// voir `data/quote_send.dart`.
+///
+/// Libellés des scènes démo (mêmes clés/valeurs que
+/// `_demoScenesForAi` dans `widgets/studio/ai_ambiance_panel.dart`) —
+/// utilisés uniquement pour renseigner le champ "scène ou photo
+/// utilisée" du mail de devis (brief "correction de consigne" Gmail),
+/// jamais pour piloter un quelconque rendu.
+const Map<String, String> _quoteDemoSceneLabels = {
+  'haussmann': 'Haussmannien',
+  'moderne': 'Contemporain',
+  'provencal': 'Provençal',
+  'scandinave': 'Scandinave',
+};
+
+/// Construit le libellé de la scène/photo actuellement chargée dans le
+/// Studio, à des fins purement informatives dans le corps du mail de
+/// devis — `null` si aucune scène n'a encore été chargée (cas normal
+/// d'un client qui passe directement par le catalogue).
+String? _sceneLabelForQuote(AppState state) {
+  if (state.roomImage == null) return null;
+  if (state.isDemoRoom) {
+    final label = _quoteDemoSceneLabels[state.demoScene] ?? state.demoScene;
+    return 'Scène démo — $label';
+  }
+  return 'Photo importée par le client (Studio)';
+}
+
 class _SendQuoteButton extends StatefulWidget {
   final AppState state;
   final Chiffrage chiffrage;
@@ -349,6 +375,7 @@ class _SendQuoteButtonState extends State<_SendQuoteButton> {
       message: contact.message,
       items: items,
       totalEstimate: widget.chiffrage.totalTtc,
+      sceneLabel: _sceneLabelForQuote(widget.state),
     );
 
     if (!mounted) return;
