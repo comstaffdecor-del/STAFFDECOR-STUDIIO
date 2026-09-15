@@ -114,6 +114,90 @@ const AI_QUOTA_IP_HASH_SALT =
   'staffdecor-ai-demo-quota-salt';
 
 // ---------------------------------------------------------------
+// P25-DEBUG-IO - Mode debug temporaire (retour client : "les scenes
+// demo ne passent toujours pas avec Gemini en vrai, il faut prouver
+// ce qui est reellement envoye"). Quand AI_DEBUG_SAVE_RENDER_IO=true,
+// chaque appel /api/ai-render sauvegarde sur disque, sous
+// /tmp/ai_render_debug/<requestId>/ :
+//   - input_room.jpg          (image scene EXACTEMENT telle que recue,
+//                               avant tout traitement/compression serveur)
+//   - input_product_ref.png   (reference produit envoyee a Gemini, si
+//                               presente)
+//   - prompt.txt              (prompt final EXACT envoye a Gemini)
+//   - output.jpg              (image renvoyee par Gemini, si succes)
+//   - meta.json               (sku, renderMode, source, mimeType,
+//                               tailles, usedProductReference, etc.)
+// Objectif : permettre une inspection humaine directe (pas de mock, pas
+// de supposition) de ce que Gemini recoit et renvoie reellement pour
+// chaque scene demo. Desactive par defaut (aucun impact en production
+// tant que la variable n'est pas positionnee) - ne remplace jamais la
+// reponse HTTP normale, purement une trace disque en plus.
+const AI_DEBUG_SAVE_RENDER_IO = process.env.AI_DEBUG_SAVE_RENDER_IO === 'true';
+const AI_DEBUG_DIR = process.env.AI_DEBUG_DIR || '/tmp/ai_render_debug';
+
+function debugRenderIoDir(requestId) {
+  return path.join(AI_DEBUG_DIR, requestId);
+}
+
+/**
+ * Ecrit les fichiers d'entree (image scene + reference produit + prompt)
+ * AVANT l'appel Gemini. Ne leve jamais - un echec d'ecriture debug ne
+ * doit jamais faire echouer une vraie requete de rendu.
+ */
+function saveDebugRenderInput({ requestId, inputBuffer, inputMimeType, productRef, prompt, meta }) {
+  if (!AI_DEBUG_SAVE_RENDER_IO) return;
+  try {
+    const dir = debugRenderIoDir(requestId);
+    fs.mkdirSync(dir, { recursive: true });
+
+    const roomExt = inputMimeType === 'image/png' ? 'png' : 'jpg';
+    fs.writeFileSync(path.join(dir, `input_room.${roomExt}`), inputBuffer);
+
+    if (productRef) {
+      fs.writeFileSync(path.join(dir, 'input_product_ref.png'), Buffer.from(productRef.base64, 'base64'));
+    }
+
+    fs.writeFileSync(path.join(dir, 'prompt.txt'), prompt, 'utf8');
+    fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
+  } catch (err) {
+    console.error(
+      JSON.stringify({ event: 'ai_debug_save_input_error', requestId, error: String(err?.message || err) }),
+    );
+  }
+}
+
+/**
+ * Complete meta.json et ecrit output.jpg APRES la reponse Gemini
+ * (succes ou echec). Ne leve jamais, meme logique defensive que
+ * saveDebugRenderInput.
+ */
+function saveDebugRenderOutput({ requestId, outData, outMime, extraMeta }) {
+  if (!AI_DEBUG_SAVE_RENDER_IO) return;
+  try {
+    const dir = debugRenderIoDir(requestId);
+    fs.mkdirSync(dir, { recursive: true });
+
+    if (outData) {
+      const outExt = outMime === 'image/png' ? 'png' : 'jpg';
+      fs.writeFileSync(path.join(dir, `output.${outExt}`), Buffer.from(outData, 'base64'));
+    }
+
+    const metaPath = path.join(dir, 'meta.json');
+    let meta = {};
+    try {
+      meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    } catch (_) {
+      // meta.json absent (input jamais sauvegarde, ex: erreur tres tot) -> on repart de {}
+    }
+    fs.writeFileSync(metaPath, JSON.stringify({ ...meta, ...extraMeta }, null, 2), 'utf8');
+  } catch (err) {
+    console.error(
+      JSON.stringify({ event: 'ai_debug_save_output_error', requestId, error: String(err?.message || err) }),
+    );
+  }
+}
+
+// ---------------------------------------------------------------
 // Middlewares
 // ---------------------------------------------------------------
 
@@ -555,6 +639,7 @@ app.post('/api/ai-render', async (req, res) => {
     }
 
     const source = req.body?.source || 'unknown';
+    const demoScene = req.body?.demoScene || null;
     const usedProductReferenceHint = Boolean(req.body?.productReferenceBase64);
 
     let quota;
@@ -697,6 +782,28 @@ app.post('/api/ai-render', async (req, res) => {
       });
     }
 
+    // P25-DEBUG-IO - trace disque de l'ENTREE exacte envoyee a Gemini
+    // (voir doc en tete de fichier). N'affecte jamais le flux normal.
+    saveDebugRenderInput({
+      requestId,
+      inputBuffer,
+      inputMimeType: realMimeType,
+      productRef,
+      prompt: finalPrompt,
+      meta: {
+        requestId,
+        sku,
+        renderMode: effectiveRenderMode,
+        source,
+        demoScene,
+        mimeType: realMimeType,
+        imageBytesLength: inputBuffer.length,
+        usedProductReference,
+        productReferencePath: productRef ? path.relative(path.join(__dirname, '..', '..'), productRef.path) : null,
+        model: MODEL,
+      },
+    });
+
     const geminiBody = {
       contents: [{
         parts: geminiParts,
@@ -752,6 +859,13 @@ app.post('/api/ai-render', async (req, res) => {
           },
         }),
       );
+      saveDebugRenderOutput({
+        requestId,
+        outData: null,
+        outMime: null,
+        extraMeta: { httpStatus: geminiResp.status, googleStatus: errStatus, errorMessage: errMessage },
+      });
+
       return res.status(geminiResp.status).json({
         ok: false,
         provider: 'gemini',
@@ -796,6 +910,13 @@ app.post('/api/ai-render', async (req, res) => {
           },
         }),
       );
+      saveDebugRenderOutput({
+        requestId,
+        outData: null,
+        outMime: null,
+        extraMeta: { httpStatus: 502, errorMessage: 'no_image_in_response', geminiRawCandidatesCount: candidates.length },
+      });
+
       return res.status(502).json({
         ok: false,
         provider: 'gemini',
@@ -803,6 +924,13 @@ app.post('/api/ai-render', async (req, res) => {
         error: 'Gemini n\'a retourné aucune image (réponse sans inlineData)',
       });
     }
+
+    saveDebugRenderOutput({
+      requestId,
+      outData,
+      outMime,
+      extraMeta: { httpStatus: 200, outputMimeType: outMime, outputBytesLength: Buffer.from(outData, 'base64').length },
+    });
 
     console.log(
       JSON.stringify({
