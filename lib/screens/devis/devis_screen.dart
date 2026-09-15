@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/chiffrage.dart';
 import '../../core/theme.dart';
+import '../../data/quote_send.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/common_ui.dart';
 
@@ -194,6 +195,8 @@ class DevisScreen extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 14),
+                    _SendQuoteButton(state: state, chiffrage: chiffrage),
                   ],
                 ),
         ),
@@ -289,6 +292,154 @@ class _DevisLocked extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Bouton "Envoyer ma demande de devis" (P24-QUOTE-GMAIL).
+///
+/// Gère localement les 3 états requis par le brief (idle / envoi en
+/// cours / résultat), avec les libellés EXACTS demandés :
+///   - repos  : "Envoyer ma demande de devis"
+///   - envoi  : "Envoi de votre demande…"
+///   - succès : "Votre demande de devis a bien été envoyée."
+///   - erreur : "L'envoi n'a pas pu aboutir. Merci de réessayer."
+/// Jamais de message technique (statut HTTP, erreur SMTP, etc.) —
+/// voir `data/quote_send.dart`.
+class _SendQuoteButton extends StatefulWidget {
+  final AppState state;
+  final Chiffrage chiffrage;
+
+  const _SendQuoteButton({required this.state, required this.chiffrage});
+
+  @override
+  State<_SendQuoteButton> createState() => _SendQuoteButtonState();
+}
+
+enum _QuoteSendUiState { idle, sending, success, error }
+
+class _SendQuoteButtonState extends State<_SendQuoteButton> {
+  _QuoteSendUiState _uiState = _QuoteSendUiState.idle;
+
+  Future<void> _onSend() async {
+    final contact = widget.state.lastContactInfo;
+    if (contact == null) {
+      // Ne devrait pas arriver (bouton visible seulement une fois
+      // contactSubmitted==true, donc lastContactInfo renseigné), mais
+      // on reste défensif plutôt que de crasher.
+      setState(() => _uiState = _QuoteSendUiState.error);
+      return;
+    }
+
+    setState(() => _uiState = _QuoteSendUiState.sending);
+
+    final items = widget.chiffrage.lignes
+        .map((l) => QuoteItem(
+              ref: l.ref,
+              name: l.designation,
+              quantity: l.qteCom,
+              unit: l.unite,
+            ))
+        .toList();
+
+    final result = await sendQuoteRequest(
+      name: '${contact.prenom} ${contact.nom}'.trim(),
+      email: contact.email,
+      phone: contact.tel,
+      message: contact.message,
+      items: items,
+      totalEstimate: widget.chiffrage.totalTtc,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _uiState = result.ok ? _QuoteSendUiState.success : _QuoteSendUiState.error;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (_uiState) {
+      case _QuoteSendUiState.sending:
+        return _StatusBanner(
+          icon: null,
+          spinner: true,
+          text: kQuoteSendLoadingMessage,
+          color: AppColors.text2,
+        );
+      case _QuoteSendUiState.success:
+        return _StatusBanner(
+          icon: FontAwesomeIcons.circleCheck,
+          text: kQuoteSendSuccessMessage,
+          color: AppColors.gold,
+        );
+      case _QuoteSendUiState.error:
+        return Column(
+          children: [
+            _StatusBanner(
+              icon: FontAwesomeIcons.triangleExclamation,
+              text: kQuoteSendErrorMessage,
+              color: AppColors.amber,
+            ),
+            const SizedBox(height: 10),
+            BtnGold(
+              label: 'Envoyer ma demande de devis',
+              icon: FontAwesomeIcons.paperPlane,
+              onTap: _onSend,
+            ),
+          ],
+        );
+      case _QuoteSendUiState.idle:
+        return BtnGold(
+          label: 'Envoyer ma demande de devis',
+          icon: FontAwesomeIcons.paperPlane,
+          onTap: _onSend,
+        );
+    }
+  }
+}
+
+/// Bandeau neutre de statut (envoi en cours / succès / erreur), aligné
+/// visuellement sur le bandeau d'avertissement légal déjà présent dans
+/// cet écran (`AppColors.card2` + coins arrondis).
+class _StatusBanner extends StatelessWidget {
+  final IconData? icon;
+  final bool spinner;
+  final String text;
+  final Color color;
+
+  const _StatusBanner({
+    this.icon,
+    this.spinner = false,
+    required this.text,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.card2,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          if (spinner)
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: color),
+            )
+          else if (icon != null)
+            Icon(icon, size: 16, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
     );
   }
 }

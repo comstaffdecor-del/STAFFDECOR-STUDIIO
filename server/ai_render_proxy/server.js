@@ -40,6 +40,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.AI_RENDER_PROXY_PORT || 8091;
@@ -853,6 +854,277 @@ app.post('/api/ai-render', async (req, res) => {
       provider: 'gemini',
       error: 'Erreur interne du proxy',
     });
+  }
+});
+
+// =================================================================
+// P24-QUOTE-GMAIL - Envoi de demandes de devis par email (Gmail SMTP)
+// =================================================================
+//
+// REGLE DE SECURITE ABSOLUE (identique au principe Gemini ci-dessus) :
+// les identifiants Gmail (GMAIL_SMTP_USER / GMAIL_SMTP_APP_PASSWORD)
+// vivent UNIQUEMENT dans process.env, cote serveur. Ils ne sont
+// JAMAIS loggues, jamais renvoyes dans une reponse HTTP, jamais
+// exposes au client Flutter. Le client Flutter ne connait que
+// l'URL de ce endpoint (POST /api/quote/send), jamais les
+// identifiants SMTP.
+//
+// Architecture obligatoire : Flutter -> POST /api/quote/send ->
+// ce proxy -> Gmail SMTP (nodemailer). Flutter n'envoie jamais de
+// mail directement.
+
+const QUOTE_MAIL_ENABLED = process.env.QUOTE_MAIL_ENABLED === 'true';
+const QUOTE_MAIL_PROVIDER = process.env.QUOTE_MAIL_PROVIDER || 'gmail_smtp';
+const QUOTE_MAIL_FROM = process.env.QUOTE_MAIL_FROM || '';
+const QUOTE_MAIL_FROM_NAME = process.env.QUOTE_MAIL_FROM_NAME || 'Staff Décor Studio';
+const QUOTE_MAIL_TO = process.env.QUOTE_MAIL_TO || '';
+const QUOTE_MAIL_BCC = process.env.QUOTE_MAIL_BCC || '';
+const GMAIL_SMTP_USER = process.env.GMAIL_SMTP_USER || '';
+const GMAIL_SMTP_APP_PASSWORD = process.env.GMAIL_SMTP_APP_PASSWORD || '';
+
+const QUOTE_DAILY_IP_LIMIT = parsePositiveIntegerEnv('QUOTE_DAILY_IP_LIMIT', 20);
+const QUOTE_DAILY_GLOBAL_LIMIT = parsePositiveIntegerEnv('QUOTE_DAILY_GLOBAL_LIMIT', 100);
+
+const QUOTE_QUOTA_STORE_PATH =
+  process.env.QUOTE_QUOTA_STORE_PATH ||
+  path.join(__dirname, '.quote_quota_store.json');
+
+/**
+ * Verifie si la configuration Gmail SMTP minimale est presente.
+ * Ne leve jamais d'exception - utilise pour decider si on tente
+ * meme l'envoi ou si on repond immediatement en erreur controlee.
+ */
+function isQuoteMailConfigured() {
+  return Boolean(
+    QUOTE_MAIL_ENABLED &&
+    QUOTE_MAIL_PROVIDER === 'gmail_smtp' &&
+    GMAIL_SMTP_USER &&
+    GMAIL_SMTP_APP_PASSWORD &&
+    QUOTE_MAIL_FROM &&
+    QUOTE_MAIL_TO,
+  );
+}
+
+// Transporteur nodemailer cree une seule fois (lazy) si la config est
+// presente. Reste null si la config Gmail est incomplete - dans ce
+// cas /api/quote/send repond avec QUOTE_SEND_FAILED sans jamais planter
+// le proxy (l'IA reste utilisable meme si Gmail n'est pas configure).
+let quoteMailTransporter = null;
+
+function getQuoteMailTransporter() {
+  if (!isQuoteMailConfigured()) {
+    return null;
+  }
+  if (!quoteMailTransporter) {
+    quoteMailTransporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: GMAIL_SMTP_USER,
+        pass: GMAIL_SMTP_APP_PASSWORD,
+      },
+    });
+  }
+  return quoteMailTransporter;
+}
+
+/**
+ * Reutilise le meme principe fail-closed que reserveAiQuota, mais sur
+ * un store JSON separe (pas de partage de compteurs entre l'IA de
+ * rendu et l'envoi de devis - ce sont deux ressources distinctes avec
+ * des limites distinctes QUOTE_DAILY_IP_LIMIT / QUOTE_DAILY_GLOBAL_LIMIT).
+ */
+function readQuoteQuotaStore() {
+  try {
+    if (!fs.existsSync(QUOTE_QUOTA_STORE_PATH)) {
+      return emptyQuotaStore();
+    }
+    const raw = fs.readFileSync(QUOTE_QUOTA_STORE_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.day !== quotaDayKey()) {
+      return emptyQuotaStore();
+    }
+    if (typeof parsed.globalCount !== 'number') {
+      parsed.globalCount = 0;
+    }
+    if (!parsed.byIpHash || typeof parsed.byIpHash !== 'object') {
+      parsed.byIpHash = {};
+    }
+    return parsed;
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: 'quote_quota_store_read_error',
+        error: String(err?.message || err),
+      }),
+    );
+    throw err;
+  }
+}
+
+function writeQuoteQuotaStore(store) {
+  const tmp = `${QUOTE_QUOTA_STORE_PATH}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(store, null, 2));
+  fs.renameSync(tmp, QUOTE_QUOTA_STORE_PATH);
+}
+
+function reserveQuoteQuota(req) {
+  const ip = getClientIp(req);
+  const ipHash = hashIp(ip);
+  const store = readQuoteQuotaStore();
+
+  const ipCount = store.byIpHash[ipHash] || 0;
+  const globalCount = store.globalCount || 0;
+
+  if (QUOTE_DAILY_GLOBAL_LIMIT >= 0 && globalCount >= QUOTE_DAILY_GLOBAL_LIMIT) {
+    return { ok: false, status: 429, code: 'QUOTE_GLOBAL_DAILY_QUOTA_EXCEEDED' };
+  }
+  if (QUOTE_DAILY_IP_LIMIT >= 0 && ipCount >= QUOTE_DAILY_IP_LIMIT) {
+    return { ok: false, status: 429, code: 'QUOTE_IP_DAILY_QUOTA_EXCEEDED' };
+  }
+
+  store.globalCount = globalCount + 1;
+  store.byIpHash[ipHash] = ipCount + 1;
+  writeQuoteQuotaStore(store);
+
+  return { ok: true };
+}
+
+/**
+ * Validation minimale mais stricte du payload de demande de devis.
+ * Ne fait JAMAIS confiance au contenu client au-dela de la forme :
+ * champs requis presents et de type correct, items = tableau
+ * d'objets avec ref/name/quantity/unit, totalEstimate numerique.
+ */
+function validateQuotePayload(body) {
+  if (!body || typeof body !== 'object') {
+    return 'Payload invalide';
+  }
+  const { name, email, phone, message, items, totalEstimate } = body;
+
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return 'Nom manquant';
+  }
+  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return 'Email invalide';
+  }
+  if (phone !== undefined && phone !== null && typeof phone !== 'string') {
+    return 'Téléphone invalide';
+  }
+  if (message !== undefined && message !== null && typeof message !== 'string') {
+    return 'Message invalide';
+  }
+  if (!Array.isArray(items)) {
+    return 'Liste de produits invalide';
+  }
+  for (const item of items) {
+    if (!item || typeof item !== 'object' || !item.ref || !item.name) {
+      return 'Ligne de produit invalide';
+    }
+  }
+  if (totalEstimate !== undefined && totalEstimate !== null && typeof totalEstimate !== 'number') {
+    return 'Estimation invalide';
+  }
+  return null;
+}
+
+/**
+ * Construit le corps du mail (texte brut) selon le gabarit du brief :
+ * Nom / Email / Telephone / Message / Produits / Estimation / Request ID.
+ */
+function buildQuoteEmailBody({ name, email, phone, message, items, totalEstimate, requestId }) {
+  const itemsLines = (items || [])
+    .map((it) => `  - ${it.ref} — ${it.name} : ${it.quantity ?? '?'} ${it.unit || ''}`.trim())
+    .join('\n');
+
+  return (
+    `Nouvelle demande de devis — Staff Décor Studio\n\n` +
+    `Nom : ${name}\n` +
+    `Email : ${email}\n` +
+    `Téléphone : ${phone || 'Non renseigné'}\n` +
+    `Message :\n${message || 'Aucun message'}\n\n` +
+    `Produits :\n${itemsLines || '  (aucun produit listé)'}\n\n` +
+    `Estimation : ${totalEstimate !== undefined && totalEstimate !== null ? `${totalEstimate} €` : 'Non calculée'}\n\n` +
+    `Request ID : ${requestId}`
+  );
+}
+
+app.post('/api/quote/send', async (req, res) => {
+  const requestId = `quote_${crypto.randomUUID()}`;
+
+  try {
+    const validationError = validateQuotePayload(req.body);
+    if (validationError) {
+      console.warn(
+        JSON.stringify({ event: 'quote_send_validation_error', requestId, error: validationError }),
+      );
+      return res.status(400).json({ ok: false, error: 'QUOTE_SEND_FAILED' });
+    }
+
+    let quota;
+    try {
+      quota = reserveQuoteQuota(req);
+    } catch (quotaErr) {
+      console.error(
+        JSON.stringify({
+          event: 'quote_quota_error',
+          requestId,
+          error: String(quotaErr?.message || quotaErr),
+        }),
+      );
+      return res.status(429).json({ ok: false, error: 'QUOTE_SEND_FAILED' });
+    }
+
+    if (!quota.ok) {
+      console.warn(
+        JSON.stringify({ event: 'quote_quota_rejected', requestId, code: quota.code }),
+      );
+      return res.status(quota.status || 429).json({ ok: false, error: 'QUOTE_SEND_FAILED' });
+    }
+
+    const transporter = getQuoteMailTransporter();
+    if (!transporter) {
+      console.error(
+        JSON.stringify({
+          event: 'quote_mail_not_configured',
+          requestId,
+          hint: 'QUOTE_MAIL_ENABLED / GMAIL_SMTP_USER / GMAIL_SMTP_APP_PASSWORD / QUOTE_MAIL_FROM / QUOTE_MAIL_TO manquants ou incomplets',
+        }),
+      );
+      return res.status(503).json({ ok: false, error: 'QUOTE_SEND_FAILED' });
+    }
+
+    const { name, email, phone, message, items, totalEstimate } = req.body;
+
+    const mailOptions = {
+      from: `"${QUOTE_MAIL_FROM_NAME}" <${QUOTE_MAIL_FROM}>`,
+      to: QUOTE_MAIL_TO,
+      bcc: QUOTE_MAIL_BCC || undefined,
+      replyTo: email,
+      subject: 'Nouvelle demande de devis — Staff Décor Studio',
+      text: buildQuoteEmailBody({ name, email, phone, message, items, totalEstimate, requestId }),
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    console.log(
+      JSON.stringify({
+        event: 'quote_send_success',
+        requestId,
+        itemsCount: Array.isArray(items) ? items.length : 0,
+      }),
+    );
+
+    return res.json({ ok: true, requestId });
+
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: 'quote_send_error',
+        requestId,
+        error: String(err && err.message ? err.message : 'erreur inconnue'),
+      }),
+    );
+    return res.status(500).json({ ok: false, error: 'QUOTE_SEND_FAILED' });
   }
 });
 

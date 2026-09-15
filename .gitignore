@@ -71,6 +71,8 @@ server/*/*.env
 # environnements).
 server/*/.ai_quota_store.json
 server/*/.ai_quota_store.json.tmp
+server/*/.quote_quota_store.json
+server/*/.quote_quota_store.json.tmp
 
 # P17-VISUEL (verif securite point 4) : le commit auto-backup d0dfe4c a
 # embarque 308 fichiers STL (~862 Mo, assets/solids/stl/) issus d'une
