@@ -1562,6 +1562,27 @@ class AppState extends ChangeNotifier {
     final prod = getProdByRef(ref);
     if (prod == null) return;
 
+    // CORRECTIF (brief "vérifier explicitement le parcours CatBar" —
+    // retour de validation post-patch) : [_reset] dans AiAmbiancePanel
+    // ne peut nettoyer [currentAmbiancePreviewBytes] que si le panneau
+    // IA est encore monté. Or le parcours réel et le plus naturel côté
+    // client est : aperçu D609 réussi -> fermeture du panneau (panneau
+    // démonté, _reset jamais appelé) -> clic DIRECT sur D607 dans la
+    // CatBar (quickToggleProd -> addToProject, SANS jamais rouvrir le
+    // panneau tant que l'auto-trigger standard n'a pas terminé son
+    // debounce). Sans ce nettoyage ICI, le rendu D609 restait visible en
+    // fond pendant toute la préparation/génération de D607 — exactement
+    // le risque de confusion visuelle explicitement signalé. On ne
+    // nettoie QUE lors d'un vrai changement de produit actif (nouveau
+    // ref différent de l'ancien [studioSelected]) : une simple mise à
+    // jour de quantité du produit DÉJÀ affiché (bouton "Mettre à jour"
+    // de la modal produit, même ref) ne doit pas faire disparaître un
+    // rendu qui reste visuellement correct pour ce même produit.
+    final previousStudioSelected = studioSelected;
+    if (previousStudioSelected != ref) {
+      clearCurrentAmbiancePreview();
+    }
+
     // Règle "1 produit par famille en studio" : retire les autres produits
     // de la même famille avant d'ajouter le nouveau.
     selectedProducts = selectedProducts
