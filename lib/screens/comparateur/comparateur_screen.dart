@@ -1,9 +1,9 @@
 /// Écran Comparateur — port fidèle de `#screen-comparateur` (shell.ts).
 ///
-/// Avant/Après avec divider draguable. Utilise le MÊME [RoomPainter] que
-/// le Studio (image + calibration identiques) — corrige le Bug #5 (le 3e
-/// système disjoint `comparateur.js/_perspPoints` à % fixes est supprimé,
-/// remplacé par le même VP réel).
+/// CORRECTIF (brief "wording client — uniquement Aperçu d'ambiance") :
+/// n'affiche plus JAMAIS de comparatif technique RoomPainter — seule la
+/// paire (scène source propre / aperçu d'ambiance distant) est montrée,
+/// voir [_AiCompZone] plus bas.
 library;
 
 import 'dart:ui' as ui;
@@ -15,14 +15,10 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/chiffrage.dart';
-import '../../core/perspective/product_texture_cache.dart';
-import '../../core/perspective/room_painter.dart';
 import '../../core/theme.dart';
 import '../../data/ia_ambiance_preview.dart' show kAiPreviewDisclaimer;
-import '../../models/persp_calib.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/common_ui.dart';
-import '../../widgets/common/motif_preview.dart';
 
 class ComparateurScreen extends StatefulWidget {
   const ComparateurScreen({super.key});
@@ -43,18 +39,6 @@ class _ComparateurScreenState extends State<ComparateurScreen> {
   // de partage système n'est disponible.
   final GlobalKey _compZoneKey = GlobalKey();
   bool _exporting = false;
-
-  // ⚠️ AJOUT Avant/Après IA (retour utilisateur : "Avant/Après ne
-  // fonctionne pas" — diagnostic confirmé : l'image IA générée dans
-  // AiAmbiancePanel restait locale à ce widget, jamais transmise à cet
-  // écran). Deux modes de comparatif désormais possibles, choisis par
-  // l'utilisateur, JAMAIS mélangés :
-  //  - false (défaut) : comparatif TECHNIQUE existant, inchangé —
-  //    RoomPainter avec/sans produit (moteur dynamique déterministe) ;
-  //  - true : comparatif AMBIANCE IA — vraie photo AVANT vs image
-  //    Gemini APRÈS, lues depuis [AppState.lastAiComparisonResult],
-  //    SANS jamais relancer de génération depuis cet écran.
-  bool _showAiComparison = false;
 
   Future<void> _downloadComparisonImage() async {
     if (_exporting) return;
@@ -137,9 +121,9 @@ class _ComparateurScreenState extends State<ComparateurScreen> {
                         icon: FontAwesomeIcons.download,
                         size: 30,
                         // Le téléchargement capture toujours la zone
-                        // AFFICHÉE (RepaintBoundary englobe les deux
-                        // modes) — cohérent que ce soit le comparatif
-                        // technique ou le comparatif IA.
+                        // AFFICHÉE (RepaintBoundary autour de
+                        // _AiCompZone) — comparatif Avant/Aperçu
+                        // d'ambiance uniquement.
                         onTap: _downloadComparisonImage,
                       ),
               ),
@@ -159,65 +143,24 @@ class _ComparateurScreenState extends State<ComparateurScreen> {
             ],
           ),
         ),
-        // ⚠️ AJOUT Avant/Après IA — bascule explicite entre les deux
-        // comparatifs (jamais fusionnés, jamais l'un à la place de
-        // l'autre par défaut) : "Rendu technique" reste le comportement
-        // EXISTANT et INCHANGÉ (RoomPainter, sélectionné par défaut) ;
-        // "Aperçu IA" affiche le dernier résultat Gemini stocké dans
-        // AppState (voir _AiCompZone plus bas), sans jamais relancer de
-        // génération depuis cet écran.
-        Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: const BoxDecoration(
-            color: AppColors.bg,
-            border: Border(bottom: BorderSide(color: AppColors.border)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: _CompModeToggle(
-                  label: 'Vue de pose',
-                  icon: FontAwesomeIcons.rulerCombined,
-                  active: !_showAiComparison,
-                  onTap: () => setState(() => _showAiComparison = false),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _CompModeToggle(
-                  label: 'Aperçu d\'ambiance',
-                  icon: FontAwesomeIcons.wandMagicSparkles,
-                  active: _showAiComparison,
-                  onTap: () => setState(() => _showAiComparison = true),
-                ),
-              ),
-            ],
-          ),
-        ),
+        // CORRECTIF (brief "wording client — uniquement Aperçu
+        // d'ambiance") : le Comparateur n'expose plus AUCUNE bascule
+        // "Vue de pose" / rendu technique RoomPainter côté client — le
+        // client se fiche des vues techniques (repères, calibration,
+        // moteur dynamique déterministe). Le Comparateur affiche
+        // désormais TOUJOURS et UNIQUEMENT :
+        //   AVANT = scène source propre (vraie photo/scène envoyée au
+        //           proxy, [AiComparisonResult.originalImageBytes]) ;
+        //   APRÈS = aperçu d'ambiance final ([AiComparisonResult.
+        //           aiImageBytes], résultat distant reçu tel quel).
+        // Jamais de RoomPainter, jamais de trait/overlay technique — le
+        // toggle et le comparatif RoomPainter historiques ont été
+        // intégralement supprimés (plus de code mort résiduel).
         Expanded(
           flex: 55,
           child: RepaintBoundary(
             key: _compZoneKey,
-            child: _showAiComparison
-                ? _AiCompZone(result: state.lastAiComparisonResult)
-                : LayoutBuilder(
-              builder: (context, c) {
-                final roomImage = state.roomImage;
-                final localImgDraw = roomImage == null
-                    ? null
-                    : computeImgDraw(
-                        roomImage.width.toDouble(),
-                        roomImage.height.toDouble(),
-                        c.maxWidth,
-                        c.maxHeight,
-                      );
-                return _CompZone(
-                  size: Size(c.maxWidth, c.maxHeight),
-                  localImgDraw: localImgDraw,
-                );
-              },
-            ),
+            child: _AiCompZone(result: state.lastAiComparisonResult),
           ),
         ),
         Expanded(
@@ -379,112 +322,6 @@ class _LockedPanel extends StatelessWidget {
   }
 }
 
-class _CompZone extends StatelessWidget {
-  final Size size;
-  final ImgDraw? localImgDraw;
-  const _CompZone({required this.size, required this.localImgDraw});
-
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    final calib = state.perspCalib ?? PerspCalib.defaultCalib;
-    final dividerX = size.width * (state.compPos / 100);
-
-    return Container(
-      color: AppColors.bg2,
-      child: Stack(
-        children: [
-          // APRÈS (fond, pleine largeur, avec produits) — [ListenableBuilder]
-          // repaint dès que la vraie photo produit (motifs) termine de
-          // charger via [ProductTextureCache] (voir Studio pour détail).
-          Positioned.fill(
-            child: ListenableBuilder(
-              listenable: ProductTextureCache.instance,
-              builder: (context, _) => CustomPaint(
-                painter: RoomPainter(
-                  roomImage: state.roomImage,
-                  imgDraw: localImgDraw,
-                  calib: calib,
-                  selectedProducts: state.selectedProducts,
-                  prodPositions: state.prodPositions,
-                  withProducts: true,
-                  metresHauteur: state.metresHauteur,
-                ),
-              ),
-            ),
-          ),
-          // AVANT (clip à gauche du divider, sans produits)
-          Positioned.fill(
-            child: ClipRect(
-              clipper: _LeftClipper(dividerX),
-              child: CustomPaint(
-                painter: RoomPainter(
-                  roomImage: state.roomImage,
-                  imgDraw: localImgDraw,
-                  calib: calib,
-                  selectedProducts: state.selectedProducts,
-                  prodPositions: state.prodPositions,
-                  withProducts: false,
-                  metresHauteur: state.metresHauteur,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: dividerX - 14,
-            top: 0,
-            bottom: 0,
-            width: 28,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onPanUpdate: (d) {
-                final newX = (dividerX + d.delta.dx).clamp(0.0, size.width);
-                state.setCompPos(newX / size.width * 100);
-              },
-              child: Center(
-                child: Container(
-                  width: 2,
-                  color: AppColors.gold,
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: const BoxDecoration(
-                        color: AppColors.gold,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(FontAwesomeIcons.arrowsLeftRight, size: 12, color: AppColors.bg),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 10,
-            bottom: 10,
-            child: _CompLabel('AVANT'),
-          ),
-          Positioned(
-            right: 10,
-            bottom: 10,
-            child: _CompLabel('APRÈS'),
-          ),
-          // Aperçu zoomé du VRAI relief sculpté (Bug B) — voir Studio pour
-          // le détail : la bande dans la photo est trop fine pour montrer
-          // le motif, même en texture-mapping réel.
-          Positioned(
-            right: 10,
-            top: 10,
-            child: MotifPreviewBar(selectedProducts: state.selectedProducts),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CompLabel extends StatelessWidget {
   final String text;
   const _CompLabel(this.text);
@@ -511,54 +348,7 @@ class _LeftClipper extends CustomClipper<Rect> {
   bool shouldReclip(covariant _LeftClipper oldClipper) => oldClipper.x != x;
 }
 
-/// Bascule "Rendu technique" / "Aperçu IA" — voir commentaire dans
-/// [ComparateurScreen.build].
-class _CompModeToggle extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool active;
-  final VoidCallback onTap;
-  const _CompModeToggle({
-    required this.label,
-    required this.icon,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? AppColors.gold.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: active ? AppColors.gold : AppColors.border),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 12, color: active ? AppColors.gold : AppColors.text2),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: active ? AppColors.gold : AppColors.text2,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Comparatif "Aperçu IA" — AVANT = vraie photo/scène envoyée au proxy,
+/// Comparatif "Aperçu d'ambiance" — AVANT = vraie photo/scène envoyée au proxy,
 /// APRÈS = image Gemini générée, toutes deux lues depuis
 /// [AppState.lastAiComparisonResult] (voir [AiComparisonResult]).
 /// N'appelle JAMAIS le proxy ni [generateAiAmbiancePreview] — affichage
