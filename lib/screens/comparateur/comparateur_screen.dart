@@ -186,7 +186,7 @@ class _ComparateurScreenState extends State<ComparateurScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: _CompModeToggle(
-                  label: 'Aperçu IA',
+                  label: 'Aperçu d\'ambiance',
                   icon: FontAwesomeIcons.wandMagicSparkles,
                   active: _showAiComparison,
                   onTap: () => setState(() => _showAiComparison = true),
@@ -584,14 +584,14 @@ class _AiCompZone extends StatelessWidget {
             const Icon(FontAwesomeIcons.wandMagicSparkles, size: 30, color: AppColors.text3),
             const SizedBox(height: 12),
             const Text(
-              'Générez d\'abord un aperçu IA depuis le Studio.',
+              'Créez d\'abord un aperçu depuis le Studio.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             const Text(
               'Importez une photo et sélectionnez un produit dans le '
-              'Studio : l\'aperçu d\'ambiance IA se génère automatiquement, '
+              'Studio : l\'aperçu d\'ambiance se génère automatiquement, '
               'puis apparaît ici en comparatif avant/après.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.text3, fontSize: 11.5, height: 1.4),

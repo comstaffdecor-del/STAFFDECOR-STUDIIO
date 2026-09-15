@@ -79,8 +79,8 @@ const bool kAiPreviewEnabled = true;
 /// d'infrastructure : proxy, serveur, réseau, API, modèle...).
 const String kAiPreviewErrorNoPhoto = 'Aucune photo sélectionnée.';
 const String kAiPreviewErrorNoProduct = 'Aucun produit sélectionné.';
-const String kAiPreviewErrorProxyUnreachable = 'Aperçu IA momentanément indisponible.';
-const String kAiPreviewErrorGenerationFailed = 'Échec de la génération.';
+const String kAiPreviewErrorProxyUnreachable = 'Aperçu momentanément indisponible.';
+const String kAiPreviewErrorGenerationFailed = 'L\'aperçu n\'a pas pu être préparé.';
 const String kAiPreviewErrorDisabled = 'Fonction non configurée sur cet environnement.';
 
 /// Message de repli générique (compat rétro).
@@ -89,8 +89,8 @@ const String kAiPreviewFallbackMessage = kAiPreviewErrorGenerationFailed;
 /// Mention non-contractuelle permanente, non masquable, affichée sous
 /// TOUTE image générée (résultat réel ou mock local).
 const String kAiPreviewDisclaimer =
-    'Aperçu IA non contractuel — illustration d\'ambiance, ne représente '
-    'pas le rendu technique du produit.';
+    'Aperçu d\'ambiance non contractuel — ne représente pas le rendu '
+    'technique du produit.';
 
 /// Résultat d'une tentative de génération d'aperçu IA.
 ///

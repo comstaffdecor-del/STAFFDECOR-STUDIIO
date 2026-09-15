@@ -162,8 +162,8 @@ class _IaSuggestionPanelState extends State<IaSuggestionPanel> {
             const Text(
               'L\'assistant vous propose des références validées, vous '
               'confirmez. Suggestions calculées par similarité visuelle '
-              'parmi les modèles validés présentation — jamais une '
-              'confiance IA, toujours une correspondance mesurée.',
+              'parmi les modèles validés présentation — toujours une '
+              'correspondance mesurée.',
               style: TextStyle(color: AppColors.text3, fontSize: 11.5),
             ),
             const SizedBox(height: 16),

@@ -428,7 +428,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
               children: [
                 const Expanded(
                   child: Text(
-                    'Aperçu d\'ambiance IA',
+                    'Aperçu d\'ambiance',
                     style: TextStyle(
                       color: AppColors.gold,
                       fontSize: 16,
@@ -444,9 +444,8 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Illustration d\'ambiance générée par IA, uniquement pour '
-              'visualiser un produit validé dans un décor — jamais un '
-              'rendu technique.',
+              'Aperçu d\'ambiance destiné à visualiser le produit dans un '
+              'décor — jamais un rendu technique. Non contractuel.',
               style: TextStyle(color: AppColors.text3, fontSize: 11.5),
             ),
             const SizedBox(height: 16),
@@ -609,7 +608,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Recommandé : le moteur dynamique place la corniche, l\'IA '
+          'Recommandé : le moteur dynamique place la corniche, l\'aperçu '
           'améliore uniquement le réalisme (matière, ombres, lumière) — '
           'sans en changer la position.',
           style: TextStyle(color: AppColors.text3, fontSize: 10.5),
@@ -706,7 +705,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
               children: [
                 Icon(FontAwesomeIcons.wandMagicSparkles, size: 14),
                 SizedBox(width: 8),
-                Text('Générer un aperçu IA', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                Text('Créer l\'aperçu', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
@@ -741,7 +740,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
                   Icon(FontAwesomeIcons.images, size: 13),
                   SizedBox(width: 8),
                   Text(
-                    'Voir un aperçu démo (local, sans IA)',
+                    'Voir un aperçu démo local',
                     style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
                   ),
                 ],
@@ -750,8 +749,8 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Effet de superposition local, sans appel réseau ni intelligence '
-            'artificielle — uniquement pour illustrer la démo.',
+            'Effet de superposition local, sans appel réseau — uniquement '
+            'pour illustrer la démo.',
             style: TextStyle(color: AppColors.text3, fontSize: 10.5),
           ),
         ],
@@ -776,7 +775,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
               child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.gold),
             ),
             SizedBox(height: 12),
-            Text('Génération de l\'aperçu IA…', style: TextStyle(color: AppColors.gold, fontSize: 12.5)),
+            Text('Préparation de l\'aperçu…', style: TextStyle(color: AppColors.gold, fontSize: 12.5)),
           ],
         ),
       ),
@@ -836,7 +835,7 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
                 Icon(FontAwesomeIcons.images, size: 10, color: AppColors.text2),
                 SizedBox(width: 6),
                 Text(
-                  'DÉMO LOCALE — PAS D\'IA',
+                  'DÉMO LOCALE',
                   style: TextStyle(color: AppColors.text2, fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.4),
                 ),
               ],

@@ -430,7 +430,7 @@ class _StudioTopbar extends StatelessWidget {
                   // passe, voir lib/data/ia_ambiance_preview.dart).
                   _ToolBtn(
                     icon: FontAwesomeIcons.wandSparkles,
-                    tip: 'Aperçu d\'ambiance IA',
+                    tip: 'Aperçu d\'ambiance',
                     onTap: onAiAmbiance,
                   ),
                   // ⚠️ CORRECTION retour utilisateur ("les boutons d'enregistrement...

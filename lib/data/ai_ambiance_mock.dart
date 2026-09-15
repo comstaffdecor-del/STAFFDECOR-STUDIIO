@@ -24,9 +24,9 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 const String kAiMockDisclaimer =
-    'Aperçu illustratif LOCAL (démo, sans intelligence artificielle) — '
-    'simple superposition d\'image, ne représente ni un rendu IA ni un '
-    'rendu technique du produit.';
+    'Aperçu illustratif LOCAL (démo, en mode démonstration locale) — '
+    'simple superposition d\'image, ne représente pas le rendu technique '
+    'du produit.';
 
 /// Compose localement une image "scène + surimpression produit +
 /// filtre de teinte + filigrane DÉMO", sans aucun appel réseau.
@@ -137,7 +137,7 @@ Future<Uint8List?> generateLocalMockPreview({
 }
 
 void _drawWatermark(ui.Canvas canvas, double w, double h) {
-  const text = 'DÉMO — PAS D\'IA — ILLUSTRATIF';
+  const text = 'DÉMO LOCALE — ILLUSTRATIF';
   final style = ui.TextStyle(
     color: const ui.Color.fromRGBO(255, 255, 255, 0.55),
     fontSize: (w * 0.045).clamp(16.0, 34.0),
