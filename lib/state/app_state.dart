@@ -271,6 +271,16 @@ class AppState extends ChangeNotifier {
     required Size containerSize,
     bool demo = false,
   }) async {
+    // CORRECTIF (brief "persistance propre du rendu d'aperçu + reset
+    // propre au changement de scène", Objectif 3) : toute nouvelle scène
+    // (import photo OU scène démo, voir [loadDemoScene] plus bas) doit
+    // repartir d'une vue propre — aucun ancien rendu d'ambiance IA
+    // distant ne doit rester affiché par-dessus la nouvelle scène source
+    // ([currentAmbiancePreviewBytes] pilote la vue principale de
+    // `_PhotoZone`, voir sa docstring). [roomImage] lui-même est de
+    // toute façon réécrit juste en dessous : cet appel supprime
+    // uniquement le rendu VISUEL résiduel d'un aperçu précédent.
+    clearCurrentAmbiancePreview();
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
     roomImage = frame.image;
@@ -375,6 +385,13 @@ class AppState extends ChangeNotifier {
   /// bug où le sélecteur de scène démo ne changeait qu'un libellé texte
   /// sans jamais charger/afficher de vraie image.
   Future<void> loadDemoScene(String key, {Size? containerSize}) async {
+    // CORRECTIF (brief "persistance propre du rendu d'aperçu + reset
+    // propre au changement de scène", Objectif 3) : voir le commentaire
+    // symétrique dans [setRoomImageBytes] — même règle pour un
+    // changement de scène démo (première sélection OU re-sélection
+    // depuis [_DemoScenePicker]) : aucun ancien rendu IA distant ne doit
+    // survivre au changement de scène.
+    clearCurrentAmbiancePreview();
     final size = containerSize ?? _lastPhotoZoneSize;
     if (size == null || size.width <= 0 || size.height <= 0) {
       // Zone photo pas encore mesurée : on mémorise juste le choix, le
@@ -1326,6 +1343,56 @@ class AppState extends ChangeNotifier {
   /// un vrai comparatif avant/après cohérent.
   void setLastAiComparisonResult(AiComparisonResult result) {
     lastAiComparisonResult = result;
+    notifyListeners();
+  }
+
+  /// Dernier rendu d'ambiance IA DISTANT réussi — DIFFÉRENT de
+  /// [lastAiComparisonResult] (utilisé uniquement par le Comparateur
+  /// Avant/Après). Ce champ pilote la vue PRINCIPALE du Studio
+  /// (`_PhotoZone` dans `studio_screen.dart`) : quand il est non-null,
+  /// il devient l'image affichée en Studio, y compris APRÈS fermeture
+  /// du panneau [AiAmbiancePanel] — c'est tout l'objet de ce mécanisme
+  /// (brief "persistance propre du rendu d'aperçu").
+  ///
+  /// ⚠️ RÈGLE CRITIQUE — séparation stricte source de vérité / vue
+  /// affichée :
+  ///   - [roomImage] reste TOUJOURS la source de vérité pour tout futur
+  ///     appel IA (voir [AiAmbiancePanel._useCurrentScene], qui encode
+  ///     `state.roomImage`, jamais ce champ) — sinon un deuxième appel
+  ///     travaillerait sur une image déjà transformée par Gemini, avec
+  ///     dégradation progressive au fil des appels successifs.
+  ///   - Ce champ n'est QUE visuel : `PhotoZone display image =
+  ///     currentAmbiancePreviewBytes ?? roomImage`.
+  ///
+  /// Cycle de vie (voir [setCurrentAmbiancePreview] /
+  /// [clearCurrentAmbiancePreview]) :
+  ///   - rempli uniquement par [AiAmbiancePanel._generate] au succès
+  ///     d'une génération RÉELLE (jamais pour le mock local) ;
+  ///   - vidé par [AiAmbiancePanel._reset] (changement de produit,
+  ///     "Nouvel aperçu", "Réessayer") ;
+  ///   - vidé par [setRoomImageBytes]/[loadDemoScene] (import photo ou
+  ///     changement de scène démo) ;
+  ///   - JAMAIS vidé par [closeAiAmbiancePanel] : la fermeture du
+  ///     panneau ne doit PAS faire disparaître le rendu affiché.
+  Uint8List? currentAmbiancePreviewBytes;
+
+  /// Enregistre le dernier rendu d'ambiance IA distant réussi comme vue
+  /// principale du Studio — voir docstring de
+  /// [currentAmbiancePreviewBytes].
+  void setCurrentAmbiancePreview(Uint8List bytes) {
+    currentAmbiancePreviewBytes = bytes;
+    notifyListeners();
+  }
+
+  /// Supprime le rendu d'ambiance IA distant actuellement affiché en vue
+  /// principale du Studio — appelé à chaque changement de produit
+  /// (avant un nouvel appel) et à chaque changement/import de scène
+  /// (photo importée ou scène démo). No-op silencieux si déjà `null`
+  /// (safe à appeler systématiquement, sans vérification préalable par
+  /// l'appelant).
+  void clearCurrentAmbiancePreview() {
+    if (currentAmbiancePreviewBytes == null) return;
+    currentAmbiancePreviewBytes = null;
     notifyListeners();
   }
 

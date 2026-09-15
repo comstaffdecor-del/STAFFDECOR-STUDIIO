@@ -362,20 +362,29 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     // puisse afficher photo originale vs image IA sans relancer Gemini.
     // `scene` est la MÊME photo/scène qui vient d'être envoyée au proxy
     // ci-dessus — c'est bien le "AVANT" correspondant à ce "APRÈS".
-    if (result.success && result.imageBytes != null) {
-      appState.setLastAiComparisonResult(
-        AiComparisonResult(
-          originalImageBytes: scene,
-          aiImageBytes: result.imageBytes!,
-          sku: ref,
-          model: result.model,
-          usedProductReference: result.usedProductReference,
-          productReferencePath: result.productReferencePath,
-          renderMode: result.renderMode,
-        ),
-      );
-    }
-  }
+        if (result.success && result.imageBytes != null) {
+          appState.setLastAiComparisonResult(
+            AiComparisonResult(
+              originalImageBytes: scene,
+              aiImageBytes: result.imageBytes!,
+              sku: ref,
+              model: result.model,
+              usedProductReference: result.usedProductReference,
+              productReferencePath: result.productReferencePath,
+              renderMode: result.renderMode,
+            ),
+          );
+          // CORRECTIF (brief "persistance propre du rendu d'aperçu",
+          // Objectif 1) : le rendu distant réussi devient la vue
+          // PRINCIPALE du Studio, visible même après fermeture de ce
+          // panneau — voir docstring de
+          // [AppState.currentAmbiancePreviewBytes]. Écrit UNIQUEMENT ici
+          // (résultat réel du proxy), jamais pour le mock local
+          // (_generateLocalMock) : un aperçu "DÉMO LOCALE" ne doit
+          // jamais devenir le fond persistant du Studio.
+          appState.setCurrentAmbiancePreview(result.imageBytes!);
+        }
+      }
 
   /// Effet local de démo (dart:ui, AUCUN appel réseau) — proposé quand la
   /// génération réelle est indisponible (`kAiPreviewEnabled==false` ou clé
@@ -415,6 +424,17 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
   }
 
   void _reset() {
+    // CORRECTIF (brief "persistance propre du rendu d'aperçu + reset
+    // propre au changement de scène", Objectif 2) : [_reset] est le
+    // point d'entrée UNIQUE de "Changer de produit" (_buildPickScene),
+    // "Nouvel aperçu" (_buildResult) et "Réessayer" (_buildFallback) —
+    // nettoyer ici le rendu distant précédemment affiché en Studio
+    // garantit qu'un ANCIEN rendu (ex: D609) ne reste JAMAIS visible en
+    // fond pendant la préparation/génération du NOUVEAU produit (ex:
+    // D607). `roomImage` (la scène source ORIGINALE) n'est jamais
+    // touché ici : le prochain appel [_generate] repartira bien de lui,
+    // jamais d'un rendu déjà transformé par Gemini.
+    context.read<AppState>().clearCurrentAmbiancePreview();
     setState(() {
       _selectedRef = null;
       _sceneBytes = null;

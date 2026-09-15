@@ -514,56 +514,93 @@ class _PhotoZone extends StatelessWidget {
     final hasPhoto = state.roomImage != null;
     final showPlaceholder = !hasPhoto && !state.isDemoRoom;
 
+    // CORRECTIF (brief "persistance propre du rendu d'aperçu + reset
+    // propre au changement de scène", Objectif 1) — RÈGLE EXACTE DE
+    // PRIORITÉ D'AFFICHAGE :
+    //
+    //     PhotoZone display image = currentAmbiancePreviewBytes ?? roomImage
+    //
+    // Quand un rendu d'ambiance IA distant a réussi, il devient la vue
+    // PRINCIPALE du Studio — y compris après fermeture du panneau
+    // [AiAmbiancePanel] (qui ne vide JAMAIS ce champ, voir
+    // [AppState.closeAiAmbiancePanel]). `state.roomImage` reste
+    // intégralement la source de vérité utilisée par tout futur appel
+    // IA (voir [AiAmbiancePanel._useCurrentScene]) : ce champ n'est
+    // qu'une SURCOUCHE visuelle, jamais une substitution de `roomImage`
+    // lui-même. Exception volontaire : pendant l'édition des repères de
+    // calibration ([showCalibHandles]), on revient toujours au rendu
+    // RoomPainter de la scène source — la calibration porte sur la
+    // géométrie de la VRAIE photo, jamais sur une image déjà transformée
+    // par Gemini.
+    final distantPreview = state.currentAmbiancePreviewBytes;
+    final showDistantPreview = distantPreview != null && !state.showCalibHandles;
+
     return Container(
       color: AppColors.bg2,
       child: Stack(
         children: [
-          Positioned.fill(
-            // ⚠️ AJOUT pinch-to-zoom mobile (retour utilisateur : "On ne
-            // peut pas zoomer avec les doigts sur téléphone pour agrandir
-            // le visuel") — [InteractiveViewer] permet le pinch-to-zoom
-            // et le pan tactile natif sur le rendu de la pièce. Désactivé
-            // (panEnabled/scaleEnabled = false) pendant l'édition des
-            // repères de calibration pour ne pas capter les gestes de
-            // drag destinés aux poignées dorées (voir
-            // `CalibHandlesOverlay` plus bas, qui doit rester le seul
-            // récepteur de gestes dans ce cas).
-            child: InteractiveViewer(
-              panEnabled: !state.showCalibHandles,
-              scaleEnabled: !state.showCalibHandles,
-              minScale: 1.0,
-              maxScale: 4.0,
-              child: RepaintBoundary(
-                key: captureKey,
-                child: ListenableBuilder(
-                  listenable: ProductTextureCache.instance,
-                  builder: (context, _) => CustomPaint(
-                    painter: RoomPainter(
-                      roomImage: state.roomImage,
-                      imgDraw: localImgDraw,
-                      calib: state.perspCalib ?? PerspCalib.defaultCalib,
-                      selectedProducts: state.selectedProducts,
-                      prodPositions: state.prodPositions,
-                      // BUG-1-FIX (STOP-CLIENT-RELEASE) : tant que le panneau
-                      // "Aperçu d'ambiance" est ouvert et/ou qu'une génération
-                      // distante est en cours, le rendu local (composite
-                      // RoomPainter) du produit ne doit JAMAIS être visible —
-                      // seul le résultat distant (affiché dans le panneau)
-                      // doit apparaître. Ne change rien au comportement
-                      // historique du bouton "Afficher/masquer produits"
-                      // (state.showProductOverlay) en dehors de ce flux IA.
-                      withProducts: state.showProductOverlay &&
-                          !state.showAiAmbiancePanel &&
-                          !state.aiAmbianceGenerating &&
-                          !state.pendingStandardAutoTrigger,
-                      metresHauteur: state.metresHauteur,
+          if (showDistantPreview)
+            // Rendu distant persistant : simple image, JAMAIS le
+            // RoomPainter local par-dessus (aucun produit local
+            // incrusté, aucun trait de calibration/guide/overlay
+            // technique — uniquement le résultat Gemini tel que reçu).
+            Positioned.fill(
+              child: Container(
+                color: AppColors.bg2,
+                child: Image.memory(
+                  distantPreview,
+                  fit: BoxFit.contain,
+                  gaplessPlayback: true,
+                ),
+              ),
+            )
+          else
+            Positioned.fill(
+              // ⚠️ AJOUT pinch-to-zoom mobile (retour utilisateur : "On ne
+              // peut pas zoomer avec les doigts sur téléphone pour agrandir
+              // le visuel") — [InteractiveViewer] permet le pinch-to-zoom
+              // et le pan tactile natif sur le rendu de la pièce. Désactivé
+              // (panEnabled/scaleEnabled = false) pendant l'édition des
+              // repères de calibration pour ne pas capter les gestes de
+              // drag destinés aux poignées dorées (voir
+              // `CalibHandlesOverlay` plus bas, qui doit rester le seul
+              // récepteur de gestes dans ce cas).
+              child: InteractiveViewer(
+                panEnabled: !state.showCalibHandles,
+                scaleEnabled: !state.showCalibHandles,
+                minScale: 1.0,
+                maxScale: 4.0,
+                child: RepaintBoundary(
+                  key: captureKey,
+                  child: ListenableBuilder(
+                    listenable: ProductTextureCache.instance,
+                    builder: (context, _) => CustomPaint(
+                      painter: RoomPainter(
+                        roomImage: state.roomImage,
+                        imgDraw: localImgDraw,
+                        calib: state.perspCalib ?? PerspCalib.defaultCalib,
+                        selectedProducts: state.selectedProducts,
+                        prodPositions: state.prodPositions,
+                        // BUG-1-FIX (STOP-CLIENT-RELEASE) : tant que le panneau
+                        // "Aperçu d'ambiance" est ouvert et/ou qu'une génération
+                        // distante est en cours, le rendu local (composite
+                        // RoomPainter) du produit ne doit JAMAIS être visible —
+                        // seul le résultat distant (affiché dans le panneau)
+                        // doit apparaître. Ne change rien au comportement
+                        // historique du bouton "Afficher/masquer produits"
+                        // (state.showProductOverlay) en dehors de ce flux IA.
+                        withProducts: state.showProductOverlay &&
+                            !state.showAiAmbiancePanel &&
+                            !state.aiAmbianceGenerating &&
+                            !state.pendingStandardAutoTrigger,
+                        metresHauteur: state.metresHauteur,
+                      ),
+                      size: size,
                     ),
-                    size: size,
                   ),
                 ),
               ),
             ),
-          ),
           if (showPlaceholder)
             Positioned.fill(
               child: Container(
