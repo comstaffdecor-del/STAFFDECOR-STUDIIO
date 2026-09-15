@@ -40,6 +40,39 @@ class CatBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
 
+    // ⚠️ CORRECTION overflow (brief "product_strip.dart:45") — `CatBar`
+    // est monté par `studio_screen.dart` dans un `Expanded(child: CatBar())`
+    // qui impose une contrainte de hauteur STRICTE (tight) égale à
+    // l'espace restant après la zone photo (`photoZoneSize.height =
+    // constraints.maxHeight * 0.62`). Or les deux enfants de ce `Column`
+    // avaient chacun une hauteur FIXE non négociable (40 + 92 = 132px) :
+    // dès que l'espace alloué par l'`Expanded` parent tombait sous 132px
+    // (cas confirmé : écran paysage 812×375, il ne restait que 120.5px),
+    // le `Column` débordait de 12px — reproductible précisément à
+    // `product_strip.dart:45:14`.
+    //
+    // ⚠️ CORRECTION revue (première passe insuffisante) — un premier fix
+    // avait remplacé le `SizedBox(height: 92)` par un simple `Expanded`.
+    // Cela supprime bien l'overflow, mais introduit une RÉGRESSION
+    // VISUELLE en portrait confortable : le `Column` de `CatBar` reçoit
+    // une hauteur TIGHT égale à l'espace laissé par la zone photo
+    // (`38%` environ de la hauteur dispo, largement > 132px sur un écran
+    // portrait normal, ex. ~286px sur 812px de haut) — un `Expanded`
+    // aurait alors étiré le strip produits sur TOUTE cette hauteur au
+    // lieu des 92px historiques, agrandissant démesurément les vignettes
+    // (régression visuelle, pas juste un bugfix).
+    //
+    // Fix retenu : la barre d'onglets garde sa hauteur fixe (40px,
+    // contenu court et déjà scrollable horizontalement), et le strip
+    // produits est enveloppé dans `Flexible(fit: FlexFit.loose,
+    // child: SizedBox(height: 92, ...))` :
+    //   - hauteur disponible ≥ 132px (cas confortable/portrait normal)
+    //     → le `SizedBox(height: 92)` est intégralement respecté,
+    //     apparence historique inchangée à l'identique ;
+    //   - hauteur disponible < 132px (cas paysage/petit écran) →
+    //     `FlexFit.loose` autorise le strip à se comprimer sous 92px
+    //     plutôt que de forcer un débordement — jamais plus d'overflow,
+    //     quelle que soit l'orientation/hauteur d'écran.
     return Container(
       color: AppColors.bg2,
       child: Column(
@@ -69,9 +102,23 @@ class CatBar extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(
-            height: 92,
-            child: _ProductStrip(famille: state.catTabStudio),
+          Flexible(
+            fit: FlexFit.loose,
+            // Key stable (utilisée par les tests widget) pour mesurer
+            // directement l'élément qui se comprime réellement — plutôt
+            // qu'un finder fragile type `find.byType(ListView).last` (qui
+            // casserait silencieusement si un 3e `ListView` apparaissait
+            // ailleurs dans l'arbre) ou que la taille de `CatBar` elle-même
+            // (qui, étant l'enfant direct d'un `Expanded` en production,
+            // est de toute façon contrainte à la taille allouée par le
+            // parent — mesurer `CatBar` ne prouve donc PAS que le strip
+            // interne s'est réellement comprimé, seulement que le parent a
+            // bien la taille qu'on lui a donnée).
+            child: SizedBox(
+              key: const Key('product-strip-container'),
+              height: 92,
+              child: _ProductStrip(famille: state.catTabStudio),
+            ),
           ),
         ],
       ),
