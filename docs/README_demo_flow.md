@@ -7,18 +7,32 @@
 > (458 réfs, 9 familles, source `ged.staffdecor.fr`), rendu d'aperçu IA
 > contrôlé, puis accès au devis.
 >
-> **Clarification de vocabulaire** : dans le code et les logs, les termes
-> *"Mano"* / *"Nano"* / *"ManoBanana"* / *"P19-MANOBANANA-QAD"* désignent le
-> **pipeline / modèle IA image** utilisé pour générer l'aperçu (alias
-> interne du modèle Gemini image), **pas la marketplace ManoMano**. Cette
-> démo :
-> - ✅ intègre le pipeline IA "Mano/Nano" pour la preview visuelle,
-> - ✅ intègre le catalogue produit Staff Décor,
-> - ❌ n'intègre **aucune** API ManoMano, aucun catalogue ManoMano live,
->   aucun checkout/panier ManoMano, aucun branding officiel ManoMano.
+> **🔒 Règle absolue — transparence totale du pipeline IA (Mano/Nano
+> invisible côté utilisateur)** : dans le code, les commentaires et les
+> logs serveur, les termes *"Mano"* / *"Nano"* / *"ManoBanana"* /
+> *"P19-MANOBANANA-QAD"* / *"Gemini"* désignent le **pipeline / modèle IA
+> image** utilisé en interne pour générer l'aperçu. **Ce vocabulaire ne
+> doit JAMAIS apparaître dans l'UI, dans le déroulé présenté à
+> l'utilisateur, ni être mentionné à l'oral pendant la démo** — le
+> pipeline IA reste une brique interne totalement transparente, intégrée
+> derrière le bouton/parcours "aperçu". L'utilisateur ne doit voir qu'un
+> parcours Staff Décor Studio fluide : scène démo → sélection produit →
+> preview IA → résultat → devis.
 >
-> À dire si besoin en une phrase : *"C'est une démo Staff Décor Studio
-> avec pipeline IA interne, pas une intégration marketplace ManoMano."*
+> - ✅ Wording public autorisé, déjà en place dans le code UI (vérifié,
+>   aucune autre mention n'existe) : **"Aperçu IA"**, **"Générer un
+>   aperçu IA"**, **"Aperçu d'ambiance IA"**, **"Génération de l'aperçu
+>   IA…"**, **"Nouvel aperçu"**, **"Rendu technique"** (bascule
+>   comparateur).
+> - ❌ Jamais dans l'UI ni à l'oral : "Mano", "Nano", "ManoBanana",
+>   "Gemini", "proxy", "modèle IA [nom]", ou tout détail d'infrastructure.
+> - ❌ Cette démo n'intègre par ailleurs **aucune** marketplace/API
+>   ManoMano (catalogue live, checkout, panier, branding officiel) — sujet
+>   sans rapport avec le pipeline interne ci-dessus, mentionné ici
+>   uniquement pour éviter toute confusion résiduelle sur le mot "Mano".
+> - Les détails proxy/quota/modèle restent **exclusivement dans la
+>   checklist interne** (§5-6 ci-dessous), jamais dans le discours ou
+>   l'écran présentés à un public externe.
 
 ---
 
@@ -80,6 +94,14 @@ voir §3) : **D609**, **D607**, **D610**, **D620**, **D630**.
   sont dans la whitelist présentation `assets/profiles/index.json` (31
   refs scorables sur 43 présentées). D609/D607/D610/D620/D630 en font
   partie.
+- **Vérification transparence UI (faite, ce document en fait foi)** :
+  balayage exhaustif de tout `lib/` (hors commentaires de code) —
+  **zéro** occurrence de "Mano", "Nano", "Gemini" ou "ManoBanana" dans
+  une chaîne de texte affichée à l'utilisateur (`Text()`, `tooltip`,
+  `label`, message d'erreur). Un message d'erreur contenait auparavant le
+  mot technique "Proxy" (`kAiPreviewErrorProxyUnreachable` = *"Proxy de
+  rendu injoignable."*) ; corrigé en *"Aperçu IA momentanément
+  indisponible."* — voir `lib/data/ia_ambiance_preview.dart`.
 
 ---
 

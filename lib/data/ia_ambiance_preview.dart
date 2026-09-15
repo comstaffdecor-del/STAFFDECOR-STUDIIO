@@ -68,9 +68,18 @@ const bool kAiPreviewEnabled = true;
 
 /// Messages d'erreur COURTS, un par cause distincte — jamais un message
 /// technique brut affiché à l'utilisateur final.
+///
+/// ⚠️ CORRECTION (brief "Mano/Nano doit rester totalement transparent
+/// dans la démo") : [kAiPreviewErrorProxyUnreachable] contenait le mot
+/// "Proxy", un terme d'infrastructure technique qui n'a rien à faire
+/// dans un message visible côté utilisateur final — le pipeline IA doit
+/// rester intégré et invisible, seul le wording public "aperçu IA" /
+/// "génération" est autorisé à l'écran. Reformulé en un message neutre
+/// aligné sur les autres messages de ce bloc (aucune mention
+/// d'infrastructure : proxy, serveur, réseau, API, modèle...).
 const String kAiPreviewErrorNoPhoto = 'Aucune photo sélectionnée.';
 const String kAiPreviewErrorNoProduct = 'Aucun produit sélectionné.';
-const String kAiPreviewErrorProxyUnreachable = 'Proxy de rendu injoignable.';
+const String kAiPreviewErrorProxyUnreachable = 'Aperçu IA momentanément indisponible.';
 const String kAiPreviewErrorGenerationFailed = 'Échec de la génération.';
 const String kAiPreviewErrorDisabled = 'Fonction non configurée sur cet environnement.';
 
