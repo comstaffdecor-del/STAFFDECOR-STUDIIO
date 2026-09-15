@@ -208,22 +208,77 @@ function buildRefinePrompt(sku, retombeeCm, avanceeCm) {
     `Do not crop the image.\n` +
     `The only meaningful change should be a more realistic, natural, photographic rendering of the ` +
     `${sku} cornice that is already in place.\n` +
+    `${WINDOW_PRESERVATION_BLOCK}\n` +
+    `${GEOMETRY_PRESERVATION_BLOCK}\n` +
     `Return the edited room image.`
   );
 }
 
+/**
+ * P22-FENETRES-STL - Blocs de contraintes ajoutes au prompt (brief du
+ * 15/09) suite au retour "Mano ne reconnait pas bien les fenetres et les
+ * vues STL / produits ne sont pas bien interpretees". Textes EXACTS
+ * fournis par le brief (EN + FR concatenes, aucune reformulation) :
+ * on envoie les deux langues au modele pour maximiser la robustesse de
+ * comprehension, le gabarit restant par ailleurs entierement fixe (pas
+ * de variable libre cote client au-dela de sku/cotes, cf. docstring
+ * en tete de fichier).
+ */
+const WINDOW_PRESERVATION_BLOCK =
+  `Preserve all windows, glass doors, curtains, shutters and openings exactly as in the source image.\n` +
+  `Do not cover, remove, duplicate, move or reinterpret windows.\n` +
+  `Do not add decorative moulding across windows, glass panes, curtains or openings.\n` +
+  `Treat windows and openings as architectural obstacles.\n` +
+  `The decorative product must follow only the existing wall/ceiling boundary and stop cleanly before openings if necessary.\n` +
+  `Conserver toutes les fenetres, portes vitrees, rideaux, volets et ouvertures exactement comme sur l'image source.\n` +
+  `Ne pas couvrir, supprimer, dupliquer, deplacer ou transformer les fenetres.\n` +
+  `Ne pas placer la moulure sur les vitres, rideaux ou ouvertures.\n` +
+  `Considerer les fenetres comme des obstacles architecturaux.\n` +
+  `Le produit decoratif doit suivre uniquement la jonction mur/plafond existante et s'interrompre proprement si une ouverture gene.`;
+
+const GEOMETRY_PRESERVATION_BLOCK =
+  `Preserve the original room geometry exactly.\n` +
+  `Do not create new walls, recesses, alcoves, false ceilings, beams, ledges, columns, openings or protrusions.\n` +
+  `Do not change the shape of corners, ceiling lines, wall edges or perspective.\n` +
+  `Only add the selected decorative moulding/product.`;
+
+const STL_REFERENCE_ONLY_BLOCK =
+  `The STL/reference image is only a product shape reference.\n` +
+  `Do not render it as a floating 3D object.\n` +
+  `Do not copy the raw technical STL look.\n` +
+  `Convert the product into a realistic installed white/off-white decorative moulding integrated into the room.\n` +
+  `La vue STL/reference produit sert uniquement a comprendre la forme du produit.\n` +
+  `Ne pas afficher un objet 3D flottant.\n` +
+  `Ne pas reproduire l'aspect technique brut du STL.\n` +
+  `Transformer le produit en moulure decorative blanche/blanc casse, posee naturellement dans la piece.`;
+
 function buildPrompt(sku, retombeeCm, avanceeCm, hasProductRef) {
+  // P22-FENETRES-STL - rendu attendu : naturel mais strict (blanc/blanc
+  // casse, adapte a la lumiere reelle de la piece, ombres douces,
+  // perspective respectee, grain photo conserve). Interdit : aspect
+  // plastique, corniche trop blanche/brulee, detachement visuel.
+  const renderQualityBlock =
+    `The final render must look natural but precise: white/off-white plaster, ` +
+    `matched to the real light of the room, soft realistic shadows, respected perspective, ` +
+    `and the original photo grain/texture preserved.\n` +
+    `Do not render a plastic-looking or overly-white/burnt-out cornice.\n` +
+    `The added product must look physically attached to the wall/ceiling, never visually detached or floating.`;
+
   if (hasProductRef) {
     return (
       `Edit the FIRST image, which is the room photo.\n` +
       `Add a clearly visible white plaster crown moulding / cornice ${sku} along the entire wall-ceiling junction.\n` +
       `Use the SECOND image as the product reference for the shape and relief of ${sku}.\n` +
+      `${STL_REFERENCE_ONLY_BLOCK}\n` +
       `The cornice must be visibly added to the room, not merely preserve the original image.\n` +
       `It must have approximately ${retombeeCm} cm wall drop and ${avanceeCm} cm ceiling projection, with realistic shadows and molded relief.\n` +
       `Preserve the room, furniture, lighting, people, perspective, camera angle, and all existing objects.\n` +
       `Do not redesign the room.\n` +
       `Do not change the furniture.\n` +
       `Do not crop the image unnecessarily.\n` +
+      `${WINDOW_PRESERVATION_BLOCK}\n` +
+      `${GEOMETRY_PRESERVATION_BLOCK}\n` +
+      `${renderQualityBlock}\n` +
       `The only meaningful change should be the added ${sku} plaster cornice at the wall-ceiling junction.\n` +
       `If the original image has no cornice, add one clearly.\n` +
       `Return the edited room image.`
@@ -239,6 +294,9 @@ function buildPrompt(sku, retombeeCm, avanceeCm, hasProductRef) {
     `Do not redesign the room.\n` +
     `Do not change the furniture.\n` +
     `Do not crop the image unnecessarily.\n` +
+    `${WINDOW_PRESERVATION_BLOCK}\n` +
+    `${GEOMETRY_PRESERVATION_BLOCK}\n` +
+    `${renderQualityBlock}\n` +
     `The only meaningful change should be the added ${sku} plaster cornice at the wall-ceiling junction.\n` +
     `If the original image has no cornice, add one clearly.\n` +
     `Return the edited room image.`
