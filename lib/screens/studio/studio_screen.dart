@@ -544,7 +544,18 @@ class _PhotoZone extends StatelessWidget {
                       calib: state.perspCalib ?? PerspCalib.defaultCalib,
                       selectedProducts: state.selectedProducts,
                       prodPositions: state.prodPositions,
-                      withProducts: state.showProductOverlay,
+                      // BUG-1-FIX (STOP-CLIENT-RELEASE) : tant que le panneau
+                      // "Aperçu d'ambiance" est ouvert et/ou qu'une génération
+                      // distante est en cours, le rendu local (composite
+                      // RoomPainter) du produit ne doit JAMAIS être visible —
+                      // seul le résultat distant (affiché dans le panneau)
+                      // doit apparaître. Ne change rien au comportement
+                      // historique du bouton "Afficher/masquer produits"
+                      // (state.showProductOverlay) en dehors de ce flux IA.
+                      withProducts: state.showProductOverlay &&
+                          !state.showAiAmbiancePanel &&
+                          !state.aiAmbianceGenerating &&
+                          !state.pendingStandardAutoTrigger,
                       metresHauteur: state.metresHauteur,
                     ),
                     size: size,

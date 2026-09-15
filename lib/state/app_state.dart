@@ -700,8 +700,13 @@ class AppState extends ChangeNotifier {
 
   void setAiAmbianceGenerating(bool value) {
     aiAmbianceGenerating = value;
-    // Pas de notifyListeners ici : purement un flag de garde interne,
-    // ne pilote aucun affichage (le panneau gère son propre spinner).
+    // BUG-1-FIX (STOP-CLIENT-RELEASE) : ce flag pilote désormais AUSSI
+    // l'affichage du rendu local RoomPainter (`withProducts` dans
+    // `studio_screen.dart`, masqué pendant toute génération distante) —
+    // notifyListeners() est donc désormais nécessaire pour que ce
+    // changement soit reflété immédiatement à l'écran (avant, ce flag
+    // n'était qu'une garde interne anti-boucle, jamais lu par l'UI).
+    notifyListeners();
   }
 
   /// Signature (sku + version de la scène courante) du dernier aperçu IA
@@ -732,6 +737,18 @@ class AppState extends ChangeNotifier {
     // _generate() n'ait eu l'occasion de l'utiliser) ne doit jamais
     // fuiter vers une prochaine ouverture manuelle du panneau.
     _pendingHybridAutoScene = null;
+    // BUG-3-FIX (STOP-CLIENT-RELEASE) : si le panneau est fermé PENDANT
+    // qu'une génération réseau est en vol (widget démonté avant la fin de
+    // `_generate()`), ce flag restait bloqué à `true` pour toujours —
+    // `maybeAutoTriggerStandardAiPreview` refusait alors silencieusement
+    // tout nouveau déclenchement automatique pour le reste de la session
+    // (garde `if (aiAmbianceGenerating) return;`), et le rendu local
+    // RoomPainter restait masqué indéfiniment (`withProducts` dans
+    // `studio_screen.dart`). Le futur `finally` de `_generate()` réécrira
+    // `false` de toute façon une fois la requête HTTP terminée (résultat
+    // ignoré car le widget n'est plus monté), donc cette remise à zéro
+    // immédiate ne peut jamais faire courir deux générations en même temps.
+    aiAmbianceGenerating = false;
     notifyListeners();
   }
 
@@ -1103,10 +1120,25 @@ class AppState extends ChangeNotifier {
 
   Timer? _standardAutoTriggerDebounce;
 
+  /// BUG-1-FIX (STOP-CLIENT-RELEASE) : vrai pendant la fenêtre de debounce
+  /// (1,5 s, [kStandardAutoTriggerDebounce]) entre le tap produit dans le
+  /// strip Studio et l'ouverture EFFECTIVE du panneau "Aperçu d'ambiance"
+  /// (ou l'abandon silencieux si un garde-fou bloque le déclenchement).
+  /// Consulté par `studio_screen.dart` (aux côtés de [showAiAmbiancePanel]
+  /// et [aiAmbianceGenerating]) pour masquer le rendu local RoomPainter du
+  /// produit pendant CETTE fenêtre courte : sans cela, le produit qui vient
+  /// d'être ajouté à [selectedProducts] par `addToProject` resterait
+  /// visible localement pendant ~1,5 s avant que le panneau ne s'ouvre,
+  /// violant la règle "jamais de tentative de pose locale visible avant le
+  /// retour distant". Toujours remis à `false` avant la fin du callback du
+  /// [Timer], que le déclenchement aboutisse ou soit abandonné.
+  bool pendingStandardAutoTrigger = false;
+
   @visibleForTesting
   void disposeStandardAutoTriggerDebounceForTesting() {
     _standardAutoTriggerDebounce?.cancel();
     _standardAutoTriggerDebounce = null;
+    pendingStandardAutoTrigger = false;
   }
 
   /// Réinitialise l'état du quota EN MÉMOIRE (pas dans
@@ -1194,6 +1226,14 @@ class AppState extends ChangeNotifier {
     // Debounce : un nouvel appel (changement rapide de SKU) annule
     // systématiquement la tentative précédente encore en attente.
     _standardAutoTriggerDebounce?.cancel();
+    // BUG-1-FIX (STOP-CLIENT-RELEASE) : le produit vient d'être ajouté à
+    // [selectedProducts] (par [addToProject], juste avant cet appel) —
+    // sans ce flag, le rendu local RoomPainter l'afficherait déjà pendant
+    // toute la fenêtre de debounce ci-dessous, avant même que le panneau
+    // ne s'ouvre. `notifyListeners()` déclenche le rebuild immédiat de
+    // `studio_screen.dart` (qui consulte ce champ pour `withProducts`).
+    pendingStandardAutoTrigger = true;
+    notifyListeners();
     _standardAutoTriggerDebounce = Timer(kStandardAutoTriggerDebounce, () async {
       // Contrôle AUTORITAIRE du quota : on attend ici la fin du
       // chargement lancé plus haut (déjà terminé dans l'écrasante
@@ -1206,32 +1246,46 @@ class AppState extends ChangeNotifier {
         if (kDebugMode && debugAiAutoStandardLogsEnabled) {
           debugPrint('[AI_AUTO_STANDARD] skip: disabled');
         }
+        pendingStandardAutoTrigger = false;
+        notifyListeners();
         return;
       }
       if (roomImage == null) {
         if (kDebugMode && debugAiAutoStandardLogsEnabled) {
           debugPrint('[AI_AUTO_STANDARD] skip: no room image');
         }
+        pendingStandardAutoTrigger = false;
+        notifyListeners();
         return;
       }
       if (aiAmbianceGenerating) {
         if (kDebugMode && debugAiAutoStandardLogsEnabled) {
           debugPrint('[AI_AUTO_STANDARD] skip: generation already running');
         }
+        pendingStandardAutoTrigger = false;
+        notifyListeners();
         return;
       }
       final currentKey = '$ref#$roomImageVersion#add';
-      if (currentKey != key) return; // photo/version a changé entre-temps
+      if (currentKey != key) {
+        pendingStandardAutoTrigger = false;
+        notifyListeners();
+        return; // photo/version a changé entre-temps
+      }
       if (_lastStandardAutoTriggerKey == currentKey) {
         if (kDebugMode && debugAiAutoStandardLogsEnabled) {
           debugPrint('[AI_AUTO_STANDARD] skip: already generated key=$currentKey');
         }
+        pendingStandardAutoTrigger = false;
+        notifyListeners();
         return;
       }
       if (_standardAutoTriggerCount >= kMaxStandardAutoTriggersPerDay) {
         if (kDebugMode && debugAiAutoStandardLogsEnabled) {
           debugPrint('[AI_AUTO_STANDARD] skip: quota reached');
         }
+        pendingStandardAutoTrigger = false;
+        notifyListeners();
         return;
       }
 
@@ -1245,6 +1299,11 @@ class AppState extends ChangeNotifier {
         debugPrint('[AI_AUTO_STANDARD] opening panel ref=$ref key=$currentKey '
             'count=$_standardAutoTriggerCount/$kMaxStandardAutoTriggersPerDay');
       }
+      // Le panneau (showAiAmbiancePanel, mis à `true` par
+      // [openAiAmbiancePanel] ci-dessous) prend le relais de
+      // [pendingStandardAutoTrigger] pour masquer le rendu local — safe de
+      // le redescendre à `false` ici avant l'ouverture effective.
+      pendingStandardAutoTrigger = false;
       // autoGenerateHybrid volontairement absent (défaut false) :
       // AiAmbiancePanel utilisera _useCurrentScene() (photo brute) +
       // _generate() -> renderMode='add' (resolveRenderModeForScene),

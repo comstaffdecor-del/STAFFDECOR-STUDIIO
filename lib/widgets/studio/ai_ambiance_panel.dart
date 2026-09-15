@@ -68,6 +68,32 @@ const _demoScenesForAi = {
   'scandinave': 'Scandinave',
 };
 
+/// Contenu du loader affiché pendant [_AiAmbiancePanelState._buildGenerating]
+/// — extrait tel quel (inchangé visuellement) pour être réutilisable
+/// au-dessus soit d'un fond flouté (scène disponible), soit d'un fond
+/// neutre (aucune scène connue, cas résiduel).
+class _GeneratingLoader extends StatelessWidget {
+  const _GeneratingLoader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.gold),
+          ),
+          SizedBox(height: 12),
+          Text('Préparation de l\'aperçu…', style: TextStyle(color: AppColors.gold, fontSize: 12.5)),
+        ],
+      ),
+    );
+  }
+}
+
 class AiAmbiancePanel extends StatefulWidget {
   final VoidCallback onClose;
   const AiAmbiancePanel({super.key, required this.onClose});
@@ -613,8 +639,16 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
               .toList(),
         ),
         const SizedBox(height: 10),
+        // BUG-3-FIX (STOP-CLIENT-RELEASE) : auparavant ce bouton ne
+        // changeait QUE `_screenState`, laissant `_resultBytes` /
+        // `_lastErrorMessage` / `_isHybridScene` d'un essai précédent
+        // potentiellement affichés/actifs derrière un nouvel essai — appel
+        // à [_reset] (identique à "Nouvel aperçu"/"Réessayer") pour
+        // repartir d'un état intégralement propre à chaque changement de
+        // produit, condition nécessaire au support multi-appels successifs
+        // dans la même session (D609 → D607 → D610...).
         TextButton(
-          onPressed: () => setState(() => _screenState = _AiScreenState.pickProduct),
+          onPressed: _reset,
           child: const Text('Changer de produit', style: TextStyle(color: AppColors.text3, fontSize: 11.5)),
         ),
       ],
@@ -748,21 +782,46 @@ class _AiAmbiancePanelState extends State<AiAmbiancePanel> {
     );
   }
 
+  /// BUG-1-FIX (STOP-CLIENT-RELEASE) : auparavant cet écran affichait
+  /// uniquement un spinner nu, sans aucun aperçu de la scène source —
+  /// écart structurel par rapport à la règle "scène source FLOUTÉE +
+  /// loader" pendant l'attente du retour distant (jamais une tentative de
+  /// pose locale visible). La scène affichée ici est [_sceneBytes], LA
+  /// MÊME image déjà envoyée au proxy dans [_generate] (photo brute ou
+  /// scène démo selon le choix fait en amont) — jamais recomposée avec le
+  /// produit, jamais le rendu RoomPainter (déjà masqué séparément côté
+  /// Studio via `withProducts`, voir `studio_screen.dart`).
   Widget _buildGenerating() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 30),
-      child: Center(
-        child: Column(
-          children: [
-            SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.gold),
+    final scene = _sceneBytes;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        children: [
+          if (scene != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  ImageFiltered(
+                    imageFilter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                    child: Image.memory(scene, fit: BoxFit.cover, width: double.infinity, height: 220),
+                  ),
+                  Container(
+                    width: double.infinity,
+                    height: 220,
+                    color: AppColors.bg.withValues(alpha: 0.35),
+                  ),
+                  const _GeneratingLoader(),
+                ],
+              ),
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 30),
+              child: _GeneratingLoader(),
             ),
-            SizedBox(height: 12),
-            Text('Préparation de l\'aperçu…', style: TextStyle(color: AppColors.gold, fontSize: 12.5)),
-          ],
-        ),
+        ],
       ),
     );
   }
