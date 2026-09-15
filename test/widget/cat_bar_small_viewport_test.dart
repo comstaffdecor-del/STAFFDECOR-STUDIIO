@@ -118,10 +118,23 @@ void main() {
 
       expect(tester.takeException(), isNull);
 
-      // La barre d'onglets (40px) + le strip comprimé doivent tenir
-      // exactement dans les 100px alloués — jamais plus.
-      final catBarSize = tester.getSize(find.byType(CatBar));
-      expect(catBarSize.height, lessThanOrEqualTo(100.0));
+      // ⚠️ CORRECTION (revue) — mesurer `CatBar` elle-même ne prouve PAS
+      // que le strip interne s'est réellement comprimé : en production
+      // `CatBar` est l'enfant direct d'un `Expanded`, donc sa taille est
+      // de toute façon égale à l'espace alloué par le parent (100px ici),
+      // que le strip interne ait ou non respecté cette contrainte. Il faut
+      // mesurer l'élément qui compresse réellement — le `SizedBox` du
+      // strip produits, identifié par une `Key` stable.
+      //
+      // Calcul attendu : 100px disponibles pour `CatBar` - 40px fixes
+      // (barre d'onglets) = 60px restants pour le strip produits, alloués
+      // par `Flexible(fit: FlexFit.loose)`. Le `SizedBox(height: 92)`
+      // demande 92px mais est contraint à ce maximum de 60px → hauteur
+      // rendue = 60px EXACTEMENT (pas juste "≤ 100").
+      final stripContainerSize = tester.getSize(
+        find.byKey(const Key('product-strip-container')),
+      );
+      expect(stripContainerSize.height, 60.0);
     },
   );
 
@@ -143,8 +156,16 @@ void main() {
       // 92px — pas plus (ce qui trahirait un `Expanded` résiduel étirant
       // les vignettes), pas moins (ce qui trahirait un `FlexFit.loose`
       // mal appliqué qui compresserait sans nécessité).
-      final stripSize = tester.getSize(find.byType(ListView).last);
-      expect(stripSize.height, 92.0);
+      //
+      // Mesuré via la `Key` stable posée sur le `SizedBox` du strip
+      // plutôt que `find.byType(ListView).last`, qui fonctionnait mais
+      // restait fragile (un futur 3e `ListView` ajouté ailleurs dans
+      // l'arbre — par ex. dans un futur écran englobant — casserait ce
+      // finder silencieusement sans erreur explicite).
+      final stripContainerSize = tester.getSize(
+        find.byKey(const Key('product-strip-container')),
+      );
+      expect(stripContainerSize.height, 92.0);
     },
   );
 
@@ -162,8 +183,10 @@ void main() {
 
       expect(tester.takeException(), isNull);
 
-      final stripSize = tester.getSize(find.byType(ListView).last);
-      expect(stripSize.height, 92.0);
+      final stripContainerSize = tester.getSize(
+        find.byKey(const Key('product-strip-container')),
+      );
+      expect(stripContainerSize.height, 92.0);
     },
   );
 
@@ -228,7 +251,13 @@ void main() {
         await tester.ensureVisible(devisFinder);
         await tester.pumpAndSettle();
 
-        await tester.tap(devisFinder, warnIfMissed: false);
+        // Pas de `warnIfMissed: false` ici : si le tap rate vraiment sa
+        // cible (ex. régression future qui recasse le scroll), Flutter
+        // doit le signaler explicitement plutôt que de masquer l'alerte —
+        // l'assertion `state.currentScreen` ci-dessous protège déjà contre
+        // les faux positifs, mais laisser le warning actif donne un signal
+        // plus tôt et plus clair en cas de souci.
+        await tester.tap(devisFinder);
         await tester.pump();
 
         expect(state.currentScreen, 'devis');

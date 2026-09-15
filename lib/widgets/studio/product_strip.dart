@@ -104,7 +104,18 @@ class CatBar extends StatelessWidget {
           ),
           Flexible(
             fit: FlexFit.loose,
+            // Key stable (utilisée par les tests widget) pour mesurer
+            // directement l'élément qui se comprime réellement — plutôt
+            // qu'un finder fragile type `find.byType(ListView).last` (qui
+            // casserait silencieusement si un 3e `ListView` apparaissait
+            // ailleurs dans l'arbre) ou que la taille de `CatBar` elle-même
+            // (qui, étant l'enfant direct d'un `Expanded` en production,
+            // est de toute façon contrainte à la taille allouée par le
+            // parent — mesurer `CatBar` ne prouve donc PAS que le strip
+            // interne s'est réellement comprimé, seulement que le parent a
+            // bien la taille qu'on lui a donnée).
             child: SizedBox(
+              key: const Key('product-strip-container'),
               height: 92,
               child: _ProductStrip(famille: state.catTabStudio),
             ),
