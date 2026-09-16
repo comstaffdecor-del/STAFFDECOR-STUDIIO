@@ -296,6 +296,7 @@ function buildRefinePrompt(sku, retombeeCm, avanceeCm) {
     `${WINDOW_PRESERVATION_BLOCK}\n` +
     `${GEOMETRY_PRESERVATION_BLOCK}\n` +
     `${CORNICE_ATTACHMENT_BLOCK}\n` +
+    `${STRICT_IDENTITY_LOCK_BLOCK}\n` +
     `Return the edited room image.`
   );
 }
@@ -370,6 +371,89 @@ const CORNICE_ATTACHMENT_BLOCK =
   `Si une fenetre ou une ouverture interrompt la jonction mur/plafond, la corniche doit s'arreter proprement ` +
   `avant l'ouverture et ne reprendre que si c'est architecturalement plausible.`;
 
+/**
+ * P26-VALIDATION-DEMO - Retour du 16/09 suite a la validation reelle
+ * (Gemini non-mock) des 4 scenes demo x plusieurs SKU : 5/5 combinaisons
+ * obligatoires en KO, pour 4 causes racines distinctes et confirmees par
+ * inspection visuelle stricte (avant/apres, zoom plafond) :
+ *
+ *   - Haussmann/D609 : AUCUNE modification (le modele considere que la
+ *     corniche ornementee deja presente "suffit" et ne touche a rien).
+ *   - Haussmann/D607 : une bande ajoutee, mais plate, sans ombre de
+ *     contact, "flotte" pres de la fenetre -> effet autocollant/2D.
+ *   - Haussmann/D610 : re-generation quasi complete de la piece (angle de
+ *     camera different, mobilier invente, rideaux inventes, plafond
+ *     modifie, medaillon different) -> violation totale de l'identite de
+ *     la piece, pas une edition locale.
+ *   - Scandinave/D609 : la corniche ajoutee est correcte MAIS la barre de
+ *     rideau doree et la poutre en bois existantes ont ete supprimees /
+ *     remplacees -> violation de la preservation des objets existants.
+ *   - Provencal/D609 : corniche ajoutee mais flottante/decollee la ou le
+ *     plafond a des poutres apparentes -> le bloc CORNICE_ATTACHMENT_BLOCK
+ *     existant ne couvre pas explicitement le cas des poutres.
+ *
+ * Deux blocs dedies ci-dessous, ajoutes (pas de suppression des blocs
+ * existants) a buildPrompt() ET buildRefinePrompt() :
+ *   - STRICT_IDENTITY_LOCK_BLOCK : interdit toute re-generation/
+ *     reinvention de la piece et toute suppression/remplacement d'un
+ *     objet existant (couvre D610 et le cas rideau/poutre Scandinave).
+ *   - EXISTING_CORNICE_AND_BEAMS_BLOCK : impose une modification visible
+ *     meme si une corniche existe deja (Haussmann), et impose un
+ *     raccord physique/ombre realiste la ou la corniche croise des
+ *     poutres apparentes (Provencal), plutot qu'un simple bandeau plat
+ *     pose par-dessus (Haussmann D607).
+ */
+const STRICT_IDENTITY_LOCK_BLOCK =
+  `This is a LOCAL, TARGETED edit, not a full re-generation of the photo.\n` +
+  `Keep the exact same camera framing, crop, angle, room proportions and perspective as the source image.\n` +
+  `Do not invent, add, remove or replace any existing object: furniture, curtains, curtain rods, wooden beams, ` +
+  `light fixtures, shelves, books, mirrors, doors, ceiling medallions, wall panels or decorations must all remain ` +
+  `exactly as they are in the source image, pixel-for-pixel as close as possible outside the cornice area.\n` +
+  `Do not change the shape, position or style of the ceiling, walls, or any architectural element that is not the ` +
+  `cornice itself.\n` +
+  `If the source image contains a curtain rod, a beam, a medallion or any fixture near the wall-ceiling junction, ` +
+  `you must keep that exact object in place and route/adapt the cornice around it rather than deleting, moving ` +
+  `or redesigning it.\n` +
+  `The result must remain immediately recognizable as the SAME photograph as the source image, with only the ` +
+  `cornice/moulding as the meaningful visible change.\n` +
+  `Ceci est une modification LOCALE et CIBLEE, pas une regeneration complete de la photo.\n` +
+  `Conserver exactement le meme cadrage, le meme angle de camera, les memes proportions et la meme perspective ` +
+  `que l'image source.\n` +
+  `Ne pas inventer, ajouter, supprimer ou remplacer un objet existant : mobilier, rideaux, barres de rideaux, ` +
+  `poutres en bois, luminaires, etageres, livres, miroirs, portes, medaillons de plafond, moulures ou decorations ` +
+  `murales doivent rester exactement identiques a l'image source, hors de la zone de la corniche.\n` +
+  `Ne pas modifier la forme, la position ou le style du plafond, des murs, ou de tout element architectural qui ` +
+  `n'est pas la corniche elle-meme.\n` +
+  `Si l'image source contient une barre de rideau, une poutre, un medaillon ou tout element pres de la jonction ` +
+  `mur/plafond, conserver cet element exactement en place et faire passer/adapter la corniche autour, plutot que ` +
+  `de le supprimer, le deplacer ou le redessiner.\n` +
+  `Le resultat doit rester immediatement reconnaissable comme la MEME photographie que l'image source, avec la ` +
+  `corniche/moulure comme seul changement visible significatif.`;
+
+const EXISTING_CORNICE_AND_BEAMS_BLOCK =
+  `If the room already shows an existing decorative cornice or ornate ceiling moulding, you must still make a ` +
+  `clearly visible modification: add the new product profile as a distinct, continuously and physically attached ` +
+  `addition (no gap, consistent shadow logic, following the exact same wall-ceiling line) so the change is ` +
+  `unambiguous. Never leave the wall-ceiling junction completely unchanged.\n` +
+  `The added moulding must have real 3D relief with shading that matches the room's light direction (highlights ` +
+  `on lit sides, soft shadow on the underside) - never a flat, uniformly-lit white band or a rectilinear stepped ` +
+  `shape that looks like a flat overlay or a printed sticker.\n` +
+  `If the ceiling has exposed wooden beams, the cornice must still physically attach to the wall and ceiling ` +
+  `surface: where a beam meets the intended cornice line, the cornice must butt cleanly against the beam with a ` +
+  `realistic contact shadow (as if physically abutting solid wood), never floating above or crossing flatly over ` +
+  `the beam as a 2D strip.\n` +
+  `Si la piece presente deja une corniche ou moulure de plafond existante, il faut tout de meme realiser une ` +
+  `modification clairement visible : ajouter le nouveau profil produit comme un ajout distinct, colle en continu ` +
+  `(sans espace, ombre coherente, suivant exactement la meme ligne mur/plafond) pour que le changement soit sans ` +
+  `ambiguite. Ne jamais laisser la jonction mur/plafond totalement inchangee.\n` +
+  `La moulure ajoutee doit avoir un vrai relief 3D avec des ombres coherentes avec la lumiere de la piece ` +
+  `(reflets cote eclaire, ombre douce en dessous) - jamais une bande blanche plate et uniformement eclairee, ni ` +
+  `une forme rectiligne en escalier qui ressemble a un habillage plat ou a un autocollant imprime.\n` +
+  `Si le plafond a des poutres apparentes, la corniche doit tout de meme s'attacher physiquement au mur et au ` +
+  `plafond : la ou une poutre croise la ligne de corniche prevue, la corniche doit venir buter proprement contre ` +
+  `la poutre avec une ombre de contact realiste (comme si elle etait physiquement appuyee contre le bois), jamais ` +
+  `flottante au-dessus ni posee a plat par-dessus la poutre comme une bande 2D.`;
+
 function buildPrompt(sku, retombeeCm, avanceeCm, hasProductRef) {
   // P22-FENETRES-STL - rendu attendu : naturel mais strict (blanc/blanc
   // casse, adapte a la lumiere reelle de la piece, ombres douces,
@@ -397,9 +481,12 @@ function buildPrompt(sku, retombeeCm, avanceeCm, hasProductRef) {
       `${WINDOW_PRESERVATION_BLOCK}\n` +
       `${GEOMETRY_PRESERVATION_BLOCK}\n` +
       `${CORNICE_ATTACHMENT_BLOCK}\n` +
+      `${STRICT_IDENTITY_LOCK_BLOCK}\n` +
+      `${EXISTING_CORNICE_AND_BEAMS_BLOCK}\n` +
       `${renderQualityBlock}\n` +
       `The only meaningful change should be the added ${sku} plaster cornice at the wall-ceiling junction.\n` +
-      `If the original image has no cornice, add one clearly.\n` +
+      `If the original image has no cornice, add one clearly. If a cornice already exists, add the new profile ` +
+      `as a distinct, clearly visible, physically attached addition anyway - never leave the junction unchanged.\n` +
       `Return the edited room image.`
     );
   }
@@ -416,9 +503,12 @@ function buildPrompt(sku, retombeeCm, avanceeCm, hasProductRef) {
     `${WINDOW_PRESERVATION_BLOCK}\n` +
     `${GEOMETRY_PRESERVATION_BLOCK}\n` +
     `${CORNICE_ATTACHMENT_BLOCK}\n` +
+    `${STRICT_IDENTITY_LOCK_BLOCK}\n` +
+    `${EXISTING_CORNICE_AND_BEAMS_BLOCK}\n` +
     `${renderQualityBlock}\n` +
     `The only meaningful change should be the added ${sku} plaster cornice at the wall-ceiling junction.\n` +
-    `If the original image has no cornice, add one clearly.\n` +
+    `If the original image has no cornice, add one clearly. If a cornice already exists, add the new profile ` +
+    `as a distinct, clearly visible, physically attached addition anyway - never leave the junction unchanged.\n` +
     `Return the edited room image.`
   );
 }
