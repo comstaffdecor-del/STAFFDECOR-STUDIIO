@@ -41,6 +41,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const sharp = require('sharp');
 
 const app = express();
 const PORT = process.env.AI_RENDER_PROXY_PORT || 8091;
@@ -554,6 +555,191 @@ function detectMimeType(buffer, declaredMime) {
   return declaredMime || 'image/jpeg';
 }
 
+/**
+ * P27-CROP-ANTI-EXTRAPOLATION - Retour client du 16/09 (2eme passe) :
+ * meme apres renforcement du texte du prompt, Gemini continue a
+ * "extrapoler" sur l'ensemble de la piece (mobilier invente, angle de
+ * camera different, poutres/rideaux supprimes, plafond redessine).
+ * Consigne explicite du client : "arretez de tenter de resoudre
+ * uniquement par prompt [...] il faut changer la methode de rendu"
+ * -> ne plus jamais envoyer la piece entiere en edition libre.
+ *
+ * Nouvelle architecture (mode 'add' UNIQUEMENT - le mode 'refine' recoit
+ * deja une scene composee par le moteur deterministe cote client, donc
+ * un risque d'extrapolation structurellement plus faible, non concerne
+ * par les 6 echecs constates) :
+ *
+ *   1. On extrait UNIQUEMENT la bande haute de la photo source (haut des
+ *      murs + jonction mur/plafond + corniches/poutres/fenetres proches
+ *      du plafond) - AI_CROP_TOP_FRACTION de la hauteur totale.
+ *   2. On envoie CETTE BANDE SEULE (+ la reference produit) a Gemini,
+ *      avec un gabarit de prompt dedie qui precise explicitement qu'il
+ *      s'agit d'un simple bandeau recadre (pas la piece complete) et
+ *      que la SEULE tache est d'y ajouter la corniche, en preservant
+ *      tout le reste du contenu de la bande a l'identique.
+ *   3. Le bandeau renvoye par Gemini est force aux dimensions EXACTES
+ *      du bandeau envoye (resize fit:'fill' si Gemini renvoie une
+ *      resolution differente), puis recompose sur l'image source
+ *      ORIGINALE (jamais une copie deja modifiee) via un masque en
+ *      degrade (feather) sur les derniers AI_CROP_FEATHER_FRACTION de
+ *      sa hauteur, pour un raccord invisible avec le bas de la piece.
+ *
+ * Garantie structurelle (pas seulement une consigne texte) : tout ce
+ * qui se trouve SOUS le bandeau (mobilier, sol, canape, table basse...)
+ * provient a 100% des pixels de la photo source originale, jamais de
+ * Gemini - Gemini ne peut PHYSIQUEMENT plus "reinventer" le canape, le
+ * cadrage general ou l'angle de camera, puisque ces pixels ne lui sont
+ * jamais transmis en sortie. Seule la zone haute (bandeau) reste sous
+ * la responsabilite du modele + des blocs de prompt existants
+ * (STRICT_IDENTITY_LOCK_BLOCK, EXISTING_CORNICE_AND_BEAMS_BLOCK, etc.)
+ * pour la preservation des poutres/rideaux/fenetres a l'INTERIEUR du
+ * bandeau.
+ */
+const AI_CROP_BAND_MODE = process.env.AI_CROP_BAND_MODE !== 'false'; // actif par defaut
+const AI_CROP_TOP_FRACTION = Number(process.env.AI_CROP_TOP_FRACTION || 0.42);
+const AI_CROP_FEATHER_FRACTION = Number(process.env.AI_CROP_FEATHER_FRACTION || 0.16);
+
+/**
+ * Extrait la bande haute de l'image source (0 <= fraction <= 1).
+ * Retourne { buffer, width, height } au format JPEG. Ne modifie jamais
+ * le buffer source (lecture seule via sharp).
+ */
+async function extractTopBand(sourceBuffer, fraction) {
+  const meta = await sharp(sourceBuffer).metadata();
+  const width = meta.width;
+  const height = Math.max(1, Math.round(meta.height * fraction));
+  const buffer = await sharp(sourceBuffer)
+    .extract({ left: 0, top: 0, width, height })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+  return { buffer, width, height, sourceWidth: meta.width, sourceHeight: meta.height };
+}
+
+/**
+ * Construit un masque PNG en niveaux de gris (utilise comme canal alpha
+ * via blend 'dest-in') : opaque sur les premiers (1-featherFraction) de
+ * la hauteur, puis degrade lineaire vers transparent sur les derniers
+ * featherFraction - assure un raccord de recomposition invisible entre
+ * le bandeau edite et le bas de la piece original.
+ */
+async function buildFeatherMask(width, height, featherFraction) {
+  const featherPx = Math.max(1, Math.round(height * featherFraction));
+  const opaqueRatio = Math.max(0, (height - featherPx) / height);
+  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">` +
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="#fff" stop-opacity="1"/>` +
+    `<stop offset="${opaqueRatio.toFixed(4)}" stop-color="#fff" stop-opacity="1"/>` +
+    `<stop offset="1" stop-color="#fff" stop-opacity="0"/>` +
+    `</linearGradient></defs>` +
+    `<rect x="0" y="0" width="${width}" height="${height}" fill="url(#g)"/></svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+/**
+ * Force le bandeau edite par Gemini aux dimensions EXACTES du bandeau
+ * envoye (Gemini peut renvoyer une resolution legerement differente),
+ * lui applique le masque en degrade, puis le recompose sur l'image
+ * source ORIGINALE COMPLETE (jamais une version deja modifiee).
+ * Retourne le buffer JPEG final, aux memes dimensions que la source.
+ */
+async function recomposeTopBand({ sourceBuffer, editedBandBuffer, bandWidth, bandHeight, featherFraction }) {
+  const resizedBand = await sharp(editedBandBuffer)
+    .resize(bandWidth, bandHeight, { fit: 'fill' })
+    .toBuffer();
+
+  const mask = await buildFeatherMask(bandWidth, bandHeight, featherFraction);
+
+  const bandWithAlpha = await sharp(resizedBand)
+    .ensureAlpha()
+    .composite([{ input: mask, blend: 'dest-in' }])
+    .png()
+    .toBuffer();
+
+  const finalBuffer = await sharp(sourceBuffer)
+    .composite([{ input: bandWithAlpha, left: 0, top: 0 }])
+    .jpeg({ quality: 92 })
+    .toBuffer();
+
+  return finalBuffer;
+}
+
+/**
+ * Gabarit de prompt DEDIE au mode bandeau (P27-CROP-ANTI-EXTRAPOLATION).
+ * Different de buildPrompt() : precise explicitement que l'image reçue
+ * n'est PAS la piece complete mais un simple bandeau recadre (haut des
+ * murs + plafond), pour eviter que Gemini ne tente de "completer"/
+ * imaginer le bas de la piece qu'il ne voit pas, et pour reduire au
+ * maximum la tache demandee (ajouter la corniche, rien d'autre) sur un
+ * contenu visuel beaucoup plus simple qu'une piece entiere.
+ */
+function buildCropAddPrompt(sku, retombeeCm, avanceeCm, hasProductRef) {
+  const renderQualityBlock =
+    `The final render must look natural but precise: white/off-white plaster, ` +
+    `matched to the real light of the room, soft realistic shadows, respected perspective, ` +
+    `and the original photo grain/texture preserved.\n` +
+    `Do not render a plastic-looking or overly-white/burnt-out cornice.\n` +
+    `The added product must look physically attached to the wall/ceiling, never visually detached or floating.`;
+
+  const cropContextBlock =
+    `IMPORTANT CONTEXT: this image is NOT a full room photo. It is a CROPPED HORIZONTAL BAND showing ONLY the ` +
+    `top portion of a room: the upper part of the walls and the ceiling, including the wall-ceiling junction, ` +
+    `and possibly window tops, beam ends or an existing cornice. The bottom of the room (furniture, floor, ` +
+    `lower walls) is intentionally NOT included in this image and is NOT your concern.\n` +
+    `Your ONLY task is to add the cornice at the wall-ceiling junction visible in THIS band.\n` +
+    `Keep the output image at EXACTLY the same pixel dimensions, framing and crop as the input band - do not ` +
+    `pad, crop further, zoom, resize or shift the image in any way.\n` +
+    `Everything else visible in this band (windows, beams, curtain rods, existing mouldings, wall texture, ` +
+    `light) must remain exactly as in the source band, unchanged, except for the added cornice itself.\n` +
+    `IMPORTANT : cette image n'est PAS une photo de piece complete. C'est un BANDEAU HORIZONTAL RECADRE montrant ` +
+    `uniquement le haut d'une piece : le haut des murs et le plafond, incluant la jonction mur/plafond, et ` +
+    `eventuellement le haut des fenetres, l'extremite de poutres ou une corniche existante. Le bas de la piece ` +
+    `(mobilier, sol, bas des murs) n'est volontairement pas inclus dans cette image et ne vous concerne pas.\n` +
+    `Votre SEULE tache est d'ajouter la corniche a la jonction mur/plafond visible dans CE bandeau.\n` +
+    `Conserver l'image de sortie EXACTEMENT aux memes dimensions en pixels, au meme cadrage et au meme recadrage ` +
+    `que le bandeau d'entree - ne pas ajouter de marge, recadrer davantage, zoomer, redimensionner ou decaler ` +
+    `l'image d'une quelconque maniere.\n` +
+    `Tout le reste visible dans ce bandeau (fenetres, poutres, barres de rideaux, moulures existantes, texture ` +
+    `du mur, lumiere) doit rester exactement comme dans le bandeau source, inchange, a l'exception de la ` +
+    `corniche ajoutee elle-meme.`;
+
+  if (hasProductRef) {
+    return (
+      `Edit the FIRST image, a cropped band of a room photo.\n` +
+      `${cropContextBlock}\n` +
+      `Add a clearly visible white plaster crown moulding / cornice ${sku} along the entire wall-ceiling junction visible in this band.\n` +
+      `Use the SECOND image as the product reference for the shape and relief of ${sku}.\n` +
+      `${STL_REFERENCE_ONLY_BLOCK}\n` +
+      `It must have approximately ${retombeeCm} cm wall drop and ${avanceeCm} cm ceiling projection, with realistic shadows and molded relief.\n` +
+      `${WINDOW_PRESERVATION_BLOCK}\n` +
+      `${GEOMETRY_PRESERVATION_BLOCK}\n` +
+      `${CORNICE_ATTACHMENT_BLOCK}\n` +
+      `${STRICT_IDENTITY_LOCK_BLOCK}\n` +
+      `${EXISTING_CORNICE_AND_BEAMS_BLOCK}\n` +
+      `${renderQualityBlock}\n` +
+      `The only meaningful change should be the added ${sku} plaster cornice at the wall-ceiling junction.\n` +
+      `If a cornice already exists in this band, add the new profile as a distinct, clearly visible, physically ` +
+      `attached addition anyway - never leave the junction unchanged.\n` +
+      `Return the edited band image, same dimensions.`
+    );
+  }
+  return (
+    `Edit this cropped band of a room photo.\n` +
+    `${cropContextBlock}\n` +
+    `Add a clearly visible white plaster crown moulding / cornice ${sku} along the entire wall-ceiling junction visible in this band.\n` +
+    `It must have approximately ${retombeeCm} cm wall drop and ${avanceeCm} cm ceiling projection, with realistic shadows and molded relief.\n` +
+    `${WINDOW_PRESERVATION_BLOCK}\n` +
+    `${GEOMETRY_PRESERVATION_BLOCK}\n` +
+    `${CORNICE_ATTACHMENT_BLOCK}\n` +
+    `${STRICT_IDENTITY_LOCK_BLOCK}\n` +
+    `${EXISTING_CORNICE_AND_BEAMS_BLOCK}\n` +
+    `${renderQualityBlock}\n` +
+    `The only meaningful change should be the added ${sku} plaster cornice at the wall-ceiling junction.\n` +
+    `If a cornice already exists in this band, add the new profile as a distinct, clearly visible, physically ` +
+    `attached addition anyway - never leave the junction unchanged.\n` +
+    `Return the edited band image, same dimensions.`
+  );
+}
+
 // ---------------------------------------------------------------
 // Helpers quota
 // ---------------------------------------------------------------
@@ -842,29 +1028,63 @@ app.post('/api/ai-render', async (req, res) => {
     const productRef = loadProductReferenceImage(sku);
     const usedProductReference = Boolean(productRef);
 
-    // Le prompt cote serveur est TOUJOURS reconstruit a partir d'un gabarit
-    // FIXE parmi 2 possibles (voir effectiveRenderMode ci-dessus) - jamais
-    // depuis un texte libre client. clientPrompt (si fourni) n'est pas
-    // utilise pour l'appel reel - evite qu'un client injecte un texte
-    // arbitraire vers l'API payante. negativePrompt (si present dans
-    // req.body) est ignore par design (voir en-tete du fichier).
-    const finalPrompt = effectiveRenderMode === 'refine'
-      ? buildRefinePrompt(sku, retombeeCm, avanceeCm)
-      : buildPrompt(sku, retombeeCm, avanceeCm, usedProductReference);
-    void clientPrompt; // explicitement non utilise
-
     const inputBuffer = Buffer.from(imageBase64, 'base64');
     const realMimeType = detectMimeType(inputBuffer, mimeType);
 
-    // Ordre des parts : texte, PUIS FIRST image (room photo), PUIS SECOND
-    // image (reference produit) si disponible - cet ordre correspond
-    // exactement a celui du test manuel valide le 14/09 (moderne.jpg +
-    // control/D609.png, gemini-3.1-flash-image) qui a produit une corniche
-    // visiblement ajoutee, contrairement au mode 1-image qui degenerait en
+    // P27-CROP-ANTI-EXTRAPOLATION - en mode 'add' (photo brute / scene
+    // demo), on n'envoie plus JAMAIS la piece entiere a Gemini : on
+    // extrait uniquement la bande haute (jonction mur/plafond) et c'est
+    // CETTE bande qui devient l'image effectivement transmise. Le mode
+    // 'refine' (scene deja composee par le moteur deterministe cote
+    // client) n'est PAS concerne - il continue a envoyer l'image complete
+    // recue, comportement inchange, voir buildRefinePrompt.
+    const useCropBand = effectiveRenderMode === 'add' && AI_CROP_BAND_MODE;
+
+    let geminiInputBuffer = inputBuffer;
+    let geminiInputMimeType = realMimeType;
+    let cropInfo = null;
+    if (useCropBand) {
+      try {
+        const band = await extractTopBand(inputBuffer, AI_CROP_TOP_FRACTION);
+        geminiInputBuffer = band.buffer;
+        geminiInputMimeType = 'image/jpeg';
+        cropInfo = band;
+      } catch (cropErr) {
+        // Echec technique du crop (image corrompue, etc.) -> on retombe
+        // sur l'ancien comportement (image complete) plutot que de
+        // planter la requete - log explicite pour investigation.
+        console.error(
+          JSON.stringify({ event: 'ai_crop_band_error', requestId, error: String(cropErr?.message || cropErr) }),
+        );
+        cropInfo = null;
+      }
+    }
+
+    // Le prompt cote serveur est TOUJOURS reconstruit a partir d'un gabarit
+    // FIXE parmi 3 possibles - jamais depuis un texte libre client.
+    // clientPrompt (si fourni) n'est pas utilise pour l'appel reel - evite
+    // qu'un client injecte un texte arbitraire vers l'API payante.
+    // negativePrompt (si present dans req.body) est ignore par design
+    // (voir en-tete du fichier).
+    const finalPrompt = effectiveRenderMode === 'refine'
+      ? buildRefinePrompt(sku, retombeeCm, avanceeCm)
+      : (cropInfo
+          ? buildCropAddPrompt(sku, retombeeCm, avanceeCm, usedProductReference)
+          : buildPrompt(sku, retombeeCm, avanceeCm, usedProductReference));
+    void clientPrompt; // explicitement non utilise
+
+    const geminiInputBase64 = cropInfo ? geminiInputBuffer.toString('base64') : imageBase64;
+
+    // Ordre des parts : texte, PUIS FIRST image (room photo ou bandeau
+    // recadre selon le mode), PUIS SECOND image (reference produit) si
+    // disponible - cet ordre correspond exactement a celui du test
+    // manuel valide le 14/09 (moderne.jpg + control/D609.png,
+    // gemini-3.1-flash-image) qui a produit une corniche visiblement
+    // ajoutee, contrairement au mode 1-image qui degenerait en
     // quasi-copie/resize.
     const geminiParts = [
       { text: finalPrompt },
-      { inline_data: { mime_type: realMimeType, data: imageBase64 } },
+      { inline_data: { mime_type: geminiInputMimeType, data: geminiInputBase64 } },
     ];
     if (productRef) {
       geminiParts.push({
@@ -872,8 +1092,14 @@ app.post('/api/ai-render', async (req, res) => {
       });
     }
 
-    // P25-DEBUG-IO - trace disque de l'ENTREE exacte envoyee a Gemini
-    // (voir doc en tete de fichier). N'affecte jamais le flux normal.
+    // P25-DEBUG-IO / P27-CROP-ANTI-EXTRAPOLATION - trace disque de
+    // l'ENTREE exacte envoyee a Gemini (voir doc en tete de fichier).
+    // input_room.<ext> reste TOUJOURS la photo source COMPLETE et
+    // INCHANGEE recue du client (jamais le bandeau) ; si un crop a ete
+    // applique, input_crop_band.jpg contient en plus EXACTEMENT ce qui a
+    // ete transmis a Gemini (le bandeau seul) - permet de prouver que le
+    // reste de la piece n'a jamais quitte le serveur. N'affecte jamais le
+    // flux normal.
     saveDebugRenderInput({
       requestId,
       inputBuffer,
@@ -891,8 +1117,25 @@ app.post('/api/ai-render', async (req, res) => {
         usedProductReference,
         productReferencePath: productRef ? path.relative(path.join(__dirname, '..', '..'), productRef.path) : null,
         model: MODEL,
+        cropBandMode: Boolean(cropInfo),
+        cropTopFraction: cropInfo ? AI_CROP_TOP_FRACTION : null,
+        cropBandWidth: cropInfo ? cropInfo.width : null,
+        cropBandHeight: cropInfo ? cropInfo.height : null,
+        cropSourceWidth: cropInfo ? cropInfo.sourceWidth : null,
+        cropSourceHeight: cropInfo ? cropInfo.sourceHeight : null,
       },
     });
+    if (cropInfo && AI_DEBUG_SAVE_RENDER_IO) {
+      try {
+        const dir = debugRenderIoDir(requestId);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, 'input_crop_band.jpg'), cropInfo.buffer);
+      } catch (dbgErr) {
+        console.error(
+          JSON.stringify({ event: 'ai_debug_save_crop_error', requestId, error: String(dbgErr?.message || dbgErr) }),
+        );
+      }
+    }
 
     const geminiBody = {
       contents: [{
@@ -1015,11 +1258,78 @@ app.post('/api/ai-render', async (req, res) => {
       });
     }
 
+    // P27-CROP-ANTI-EXTRAPOLATION - si un crop a ete applique, le bandeau
+    // RENVOYE PAR GEMINI (outData/outMime) N'EST JAMAIS retourne tel quel
+    // au client : il est d'abord recompose sur l'image SOURCE ORIGINALE
+    // COMPLETE (inputBuffer, jamais modifiee) via [recomposeTopBand].
+    // C'est cette image finale (memes dimensions que la source, tout le
+    // bas de la piece 100% pixel-identique a l'original) qui devient la
+    // reponse - jamais le bandeau seul, jamais une image ou Gemini aurait
+    // pu "completer"/reinventer le bas de la piece.
+    let finalOutData = outData;
+    let finalOutMime = outMime || 'image/jpeg';
+    let recomposeError = null;
+    if (cropInfo) {
+      try {
+        const editedBandBuffer = Buffer.from(outData, 'base64');
+        const recomposedBuffer = await recomposeTopBand({
+          sourceBuffer: inputBuffer,
+          editedBandBuffer,
+          bandWidth: cropInfo.width,
+          bandHeight: cropInfo.height,
+          featherFraction: AI_CROP_FEATHER_FRACTION,
+        });
+        finalOutData = recomposedBuffer.toString('base64');
+        finalOutMime = 'image/jpeg';
+        if (AI_DEBUG_SAVE_RENDER_IO) {
+          try {
+            const dir = debugRenderIoDir(requestId);
+            fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(path.join(dir, 'output_crop_band_raw.jpg'), editedBandBuffer);
+            fs.writeFileSync(path.join(dir, 'output_final_recomposed.jpg'), recomposedBuffer);
+          } catch (dbgErr) {
+            console.error(
+              JSON.stringify({ event: 'ai_debug_save_recompose_error', requestId, error: String(dbgErr?.message || dbgErr) }),
+            );
+          }
+        }
+      } catch (recomposeErr) {
+        // Echec de recomposition (image renvoyee corrompue, etc.) -> on ne
+        // renvoie JAMAIS le bandeau seul par erreur (ce serait une image
+        // incoherente pour le client) : on echoue explicitement plutot
+        // que de degrader silencieusement la garantie anti-extrapolation.
+        recomposeError = String(recomposeErr?.message || recomposeErr);
+        console.error(
+          JSON.stringify({ event: 'ai_crop_recompose_error', requestId, error: recomposeError }),
+        );
+      }
+    }
+
+    if (cropInfo && recomposeError) {
+      saveDebugRenderOutput({
+        requestId,
+        outData: null,
+        outMime: null,
+        extraMeta: { httpStatus: 502, errorMessage: `recompose_failed: ${recomposeError}` },
+      });
+      return res.status(502).json({
+        ok: false,
+        provider: 'gemini',
+        mode: 'real',
+        error: 'Echec de la recomposition du bandeau edite sur l\'image source',
+      });
+    }
+
     saveDebugRenderOutput({
       requestId,
-      outData,
-      outMime,
-      extraMeta: { httpStatus: 200, outputMimeType: outMime, outputBytesLength: Buffer.from(outData, 'base64').length },
+      outData: finalOutData,
+      outMime: finalOutMime,
+      extraMeta: {
+        httpStatus: 200,
+        outputMimeType: finalOutMime,
+        outputBytesLength: Buffer.from(finalOutData, 'base64').length,
+        cropBandMode: Boolean(cropInfo),
+      },
     });
 
     console.log(
@@ -1033,6 +1343,7 @@ app.post('/api/ai-render', async (req, res) => {
         productReferencePath: productRef ? path.relative(path.join(__dirname, '..', '..'), productRef.path) : null,
         model: MODEL,
         status: 200,
+        cropBandMode: Boolean(cropInfo),
         durationMs: Date.now() - startedAt,
         quota: {
           globalCount: quota.globalCount,
@@ -1049,10 +1360,11 @@ app.post('/api/ai-render', async (req, res) => {
       model: MODEL,
       sku,
       renderMode: effectiveRenderMode,
-      imageBase64: outData,
-      mimeType: outMime || 'image/jpeg',
+      imageBase64: finalOutData,
+      mimeType: finalOutMime,
       usedProductReference,
       productReferencePath: productRef ? path.relative(path.join(__dirname, '..', '..'), productRef.path) : null,
+      cropBandMode: Boolean(cropInfo),
     });
 
   } catch (err) {
